@@ -1,0 +1,530 @@
+
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Phone, Lock, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
+import { LanguageSelector } from './LanguageSelector';
+
+export function Auth() {
+  const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [userOtp, setUserOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [showOtpVerification, setShowOtpVerification] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useLanguage();
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhone(value);
+  };
+
+  const isPhoneValid = phone.length === 10;
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        phone: phone,
+        password: password,
+      });
+      if (error) throw error;
+      // Navigate to the 'from' location or default to dashboard
+      const from = location.state?.from || '/dashboard';
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        phone: phone,
+        password: password,
+      });
+      if (error) throw error;
+      // If "Confirm phone" is enabled, user needs OTP. If disabled, they get session immediately.
+      setMessage('Registration successful! If phone verification is on, check for SMS.');
+      setIsLogin(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendWhatsAppOTP = async (phoneNumber: string, otp: string) => {
+    const sid = import.meta.env.VITE_TWILIO_SID;
+    const token = import.meta.env.VITE_TWILIO_TOKEN;
+    const fromNumber = import.meta.env.VITE_TWILIO_WHATSAPP_NUMBER;
+
+    if (!sid || !token || !fromNumber) {
+      throw new Error('Twilio credentials not configured in .env');
+    }
+
+    // Format numbers for Twilio (International format with '+' but NO 'whatsapp:' prefix yet)
+    // The input 'phoneNumber' is usually just the 10 digits.
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    const toFormatted = `whatsapp:+91${cleanPhone}`; // Assuming India (+91)
+    const fromFormatted = `whatsapp:${fromNumber}`;
+
+    try {
+      console.log('Attempting to send Twilio WhatsApp OTP to:', toFormatted);
+
+      // Twilio requires form-url-encoded body
+      const formData = new URLSearchParams();
+      formData.append('To', toFormatted);
+      formData.append('From', fromFormatted);
+      formData.append('Body', `🌿 *AgriSmart AI Verification*\n\nYour OTP for password reset is: *${otp}*\n\nThis OTP is valid for 10 minutes.`);
+
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${btoa(`${sid}:${token}`)}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Twilio API Error:', errorData);
+        throw new Error(errorData.message || `Twilio Error: ${response.status}`);
+      }
+
+      return true;
+    } catch (err) {
+      console.error('WhatsApp Error:', err);
+      throw err;
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      // Generate a random 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(otp);
+
+      // Send via WhatsApp
+      await sendWhatsAppOTP(phone, otp);
+
+      const twilioNumber = import.meta.env.VITE_TWILIO_WHATSAPP_NUMBER;
+      setMessage(`OTP has been sent to your WhatsApp number. (Note: If using Twilio Sandbox, ensure you have messaged "join" to ${twilioNumber} first)`);
+      setShowOtpVerification(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send OTP. Please check your number.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOTP = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userOtp === generatedOtp) {
+      setMessage('OTP Verified successfully! Redirecting to password reset...');
+      setTimeout(() => {
+        navigate('/reset-password');
+      }, 1500);
+    } else {
+      setError('Invalid OTP. Please try again.');
+    }
+  };
+
+  if (isForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 border border-white/50 backdrop-blur-sm">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+              <Lock className="w-8 h-8 text-green-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('auth.forgotPassword')}</h1>
+            <p className="text-gray-600">
+              {showOtpVerification ? t('auth.enterOtp') : t('auth.enterMobile')}
+            </p>
+          </div>
+
+          <form onSubmit={showOtpVerification ? verifyOTP : handleForgotPassword} className="space-y-6">
+            {!showOtpVerification ? (
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('auth.mobileNumber')}
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                  <input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    required
+                    className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition bg-gray-50/50 text-gray-900 placeholder-gray-500"
+                    placeholder="9876543210"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">{phone.length}/10 {t('auth.digitsRequired')}</p>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('auth.verifyOtp')}
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                  <input
+                    id="otp"
+                    type="text"
+                    value={userOtp}
+                    onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    required
+                    maxLength={6}
+                    className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition bg-gray-50/50 text-center text-2xl font-bold tracking-[0.5em] text-gray-900 placeholder-gray-500"
+                    placeholder="000000"
+                  />
+                </div>
+              </div>
+            )}
+
+            {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+              {error}
+            </div>}
+            {message && <div className="p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              {message}
+            </div>}
+
+            <button type="submit" disabled={loading || (!showOtpVerification && !isPhoneValid) || (showOtpVerification && userOtp.length !== 6)} className="w-full bg-green-600 text-white py-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg hover:shadow-green-200/50 disabled:opacity-50 flex justify-center items-center gap-2 active:scale-95 transform">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (showOtpVerification ? t('auth.verifyOtp') : t('auth.sendOtp'))}
+            </button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setShowOtpVerification(false);
+                  setUserOtp('');
+                }}
+                className="text-green-600 hover:text-green-700 font-semibold"
+              >
+                {t('auth.backToLogin')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f0fdf4] flex items-center justify-center p-4 lg:p-8 font-sans overflow-hidden relative">
+      {/* Enhanced Background Decorative Elements */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        {/* Farm Field Patterns */}
+        <div className="absolute top-0 left-0 w-full h-full opacity-[0.03]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 40, 50 50 T 100 50' stroke='%2315803d' fill='none' stroke-width='1'/%3E%3Cpath d='M0 70 Q 25 60, 50 70 T 100 70' stroke='%2315803d' fill='none' stroke-width='1'/%3E%3Cpath d='M0 30 Q 25 20, 50 30 T 100 30' stroke='%2315803d' fill='none' stroke-width='1'/%3E%3C/svg%3E")`,
+          backgroundSize: '200px 200px'
+        }} />
+
+        {/* Scattered Farming Icons (Abstract) */}
+        <div className="absolute top-[10%] left-[5%] w-24 h-24 text-green-200/40 rotate-12">
+          <SproutIcon className="w-full h-full" />
+        </div>
+        <div className="absolute top-[20%] right-[8%] w-32 h-32 text-green-200/30 -rotate-12">
+          <TractorIcon className="w-full h-full" />
+        </div>
+        <div className="absolute bottom-[10%] left-[10%] w-40 h-40 text-green-200/20 rotate-45">
+          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
+          </svg>
+        </div>
+
+        {/* Soft Blobs */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-green-200/40 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-green-100/40 rounded-full blur-[120px]" />
+      </div>
+
+      {/* Back to Home Button */}
+      <div className="absolute top-6 left-6 z-20 flex items-center gap-4">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 text-green-700 hover:text-green-800 transition-colors bg-white/40 hover:bg-white/60 backdrop-blur-md px-4 py-2 rounded-full border border-green-100 shadow-sm"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-bold">{t('auth.backToHome')}</span>
+        </button>
+        <LanguageSelector />
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.12)] w-full max-w-5xl overflow-hidden flex flex-col lg:flex-row min-h-[650px] relative z-10 border border-green-50">
+
+        {/* Left Section: Welcome Card */}
+        <div className="lg:w-1/2 bg-gradient-to-br from-green-600 to-green-700 p-8 lg:p-12 text-white flex flex-col relative overflow-hidden">
+          {/* Subtle pattern overlay */}
+          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
+
+          <div className="mb-auto relative z-10">
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-medium mb-8 border border-white/10">
+              <SproutIcon className="w-4 h-4" />
+              <span>Smart Farming AI</span>
+            </div>
+            <h2 className="text-4xl lg:text-5xl font-extrabold leading-tight mb-6">
+              {t('auth.welcomeBack')}<br />
+              <span className="text-green-200">AgriSmart</span>
+            </h2>
+            <p className="text-green-50 text-lg max-w-md leading-relaxed opacity-90">
+              {t('auth.joinThousands')}
+            </p>
+          </div>
+
+          <div className="mt-8 flex justify-center relative z-10">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-white/20 rounded-full blur-2xl group-hover:bg-white/30 transition-all duration-500 scale-110"></div>
+              <div className="bg-white/10 backdrop-blur-md p-6 rounded-[3rem] border border-white/20 shadow-2xl relative">
+                <div className="w-80 h-80 flex items-center justify-center overflow-hidden">
+                  <img
+                    src="/src/assets/farmer.png"
+                    alt="Friendly Farmer"
+                    className="w-full h-full object-contain transform group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                      // Fallback if image not found
+                      (e.target as HTMLImageElement).src = 'https://illustrations.popsy.co/green/farmer.svg';
+                    }}
+                  />
+                </div>
+                <div className="mt-4 text-center">
+                  <div className="text-sm font-bold uppercase tracking-widest text-green-100">Ready to help</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-auto pt-8 flex items-center gap-4 text-sm font-medium opacity-80 relative z-10">
+            <div className="flex -space-x-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className={`w-8 h-8 rounded-full border-2 border-green-600 bg-green-${200 + i * 100} flex items-center justify-center text-[10px] text-green-800 font-bold`}>
+                  {i}
+                </div>
+              ))}
+            </div>
+            <p>{t('auth.empoweringFarmers')}</p>
+          </div>
+        </div>
+
+        {/* Right Section: Flip Card Container */}
+        <div className="lg:w-1/2 relative perspective-1000 bg-white">
+          <div className={`w-full h-full relative transition-transform duration-1000 preserve-3d ${!isLogin ? 'rotate-y-180' : ''}`}>
+
+            {/* Login Side (Front) */}
+            <div className="absolute inset-0 backface-hidden flex flex-col justify-center p-8 lg:p-16">
+              <div className="max-w-md mx-auto w-full">
+                <div className="mb-10 lg:hidden text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-2xl mb-4">
+                    <SproutIcon className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">AgriSmart AI</h1>
+                  <p className="text-gray-600">Login to manage your farm</p>
+                </div>
+
+                <div className="hidden lg:block mb-10">
+                  <h3 className="text-3xl font-black text-gray-900 mb-2">{t('auth.signIn')}</h3>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-6">
+                  <div className="space-y-2">
+                    <label htmlFor="phone-login" className="text-sm font-bold text-gray-700 ml-1">{t('auth.mobileNumber')}</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <input
+                        id="phone-login"
+                        type="tel"
+                        value={phone}
+                        onChange={handlePhoneChange}
+                        required
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-500"
+                        placeholder="9876543210"
+                      />
+                    </div>
+                    <div className="flex justify-between px-1">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">10 digits required</p>
+                      <p className="text-[10px] text-gray-400 font-bold">{phone.length}/10</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="password-login" className="text-sm font-bold text-gray-700 ml-1">{t('auth.password')}</label>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <input
+                        id="password-login"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-500"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end p-1">
+                    <button type="button" onClick={() => setIsForgotPassword(true)} className="text-sm font-bold text-green-600 hover:text-green-700 transition">{t('auth.forgotPassword')}</button>
+                  </div>
+
+                  {error && <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-medium">{error}</div>}
+
+                  <button type="submit" disabled={loading || !isPhoneValid} className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-700 transition shadow-xl shadow-green-200 active:scale-[0.98] disabled:opacity-50 flex justify-center items-center gap-2 transform">
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>{t('auth.signIn')} <ArrowRight className="w-6 h-6" /></>}
+                  </button>
+                </form>
+
+                <div className="mt-8 text-center">
+                  <button onClick={() => { setIsLogin(false); setError(''); setMessage(''); }} className="text-gray-500 font-bold hover:text-green-600 transition group">
+                    {t('auth.dontHaveAccount')} <span className="text-green-600 group-hover:underline">{t('auth.signUp')}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Signup Side (Back) */}
+            <div className="absolute inset-0 backface-hidden rotate-y-180 flex flex-col justify-center p-8 lg:p-16">
+              <div className="max-w-md mx-auto w-full">
+                <div className="mb-10 lg:hidden text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-2xl mb-4">
+                    <SproutIcon className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+                </div>
+
+                <div className="hidden lg:block mb-10">
+                  <h3 className="text-3xl font-black text-gray-900 mb-2">{t('auth.signUp')}</h3>
+                  <p className="text-gray-500">Start your journey with smart farming today.</p>
+                </div>
+
+                <form onSubmit={handleSignUp} className="space-y-6">
+                  <div className="space-y-2">
+                    <label htmlFor="phone-signup" className="text-sm font-bold text-gray-700 ml-1">{t('auth.mobileNumber')}</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <input
+                        id="phone-signup"
+                        type="tel"
+                        value={phone}
+                        onChange={handlePhoneChange}
+                        required
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-500"
+                        placeholder="9876543210"
+                      />
+                    </div>
+                    <div className="flex justify-between px-1">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{t('auth.digitsRequired')}</p>
+                      <p className="text-[10px] text-gray-400 font-bold">{phone.length}/10</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="password-signup" className="text-sm font-bold text-gray-700 ml-1">{t('auth.password')}</label>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <input
+                        id="password-signup"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
+                  {error && <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-medium">{error}</div>}
+                  {message && <div className="p-4 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-sm font-medium">{message}</div>}
+
+                  <button type="submit" disabled={loading || !isPhoneValid} className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-700 transition shadow-xl shadow-green-200 active:scale-[0.98] disabled:opacity-50 flex justify-center items-center gap-2 transform">
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : t('auth.signUp')}
+                  </button>
+                </form>
+
+                <div className="mt-8 text-center">
+                  <button onClick={() => { setIsLogin(true); setError(''); setMessage(''); }} className="text-gray-500 font-bold hover:text-green-600 transition group">
+                    {t('auth.alreadyHaveAccount')} <span className="text-green-600 group-hover:underline">{t('auth.signIn')}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SproutIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7 20h10" />
+      <path d="M10 20c5.5-2.5.8-6.4 3-10" />
+      <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.2.4-4.8-.3-6.8-6-3.3-7.5-5.5-2.7" />
+      <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 2.6-2.2 4.1-3 4.1-6.6a7.8 7.8 0 0 0-7.3 4Z" />
+    </svg>
+  );
+}
+
+function TractorIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m10 11 11 .9c.6 0 .9.5.8 1.1l-.8 5.4c-.1.5-.6.6-1.1.6H10" />
+      <path d="M10 11V9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2" />
+      <path d="M7 11a1 1 0 0 1 1-1h2v3H8a1 1 0 0 1-1-1Z" />
+      <path d="M5 19V9a2 2 0 0 1 2-2h4v12" />
+      <circle cx="7" cy="15" r="4" />
+      <circle cx="18" cy="15" r="4" />
+    </svg>
+  );
+}

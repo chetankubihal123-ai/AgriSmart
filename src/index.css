@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F9FAFB;
+    @apply text-prodmast-dark font-sans antialiased selection:bg-prodmast-accent selection:text-prodmast-primary overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/40 backdrop-blur-2xl border border-white/40 shadow-xl transition-all duration-500 rounded-[32px];
+  }
+  .glass-card-dark {
+    @apply bg-prodmast-primary/60 backdrop-blur-xl border border-white/10 shadow-2xl transition-all duration-500 rounded-[32px];
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Clean minimal shadow for light cards */
+  .shadow-soft {
+    box-shadow: 0 20px 40px -10px rgba(20, 47, 50, 0.05);
+  }
+  
+  /* Inner borders simulating light */
+  .inner-border {
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+  }
+
+  /* 3D Flip Card Utilities */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}
