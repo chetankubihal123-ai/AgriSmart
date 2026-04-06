@@ -20,6 +20,7 @@ import { Farm } from './lib/types';
 import { LandingPage } from './pages/LandingPage';
 import { RoleSelection } from './pages/RoleSelection';
 import { MarketRates } from './pages/MarketRates';
+import { AdminDashboard } from './components/AdminDashboard';
 
 // Create a context to manage farm state globally for the dashboard routes
 const FarmContext = createContext<{
@@ -167,6 +168,9 @@ function AppContent() {
               <Layout>
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/admin/users" element={<AdminDashboard initialView="users" />} />
+                  <Route path="/admin/orders" element={<AdminDashboard initialView="orders" />} />
+                  <Route path="/admin/analytics" element={<AdminDashboard initialView="dashboard" />} />
                   <Route path="/land-analysis" element={<LandAnalysis />} />
                   <Route path="/crop-health" element={<CropHealthWrapper />} />
                   <Route path="/disease-detection" element={<DiseaseDetectionWrapper />} />

@@ -27,6 +27,9 @@ interface Scheme {
   matchScore: number;
   tags: string[];
   state: string;
+  applicationUrl: string;
+  lastDate: string; // ISO format: YYYY-MM-DD
+  isNew?: boolean;
 }
 
 export function SchemesFinder() {
@@ -49,7 +52,9 @@ export function SchemesFinder() {
       documentRequired: ['Aadhaar Card', 'Land Records', 'Bank Passbook'],
       matchScore: selectedFarm && selectedFarm.area_hectares <= 2 ? 98 : 65,
       tags: ['Income Support', 'Universal'],
-      state: 'All'
+      state: 'All',
+      applicationUrl: 'https://pmkisan.gov.in/',
+      lastDate: '2026-12-31'
     },
     {
       id: 'krishi-bhagya',
@@ -62,7 +67,10 @@ export function SchemesFinder() {
       documentRequired: ['RTC / Pahani', 'Caste Certificate (if applicable)', 'Voter ID'],
       matchScore: 92,
       tags: ['Dry Land', 'Irrigation'],
-      state: 'Karnataka'
+      state: 'Karnataka',
+      applicationUrl: 'https://raitamitra.karnataka.gov.in/info-3/Krishi+Bhagya/kn',
+      lastDate: '2026-05-15',
+      isNew: true
     },
     {
       id: 'pm-fasal-bima',
@@ -75,7 +83,9 @@ export function SchemesFinder() {
       documentRequired: ['Sowing Certificate', 'Land Record', 'Bank Account'],
       matchScore: 88,
       tags: ['Risk Coverage', 'Climate'],
-      state: 'All'
+      state: 'All',
+      applicationUrl: 'https://pmfby.gov.in/',
+      lastDate: '2026-07-31'
     },
     {
       id: 'karnataka-diesel',
@@ -88,7 +98,10 @@ export function SchemesFinder() {
       documentRequired: ['Farmer ID (FRUITS ID)', 'Student ID Card'],
       matchScore: 75,
       tags: ['Education', 'Family Support'],
-      state: 'Karnataka'
+      state: 'Karnataka',
+      applicationUrl: 'https://ssp.postmatric.karnataka.gov.in/',
+      lastDate: '2026-08-15',
+      isNew: true
     },
     {
       id: 'micro-irrigation',
@@ -101,7 +114,24 @@ export function SchemesFinder() {
       documentRequired: ['Soil Test Report', 'Land Map', 'Dealer Quotation'],
       matchScore: selectedFarm ? 94 : 80,
       tags: ['Drip Irrigation', 'Sustainability'],
-      state: 'All'
+      state: 'All',
+      applicationUrl: 'https://pmksy.gov.in/',
+      lastDate: '2026-06-30'
+    },
+    {
+      id: 'expired-test-scheme',
+      name: 'Old Fertilizer Subsidy (Expired)',
+      provider: 'Historical Data',
+      category: 'Fertilizer',
+      eligibility: ['N/A'],
+      benefits: ['N/A'],
+      description: 'This is a test case for an expired scheme that should be hidden.',
+      documentRequired: [],
+      matchScore: 20,
+      tags: ['Legacy'],
+      state: 'All',
+      applicationUrl: '#',
+      lastDate: '2025-12-31'
     }
   ];
 
@@ -109,7 +139,8 @@ export function SchemesFinder() {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          s.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'All' || s.category === filterCategory;
-    return matchesSearch && matchesCategory;
+    const isExpired = new Date(s.lastDate) < new Date();
+    return matchesSearch && matchesCategory && !isExpired;
   }).sort((a, b) => b.matchScore - a.matchScore);
 
   const categories = ['All', 'Financial', 'Water', 'Insurance', 'Technology'];
@@ -128,7 +159,7 @@ export function SchemesFinder() {
             </h1>
           </div>
           <p className="text-indigo-100 text-lg font-medium max-w-2xl mb-8 opacity-80 leading-relaxed">
-            {t('schemes.subtitle')}
+             {t('schemes.subtitle')}
           </p>
 
           <div className="flex flex-col md:flex-row gap-4 max-w-3xl">
@@ -190,11 +221,16 @@ export function SchemesFinder() {
                   </div>
                   <div>
                     <div className="flex gap-2 mb-2">
-                      {scheme.tags.map(tag => (
-                        <span key={tag} className="text-[9px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md">
-                          {tag}
-                        </span>
-                      ))}
+                       {scheme.isNew && (
+                         <span className="text-[9px] font-black uppercase tracking-widest bg-amber-400 text-indigo-900 px-2.5 py-1 rounded-md animate-pulse">
+                           NEW
+                         </span>
+                       )}
+                       {scheme.tags.map(tag => (
+                         <span key={tag} className="text-[9px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 px-2.5 py-1 rounded-md">
+                           {tag}
+                         </span>
+                       ))}
                     </div>
                     <h3 className="text-2xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{scheme.name}</h3>
                     <p className="text-sm font-bold text-gray-400 mt-1">{scheme.provider} • {scheme.state === 'All' ? 'Central' : scheme.state}</p>
@@ -207,9 +243,9 @@ export function SchemesFinder() {
 
                <div className="flex items-center justify-between mt-auto pt-6 border-t border-gray-50">
                   <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
-                    <span className="flex items-center gap-1.5 ">
+                    <span className="flex items-center gap-1.5 text-amber-600 font-bold">
                        <Clock className="w-4 h-4" />
-                       Active Now
+                       Closes: {new Date(scheme.lastDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                     <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
                     <span className="flex items-center gap-1.5">
@@ -246,13 +282,20 @@ export function SchemesFinder() {
 
               <div className="relative z-10">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-10">
-                   <div className="bg-indigo-600 p-4 rounded-3xl shadow-xl shadow-indigo-100">
-                      <Award className="w-10 h-10 text-white" />
-                   </div>
-                   <div>
-                      <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{selectedScheme.name}</h2>
-                      <p className="text-indigo-600 font-bold uppercase tracking-widest text-xs">{selectedScheme.provider}</p>
-                   </div>
+                    <div className="bg-indigo-600 p-4 rounded-3xl shadow-xl shadow-indigo-100 relative">
+                       <Award className="w-10 h-10 text-white" />
+                       {selectedScheme.isNew && (
+                         <span className="absolute -top-2 -right-2 bg-amber-400 text-indigo-900 text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-tighter">New</span>
+                       )}
+                    </div>
+                    <div>
+                       <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{selectedScheme.name}</h2>
+                       <div className="flex items-center gap-3">
+                         <p className="text-indigo-600 font-bold uppercase tracking-widest text-xs">{selectedScheme.provider}</p>
+                         <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                         <p className="text-amber-600 font-black uppercase tracking-widest text-[10px]">Apply by {new Date(selectedScheme.lastDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                       </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -317,7 +360,10 @@ export function SchemesFinder() {
                          <span className="text-slate-900 font-extrabold">12.5k+</span> farmers applied this month
                       </p>
                    </div>
-                   <button className="w-full sm:w-auto bg-slate-900 text-white font-black px-10 py-5 rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 uppercase tracking-widest text-xs italic">
+                   <button 
+                     onClick={() => window.open(selectedScheme.applicationUrl, '_blank')}
+                     className="w-full sm:w-auto bg-slate-900 text-white font-black px-10 py-5 rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 uppercase tracking-widest text-xs italic"
+                   >
                       Start Application Now
                    </button>
                 </div>

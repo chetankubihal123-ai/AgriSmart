@@ -17,7 +17,7 @@ export function DiseaseDetection() {
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [classificationError, setClassificationError] = useState<string | null>(null);
-    const [selectedCrop, setSelectedCrop] = useState<CropType>('tomato');
+    const [selectedCrop] = useState<CropType>('tomato');
     const imageRef = useRef<HTMLImageElement>(null);
 
     const { model, modelLoading, classifyImage, isCustomModelLoaded, initializeModels } = useImageClassifier();
@@ -99,7 +99,6 @@ export function DiseaseDetection() {
                 });
             } else {
                 // Fallback to Simulated Disease Analysis
-                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 const diseases: AnalysisResult[] = [
                     {
@@ -179,29 +178,8 @@ export function DiseaseDetection() {
                         <p className="text-slate-600 font-medium">{t('disease.subtitle')}</p>
                     </div>
 
-                    <div className="flex bg-gray-100 p-1 rounded-lg self-start md:self-auto">
-                        {(['tomato', 'corn', 'chilli'] as CropType[]).map((crop) => (
-                            <button
-                                key={crop}
-                                onClick={() => setSelectedCrop(crop)}
-                                className={`px-4 py-2 rounded-md text-sm font-bold uppercase tracking-wide transition-all ${
-                                    selectedCrop === crop
-                                        ? 'bg-white text-prodmast-primary shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                {crop}
-                            </button>
-                        ))}
-                    </div>
                 </div>
 
-                {modelLoading && (
-                    <div className="bg-blue-50 text-blue-700 p-3 rounded-lg mb-4 flex items-center gap-2 text-sm">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {t('disease.loadingModels')}
-                    </div>
-                )}
 
                 {classificationError && (
                     <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-2 border border-red-200">
@@ -242,7 +220,7 @@ export function DiseaseDetection() {
                             />
                             <label
                                 htmlFor="disease-camera"
-                                className={`flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition cursor-pointer shadow-md active:scale-95 transform ${modelLoading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                                className={`flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition cursor-pointer shadow-md active:scale-95 transform`}
                             >
                                 <Camera className="w-5 h-5" />
                                 {t('disease.capture')}
@@ -257,7 +235,7 @@ export function DiseaseDetection() {
                             />
                             <label
                                 htmlFor="disease-upload"
-                                className={`flex items-center justify-center gap-2 bg-slate-100 text-slate-900 border border-slate-200 px-6 py-3 rounded-lg font-bold hover:bg-slate-200 transition cursor-pointer shadow-sm active:scale-95 transform ${modelLoading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                                className={`flex items-center justify-center gap-2 bg-slate-100 text-slate-900 border border-slate-200 px-6 py-3 rounded-lg font-bold hover:bg-slate-200 transition cursor-pointer shadow-sm active:scale-95 transform`}
                             >
                                 <Upload className="w-5 h-5" />
                                 {t('disease.upload')}

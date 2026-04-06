@@ -1,11 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { CropData, Prediction } from '../lib/types';
 import {
-  Sprout,
-  Bug,
-  Leaf,
-  CloudRain,
   Activity,
   ArrowRight,
   Filter,
@@ -21,12 +17,14 @@ import {
   LineChart,
   ShoppingBag,
   Landmark,
-  Calculator
+  Calculator,
+  Leaf,
+  Bug,
+  CloudRain
 } from 'lucide-react';
 import { useFarm } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { YieldChart, CropDistributionChart, HealthTrendChart, SoilRadarChart } from './DashboardCharts';
 import { DiseaseScanner } from './DiseaseScanner';
 import { useAuth } from '../contexts/AuthContext';
 import { AdminDashboard } from './AdminDashboard';
@@ -60,7 +58,7 @@ export function Dashboard() {
           flash: change > 0 ? 'up' : 'down'
         };
       }));
-    }, 12000); // Throttled from 5s to 12s for performance improvement
+    }, 12000);
     return () => clearInterval(ticker);
   }, []);
 
@@ -91,58 +89,6 @@ export function Dashboard() {
     if (code >= 51) return <CloudRain className="w-5 h-5 text-indigo-300" />;
     return <Cloud className="w-5 h-5 text-gray-300" />;
   };
-
-  // Derived Data for Live Charts
-  const { soilData, healthTrendData, distributionData, yieldData } = useMemo(() => {
-    if (!recentData || recentData.length === 0) {
-      return {
-        yieldData: [],
-        distributionData: [],
-        healthTrendData: [],
-        soilData: []
-      };
-    }
-
-    const latest = recentData[0];
-    const chronological = [...recentData].reverse();
-
-    const soilData = [
-      { subject: 'Nitrogen', A: latest.nitrogen || 0 },
-      { subject: 'Phosphorus', A: latest.phosphorus || 0 },
-      { subject: 'Potassium', A: latest.potassium || 0 },
-      { subject: 'pH Level', A: latest.ph_level ? (latest.ph_level / 14) * 100 : 0 },
-      { subject: 'Moisture', A: latest.soil_moisture || 0 },
-    ];
-
-    const healthTrendData = chronological.map(d => {
-      const date = new Date(d.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      let health = 95;
-      if (d.prediction) {
-        if (d.prediction.health_status === 'Warning') health = 70;
-        if (d.prediction.health_status === 'Critical' || d.prediction.health_status === 'Disease') health = 40;
-        health = Math.round(health * (d.prediction.health_confidence / 100));
-      }
-      return { date, health };
-    });
-
-    const cropCounts = recentData.reduce((acc, curr) => {
-      acc[curr.crop_type] = (acc[curr.crop_type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const distributionData = Object.keys(cropCounts).map(key => ({
-      name: key, value: cropCounts[key]
-    }));
-
-    const yieldData = chronological.map((d, index) => {
-      const name = new Date(d.recorded_at).toLocaleDateString('en-US', { month: 'short' });
-      const expected = d.prediction?.yield_estimate || 0;
-      const isFuture = index >= chronological.length - 2;
-      const actual = isFuture ? null : Math.round(expected * (0.85 + Math.random() * 0.25));
-      return { name, expected: Math.round(expected), actual };
-    });
-
-    return { soilData, healthTrendData, distributionData, yieldData };
-  }, [recentData]);
 
   useEffect(() => {
     if (selectedFarm) {
@@ -193,7 +139,7 @@ export function Dashboard() {
       path: "/schemes",
       iconColor: "text-indigo-600",
       bgHover: "group-hover:bg-indigo-50",
-      image: "https://images.unsplash.com/photo-1590282424163-952328574169?auto=format&fit=crop&q=80&w=800",
+      image: "https://images.unsplash.com/photo-1492496913980-501348b61469?auto=format&fit=crop&q=80&w=1200",
       stats: [
         { label: "Matches", value: "8 Active" },
         { label: "State", value: "Karnataka" },
@@ -462,17 +408,6 @@ export function Dashboard() {
             </div>
           </div>
         </div>
-
-        <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 mb-6 px-2 uppercase tracking-wide">
-          <Activity className="w-6 h-6 text-prodmast-primary" />
-          {t('dashboard.analyticsDashboard')}
-        </h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          <YieldChart data={yieldData} />
-          <CropDistributionChart data={distributionData} />
-          <HealthTrendChart data={healthTrendData} />
-          <SoilRadarChart data={soilData} />
-        </div>
       </div>
 
       <div className="pt-6">
@@ -488,9 +423,9 @@ export function Dashboard() {
               <div
                 key={idx}
                 onClick={() => navigate(card.path)}
-                className={`group cursor-pointer bg-white rounded-[32px] border border-gray-200 shadow-sm hover:shadow-2xl hover:border-prodmast-primary/50 transition-all duration-500 overflow-hidden flex flex-col md:flex-row ${isReverse ? 'md:flex-row-reverse' : ''}`}
+                className={`group cursor-pointer bg-white rounded-[32px] border border-gray-200 shadow-sm hover:shadow-2xl hover:border-prodmast-primary/50 transition-all duration-500 overflow-hidden flex flex-col md:flex-row max-h-fit md:max-h-[380px] ${isReverse ? 'md:flex-row-reverse' : ''}`}
               >
-                <div className="md:w-1/2 h-64 md:h-auto relative overflow-hidden">
+                <div className="md:w-[40%] h-56 md:h-auto relative overflow-hidden">
                   <img
                     src={card.image}
                     alt={card.title}
@@ -507,7 +442,7 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                <div className="md:w-1/2 p-10 lg:p-14 flex flex-col justify-center relative bg-white z-10">
+                <div className="md:w-[60%] p-8 lg:p-10 flex flex-col justify-center relative bg-white z-10">
                   <div className={`w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-8 border border-gray-100 transition-all duration-500 ${card.bgHover} group-hover:shadow-inner transform group-hover:-translate-y-2`}>
                     <div className={`${card.iconColor}`}>{card.icon}</div>
                   </div>
@@ -534,18 +469,9 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <StatCard title={t('dashboard.totalArea')} value={selectedFarm ? `${selectedFarm.area_hectares} ha` : '4.5 ha'} icon={<Sprout className="w-5 h-5" />} trend="+2.4%" trendUp={true} />
-        <StatCard title="Est. ROI" value="28.4%" icon={<Calculator className="w-5 h-5 text-indigo-500" />} trend="+4.2% vs AVG" trendUp={true} />
-        <StatCard title={t('dashboard.estYield')} value="450 Tons" icon={<TrendingUp className="w-5 h-5 text-blue-500" />} trend="+12% vs LY" trendUp={true} />
-        <StatCard title={t('dashboard.avgHealth')} value="92%" icon={<Activity className="w-5 h-5 text-green-500" />} trend={t('dashboard.excellent')} trendUp={true} />
-      </div>
-
       {selectedFarm && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-
           <DiseaseScanner />
-
           <div className="bg-white border border-gray-200 rounded-[32px] p-8 shadow-sm">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-sans font-bold text-prodmast-dark flex items-center gap-3 tracking-tight">
@@ -611,28 +537,6 @@ export function Dashboard() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon, trend, trendUp }: { title: string; value: string; icon: React.ReactNode, trend?: string, trendUp?: boolean }) {
-  return (
-    <div className="bg-white rounded-[24px] border border-gray-200 shadow-sm p-6 flex flex-col relative hover:border-prodmast-primary/30 transition-all duration-300 group">
-      <div className="flex items-center justify-between mb-6 relative z-10">
-        <span className="text-sm font-bold text-prodmast-muted uppercase tracking-wider">{title}</span>
-        <div className={`p-3 rounded-xl bg-gray-50 border border-gray-100 text-prodmast-primary group-hover:bg-prodmast-primary/10 group-hover:border-prodmast-primary/20 transition-all duration-300`}>
-          {icon}
-        </div>
-      </div>
-      <div className="relative z-10 mt-auto">
-        <p className="text-3xl md:text-4xl font-sans font-extrabold text-prodmast-dark mb-4 tracking-tight">{value}</p>
-        {trend && (
-          <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-md ${trendUp ? 'text-green-700 bg-green-50 border border-green-200' : 'text-red-700 bg-red-50 border border-red-200'}`}>
-            {trendUp ? <TrendingUp className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-            {trend}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

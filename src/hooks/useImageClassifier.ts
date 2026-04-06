@@ -25,13 +25,13 @@ export function useImageClassifier() {
         corn: null,
         chilli: null
     });
-    const [modelLoading, setModelLoading] = useState(true);
+    const [modelLoading, setModelLoading] = useState(false);
     const [modelError, setModelError] = useState<string | null>(null);
 
     const [isInitialized, setIsInitialized] = useState(false);
 
     const initializeModels = async () => {
-        if (isInitialized || !modelLoading) return;
+        if (isInitialized || modelLoading) return;
         
         try {
             setModelLoading(true);
@@ -100,7 +100,6 @@ export function useImageClassifier() {
             ];
 
             const topPredictions = predictions.slice(0, 3);
-
             const isArtificial = topPredictions.some(p =>
                 artificialKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
@@ -109,16 +108,28 @@ export function useImageClassifier() {
                 plantKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
 
-            // 2. Custom Model Check for the specific crop
+            // 2. Custom Model Auto-Check
             let customPredictions: { className: string; probability: number }[] | undefined;
+            
+            // Auto-detect which custom model to run based on MobileNet results
+            let activeCrop: CropType | null = null;
+            if (isPlant) {
+                const searchStr = topPredictions.map(p => p.className.toLowerCase()).join(' ');
+                if (searchStr.includes('tomato')) activeCrop = 'tomato';
+                else if (searchStr.includes('corn') || searchStr.includes('maize')) activeCrop = 'corn';
+                else if (searchStr.includes('chilli') || searchStr.includes('pepper')) activeCrop = 'chilli';
+            }
 
-            const targetModel = customModels[selectedCrop];
+            // Default to selectedCrop if we can't find a better match, but prioritizing detected crop
+            const finalCrop = activeCrop || selectedCrop;
+            const targetModel = customModels[finalCrop];
+
             if (targetModel && isPlant) {
                 try {
                     customPredictions = await targetModel.predict(imageElement);
                     customPredictions.sort((a, b) => b.probability - a.probability);
                 } catch (e) {
-                    console.error(`${selectedCrop} model prediction failed`, e);
+                    console.error(`${finalCrop} model prediction failed`, e);
                 }
             }
 
