@@ -46,7 +46,10 @@ function FarmProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadFarms = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('farms')
@@ -91,10 +94,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/" />;
+    return <Navigate to="/auth" />;
   }
 
-  return <FarmProvider>{children}</FarmProvider>;
+  return <>{children}</>;
 }
 
 function RoleProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -163,25 +166,23 @@ function AppContent() {
       <Route
         path="/*"
         element={
-          <PrivateRoute>
-             <RoleProtectedRoute>
-              <Layout>
+          <FarmProvider>
+             <Layout>
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/admin/users" element={<AdminDashboard initialView="users" />} />
-                  <Route path="/admin/orders" element={<AdminDashboard initialView="orders" />} />
-                  <Route path="/admin/analytics" element={<AdminDashboard initialView="dashboard" />} />
+                  <Route path="/admin/users" element={<PrivateRoute><RoleProtectedRoute><AdminDashboard initialView="users" /></RoleProtectedRoute></PrivateRoute>} />
+                  <Route path="/admin/orders" element={<PrivateRoute><RoleProtectedRoute><AdminDashboard initialView="orders" /></RoleProtectedRoute></PrivateRoute>} />
+                  <Route path="/admin/analytics" element={<PrivateRoute><RoleProtectedRoute><AdminDashboard initialView="dashboard" /></RoleProtectedRoute></PrivateRoute>} />
                   <Route path="/land-analysis" element={<LandAnalysis />} />
                   <Route path="/crop-health" element={<CropHealthWrapper />} />
                   <Route path="/disease-detection" element={<DiseaseDetectionWrapper />} />
                   <Route path="/weather" element={<WeatherImpactWrapper />} />
-                  <Route path="/shop" element={<Shop />} />
+                  <Route path="/shop" element={<PrivateRoute><RoleProtectedRoute><Shop /></RoleProtectedRoute></PrivateRoute>} />
                   <Route path="/market-rates" element={<MarketRates />} />
                   <Route path="/schemes" element={<SchemesFinder />} />
                 </Routes>
-              </Layout>
-             </RoleProtectedRoute>
-          </PrivateRoute>
+             </Layout>
+          </FarmProvider>
         }
       />
     </Routes>

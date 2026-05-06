@@ -70,11 +70,7 @@ export function LandingPage() {
     }, []);
 
     const handleGetStarted = () => {
-        if (user) {
-            navigate('/dashboard');
-        } else {
-            navigate('/auth?mode=signup');
-        }
+        navigate('/dashboard');
     };
 
     return (
@@ -176,55 +172,7 @@ export function LandingPage() {
                     </button>
                 </motion.div>
 
-                {/* Hero Dashboard Preview */}
-                <motion.div
-                    initial={{ opacity: 0, y: 100 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-100px" }}
-                    transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
-                    className="mt-20 w-full max-w-4xl rounded-[32px] bg-white/50 backdrop-blur-sm border border-white/60 p-4 shadow-xl"
-                >
-                    <div className="rounded-[24px] bg-white w-full aspect-[2/1] sm:aspect-[2.5/1] overflow-hidden relative flex flex-col md:flex-row p-6 gap-6 justify-center items-center">
 
-                        {/* Expanded Yield Projection Box */}
-                        <div className="bg-prodmast-primary p-8 rounded-[24px] shadow-sm w-full border border-prodmast-primary flex flex-col relative overflow-hidden h-full">
-                            <div className="absolute -right-20 -top-20 w-64 h-64 bg-prodmast-accent/15 rounded-full blur-3xl"></div>
-                            <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-green-500/10 rounded-full blur-2xl"></div>
-
-                            <div className="z-10 flex justify-between items-center mb-6">
-                                <div>
-                                    <h3 className="text-white text-xl font-bold tracking-wide">Live insights from Crop, climate & disease detection models</h3>
-                                    <p className="text-white/60 text-sm mt-1">Based on current soil moisture and 7-day forecast</p>
-                                </div>
-                                <span className="bg-prodmast-accent text-prodmast-primary text-sm font-bold px-3 py-1.5 rounded-full shadow-sm">Overview</span>
-                            </div>
-
-                            <div className="z-10 grid grid-cols-3 gap-6 mb-auto mt-4">
-                                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                    <div className="text-white/50 text-xs uppercase tracking-wider font-semibold mb-1">Expected Harvest</div>
-                                    <div className="text-white font-bold text-2xl">4,200 Tons</div>
-                                </div>
-                                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                    <div className="text-white/50 text-xs uppercase tracking-wider font-semibold mb-1">Plant Health Score</div>
-                                    <div className="text-white font-bold text-2xl">94 / 100</div>
-                                </div>
-                                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                    <div className="text-white/50 text-xs uppercase tracking-wider font-semibold mb-1">Est. Revenue</div>
-                                    <div className="text-white font-bold text-2xl">$125,000</div>
-                                </div>
-                            </div>
-
-                            <div className="z-10 mt-8 flex items-end gap-4 h-28 w-full">
-                                {/* Bar chart mock */}
-                                {[40, 60, 45, 80, 55, 90, 75, 85, 95].map((h, i) => (
-                                    <div key={i} className="flex-1 bg-white/10 rounded-t-md hover:bg-white/20 transition-colors" style={{ height: `${h}%` }}>
-                                        {i === 7 && <div className="w-full h-full bg-prodmast-accent rounded-t-md shadow-[0_0_15px_rgba(227,255,204,0.4)]"></div>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
             </section>
 
             {/* Features / Services Section (Dark) */}

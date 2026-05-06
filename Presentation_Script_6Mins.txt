@@ -1,0 +1,77 @@
+=============================================================================
+AGRISMART: 6-MINUTE PRESENTATION SCRIPT
+Speaker: Chetan
+Timing target: Exactly 6 Minutes
+Total Slides: 6
+=============================================================================
+
+[SLIDE 1: TITLE SLIDE] 
+Title: AgriSmart - AI-Driven Ecosystem for Precision Agriculture
+Time: 45 Seconds
+
+SCRIPT:
+"Good morning respected judges, teachers, and my fellow friends. Myself Chetan, and today I am very excited to present my project titled 'AgriSmart'. 
+
+If you look around, agriculture is the foundation of our economy, but it is still running on very old, traditional methods. Farmers rely heavily on guesswork. With my project, I wanted to change that. I wanted to put an advanced 'Digital Farm Copilot' directly into the hands of farmers to help them make data-driven, smart decisions. Let me take you through how AgriSmart solves some of the biggest problems in farming today."
+
+
+[SLIDE 2: THE PROBLEM STATEMENT]
+Title: Challenges in Modern Farming
+Time: 1 Minute
+
+SCRIPT:
+"Moving to the problem statement... Why do we need AgriSmart? 
+Today, farmers face three major challenges:
+First, unpredictable weather and changing micro-climates ruin entire harvest cycles. 
+Second, crop diseases spread rapidly. By the time a farmer realizes a plant is sick, the disease has usually destroyed a large part of the crop. 
+And third, financial struggles. There are many government schemes and subsidies available, but our farmers either don't know about them, or find it too difficult to search for them. The gap between what is available and what reaches the farmer is huge."
+
+
+[SLIDE 3: OUR SOLUTION & TECHNOLOGY]
+Title: Introducing AgriSmart & The Tech Stack
+Time: 1 Minute
+
+SCRIPT:
+"To solve this, I built AgriSmart. It is a complete digital ecosystem for precision agriculture.
+
+Before I explain the features, let me briefly tell you the technology behind it. I have used a modern web stack to ensure it is extremely fast and scalable. The frontend is built using React and TypeScript for a premium, smooth user interface. For the backend and database, I used Supabase. But the most exciting part is the AI Engine. I integrated TensorFlow.js, which allows machine learning models to run directly in the browser on the user's device, making it super fast even on low internet speeds usually found in rural areas."
+
+
+[SLIDE 4: THE CORE MODULES (THE MAGIC)]
+Title: Core Features & AI Tools
+Time: 2 Minutes 
+
+SCRIPT:
+"Now, let's talk about the main features, which is the heart of AgriSmart. 
+
+Number one is the 'AI Disease Scanner'. A farmer can just take a photo of a sick plant leaf using our app. Our TensorFlow engine acts as an AI Doctor—it scans the leaf through an interactive dashboard, identifies the exact disease, and instantly recommends the cure. No waiting for days!
+
+Number two: We have an 'Interactive Weather and Land Analyzer' that uses live maps to show humidity and temperature gradients, telling the farmer exactly when to sow and harvest.
+
+Number three is the 'Yield Predictor'. By inputting simple land data, we predict the harvest amount and show live market rate charts, helping farmers know the best time to sell for maximum profit.
+
+And finally, the 'Smart Schemes Finder'. It works like a specialized search engine that matches specific farmers to government subsidies they are eligible for, directly improving their financial state. We also have a 'Farm Copilot Chatbot' to guide them 24/7."
+
+
+[SLIDE 5: IMPACT & BUSINESS VALUE]
+Title: Socio-Economic Impact
+Time: 45 Seconds
+
+SCRIPT:
+"So, what is the actual impact of AgriSmart? 
+By using our platform, farmers are no longer guessing—they are calculating. Early disease detection acts like a digital insurance policy, preventing massive crop failures before they happen. Our yield predictors and market charts directly increase their profit margins. Ultimately, AgriSmart brings marginalized farming communities straight into the digital economy."
+
+
+[SLIDE 6: CONCLUSION]
+Title: Conclusion & Future Scope
+Time: 30 Seconds
+
+SCRIPT:
+"To conclude, AgriSmart is not just an application; it is a step towards modernizing how we view agriculture. In the future, I plan to integrate IoT sensors directly from the soil and perhaps drone imagery to make this data even more accurate. 
+
+Thank you so much for your time and patience. I would now be happy to answer any questions you might have."
+
+=============================================================================
+END OF SCRIPT
+Total Time: ~6 Minutes (if spoken at a normal, clear pace)
+=============================================================================

@@ -35,10 +35,15 @@ export function useImageClassifier() {
         
         try {
             setModelLoading(true);
+            setModelError(null);
+            console.log("Initializing AI models...");
             await tf.ready();
             
             // Load base MobileNet
-            const loadedModel = await mobilenet.load();
+            const loadedModel = await mobilenet.load({
+                version: 2,
+                alpha: 1.0
+            });
             setModel(loadedModel);
 
             // Load all custom TM models in parallel
@@ -48,7 +53,7 @@ export function useImageClassifier() {
                     const metadataURL = url + "metadata.json";
                     return { key, tmModel: await tmImage.load(modelURL, metadataURL) };
                 } catch (e) {
-                    console.error(`Failed to load ${key} model`, e);
+                    console.warn(`Failed to load ${key} custom model`, e);
                     return { key, tmModel: null };
                 }
             };
@@ -67,8 +72,9 @@ export function useImageClassifier() {
             setCustomModels(newCustomModels);
             setIsInitialized(true);
             setModelLoading(false);
+            console.log("AI models initialized successfully.");
         } catch (err) {
-            console.error("Failed to load models", err);
+            console.error("Failed to load models:", err);
             setModelError("Failed to load AI model. Please check your internet connection.");
             setModelLoading(false);
         }
@@ -89,9 +95,10 @@ export function useImageClassifier() {
 
             const plantKeywords = [
                 'plant', 'tree', 'flower', 'vegetable', 'fruit', 'leaf', 'grass', 'agriculture', 'farm', 'crop',
-                'wheat', 'corn', 'rice', 'potato', 'tomato', 'broccoli', 'cabbage', 'carrot',
+                'wheat', 'corn', 'rice', 'potato', 'tomato', 'broccoli', 'cabbage', 'carrot', 'pepper', 'chilli', 'capsicum',
                 'garden', 'field', 'greenhouse', 'pot', 'vase', 'produce', 'food', 'grain', 'seed', 'bush', 'shrub', 'herb',
-                'ear', 'spike', 'head', 'maize', 'fodder', 'hay', 'rapeseed', 'daisy', 'buckeye', 'coral fungus', 'agaric', 'mushroom'
+                'ear', 'spike', 'head', 'maize', 'fodder', 'hay', 'rapeseed', 'daisy', 'buckeye', 'coral fungus', 'agaric', 'mushroom',
+                'cardoon', 'thistle', 'vine', 'weed'
             ];
 
             const artificialKeywords = [
@@ -108,28 +115,17 @@ export function useImageClassifier() {
                 plantKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
 
-            // 2. Custom Model Auto-Check
+            // 2. Custom Model Check - Use the selected crop model for maximum accuracy
             let customPredictions: { className: string; probability: number }[] | undefined;
             
-            // Auto-detect which custom model to run based on MobileNet results
-            let activeCrop: CropType | null = null;
-            if (isPlant) {
-                const searchStr = topPredictions.map(p => p.className.toLowerCase()).join(' ');
-                if (searchStr.includes('tomato')) activeCrop = 'tomato';
-                else if (searchStr.includes('corn') || searchStr.includes('maize')) activeCrop = 'corn';
-                else if (searchStr.includes('chilli') || searchStr.includes('pepper')) activeCrop = 'chilli';
-            }
+            const targetModel = customModels[selectedCrop];
 
-            // Default to selectedCrop if we can't find a better match, but prioritizing detected crop
-            const finalCrop = activeCrop || selectedCrop;
-            const targetModel = customModels[finalCrop];
-
-            if (targetModel && isPlant) {
+            if (targetModel) {
                 try {
                     customPredictions = await targetModel.predict(imageElement);
                     customPredictions.sort((a, b) => b.probability - a.probability);
                 } catch (e) {
-                    console.error(`${finalCrop} model prediction failed`, e);
+                    console.error(`${selectedCrop} model prediction failed`, e);
                 }
             }
 

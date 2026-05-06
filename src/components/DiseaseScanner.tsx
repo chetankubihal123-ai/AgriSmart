@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { UploadCloud, CheckCircle, AlertTriangle, Loader2, Play } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { UploadCloud, CheckCircle, AlertTriangle, Loader2, Play, Scan } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function DiseaseScanner() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -8,8 +9,31 @@ export function DiseaseScanner() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ disease: string; confidence: number; raw_class: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [displayConfidence, setDisplayConfidence] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useLanguage();
+
+  useEffect(() => {
+    if (result) {
+      let start = 0;
+      const target = result.confidence;
+      const duration = 1500;
+      const increment = target / (duration / 16);
+      
+      const interval = setInterval(() => {
+        start += increment;
+        if (start >= target) {
+          setDisplayConfidence(target);
+          clearInterval(interval);
+        } else {
+          setDisplayConfidence(start);
+        }
+      }, 16);
+      return () => clearInterval(interval);
+    } else {
+      setDisplayConfidence(0);
+    }
+  }, [result]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -19,6 +43,7 @@ export function DiseaseScanner() {
       setPreviewUrl(url);
       setResult(null);
       setError(null);
+      setDisplayConfidence(0);
     }
   };
 
@@ -105,31 +130,51 @@ export function DiseaseScanner() {
               />
             </div>
           ) : (
-            <div className="flex-1 rounded-2xl overflow-hidden relative border border-white/10 bg-black/40 min-h-[250px] flex items-center justify-center">
-              <img src={previewUrl} alt="Preview" className="max-h-[300px] object-contain" />
+            <div className="flex-1 rounded-2xl overflow-hidden relative border border-white/10 bg-black/40 min-h-[250px] flex items-center justify-center p-4">
+              {/* HUD Reticles */}
+              <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-prodmast-accent opacity-60"></div>
+              <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-prodmast-accent opacity-60"></div>
+              <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-prodmast-accent opacity-60"></div>
+              <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-prodmast-accent opacity-60"></div>
+
+              <img src={previewUrl} alt="Preview" className="max-h-[300px] object-cover relative z-0" />
               
               {!loading && !result && (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center flex-col gap-4">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center flex-col gap-4 z-10">
                   <button 
                     onClick={scanImage}
-                    className="flex items-center gap-2 px-6 py-3 bg-prodmast-accent hover:bg-prodmast-accent/90 text-prodmast-dark rounded-xl font-bold uppercase tracking-wider transition-transform hover:scale-105"
+                    className="flex items-center gap-2 px-6 py-3 bg-prodmast-accent hover:bg-prodmast-accent/90 text-prodmast-dark rounded-xl font-bold uppercase tracking-wider transition-transform hover:scale-105 shadow-[0_0_20px_rgba(163,230,53,0.4)]"
                   >
-                    <Play className="w-5 h-5" fill="currentColor" /> Run AI Scan
+                    <Play className="w-5 h-5" fill="currentColor" /> INITIATE SCAN
                   </button>
                   <button 
                     onClick={clearSelection}
-                    className="text-xs text-white/70 hover:text-white underline underline-offset-4 font-medium uppercase tracking-widest"
+                    className="text-xs text-white/70 hover:text-white font-medium uppercase tracking-widest border border-transparent hover:border-white/30 px-4 py-2 rounded-lg transition-all"
                   >
-                    Use Different Image
+                    ABORT / CHANGE IMAGE
                   </button>
                 </div>
               )}
               
               {loading && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center">
-                  <Loader2 className="w-12 h-12 text-prodmast-accent animate-spin mb-4 shadow-[0_0_15px_rgba(163,230,53,0.5)] rounded-full" />
-                  <p className="text-prodmast-accent font-bold uppercase tracking-[0.2em] animate-pulse text-sm">Analyzing Crop DNA...</p>
-                </div>
+                <>
+                  <div className="absolute inset-0 bg-prodmast-dark/70 backdrop-blur-sm z-10 transition-all duration-300"></div>
+                  
+                  {/* Laser Sweeper */}
+                  <motion.div 
+                    initial={{ top: '0%', opacity: 0 }}
+                    animate={{ top: ['0%', '98%', '0%'], opacity: [0, 1, 1, 1, 0] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                    className="absolute w-full h-[3px] bg-prodmast-accent shadow-[0_0_30px_#a3e635] z-20 left-0 right-0"
+                  ></motion.div>
+                  
+                  <div className="absolute z-30 inset-0 flex flex-col items-center justify-center">
+                    <Scan className="w-16 h-16 text-prodmast-accent animate-pulse mb-6 opacity-90 shadow-prodmast-accent drop-shadow-[0_0_15px_rgba(163,230,53,0.8)]" />
+                    <div className="px-6 py-2 border border-prodmast-accent/50 bg-black/50 backdrop-blur-md rounded-full font-mono text-prodmast-accent font-bold tracking-[0.4em] text-xs shadow-inner">
+                      ANALYZING BIO-DATA...
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -174,13 +219,15 @@ export function DiseaseScanner() {
                 <div className="space-y-6">
                   <div>
                     <div className="flex justify-between mb-2">
-                      <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">AI Confidence</span>
-                      <span className="text-xs text-white font-bold">{result.confidence.toFixed(1)}%</span>
+                      <span className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Scan className="w-3 h-3" /> AI Confidence Match
+                      </span>
+                      <span className="text-xs text-white font-mono font-bold tracking-wider">{displayConfidence.toFixed(1)}%</span>
                     </div>
-                    <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
                       <div 
-                        className={`h-full rounded-full transition-all duration-1000 ease-out ${isHealthy ? 'bg-green-500 shadow-[0_0_10px_#4ade80]' : 'bg-red-500 shadow-[0_0_10px_#f87171]'}`}
-                        style={{ width: `${result.confidence}%` }}
+                        className={`h-full rounded-full transition-all duration-75 ease-linear ${isHealthy ? 'bg-green-500 shadow-[0_0_15px_#4ade80]' : 'bg-red-500 shadow-[0_0_15px_#f87171]'}`}
+                        style={{ width: `${displayConfidence}%` }}
                       ></div>
                     </div>
                   </div>

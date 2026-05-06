@@ -121,42 +121,60 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
         }, 1000 + Math.random() * 1000);
     };
 
+    // Copilot Action
+    const triggerSummarize = () => {
+        setMessages(prev => [...prev, { id: Date.now().toString(), text: "Please summarize the farm dashboard.", sender: 'user', timestamp: new Date() }]);
+        setIsTyping(true);
+        setTimeout(() => {
+            const summary = "Here is your Farm Summary: \n1. Primary Location: Karnataka \n2. Live Market: Chilli is up (+4.2%), while Tomato is down. \n3. Alerts: High risk of Leaf Blight detected in Sector 4. \n4. Overall ROI is tracking at 28.4%. \nWould you like me to deploy treatments?";
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: summary, sender: 'ai', timestamp: new Date() }]);
+            setIsTyping(false);
+            speak(summary);
+        }, 1500);
+    };
+
     if (!isOpen) {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 bg-green-600 text-white p-4 rounded-full shadow-lg hover:bg-green-700 transition-all z-50 flex items-center gap-2 hover:scale-110 active:scale-95"
+                className="fixed bottom-6 right-6 bg-prodmast-dark/80 backdrop-blur-xl border border-prodmast-accent/50 text-white p-4 rounded-full shadow-[0_0_20px_rgba(163,230,53,0.3)] hover:shadow-[0_0_30px_rgba(163,230,53,0.5)] transition-all z-50 flex items-center gap-3 hover:scale-105 active:scale-95 group"
             >
-                <MessageSquare className="w-6 h-6" />
-                <span className="font-medium hidden md:inline">{t('chatbot.trigger')}</span>
+                <div className="relative">
+                  <Bot className="w-6 h-6 text-prodmast-accent group-hover:rotate-12 transition-transform" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border-2 border-prodmast-dark"></span>
+                </div>
+                <span className="font-bold text-sm tracking-wide hidden md:inline text-prodmast-accent uppercase">Farm Copilot</span>
             </button>
         );
     }
 
     return (
-        <div className="flex flex-col h-full bg-white border-l border-gray-200 shadow-2xl w-full h-full">
+        <div className="flex flex-col h-full bg-prodmast-dark/95 backdrop-blur-2xl border-l border-white/10 shadow-2xl w-full h-full text-slate-200">
             {/* Header */}
-            <div className="p-4 border-b bg-green-50 flex justify-between items-center flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <div className="bg-green-100 p-2 rounded-lg">
-                        <Bot className="w-6 h-6 text-green-700" />
+            <div className="p-5 border-b border-white/10 bg-black/20 flex justify-between items-center flex-shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="bg-prodmast-accent/20 p-2.5 rounded-xl border border-prodmast-accent/30 relative shadow-[0_0_15px_rgba(163,230,53,0.2)]">
+                        <Bot className="w-6 h-6 text-prodmast-accent drop-shadow-md" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-800">AgriBot</h3>
-                        <p className="text-xs text-green-600 font-medium">Online</p>
+                        <h3 className="font-black text-white tracking-wide text-lg">Farm Copilot</h3>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                           <span className="w-1.5 h-1.5 rounded-full bg-prodmast-accent shadow-[0_0_5px_#a3e635] animate-pulse"></span>
+                           <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">AI Online</p>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
-                        className={`p-2 rounded-lg transition-colors ${isVoiceEnabled ? 'text-green-600 hover:bg-green-100' : 'text-gray-400 hover:bg-gray-100'}`}
+                        className={`p-2 rounded-lg transition-colors ${isVoiceEnabled ? 'text-prodmast-accent hover:bg-white/5' : 'text-slate-500 hover:bg-white/5'}`}
                         title={isVoiceEnabled ? "Mute Voice" : "Unmute Voice"}
                     >
                         {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
                     </button>
                     <button
                         onClick={() => setIsOpen(false)}
-                        className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded transition-colors"
+                        className="text-slate-400 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -164,16 +182,21 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-transparent">
                 {messages.map((msg) => (
                     <div
                         key={msg.id}
                         className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
+                        {msg.sender === 'ai' && (
+                            <div className="w-8 h-8 rounded-full bg-prodmast-accent/20 border border-prodmast-accent/30 flex items-center justify-center mr-3 flex-shrink-0 mt-1">
+                                <Bot className="w-4 h-4 text-prodmast-accent" />
+                            </div>
+                        )}
                         <div
-                            className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${msg.sender === 'user'
-                                ? 'bg-green-600 text-white rounded-br-none'
-                                : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
+                            className={`max-w-[80%] rounded-2xl px-5 py-3.5 text-sm leading-relaxed whitespace-pre-wrap ${msg.sender === 'user'
+                                ? 'bg-prodmast-accent text-prodmast-dark rounded-br-none font-medium'
+                                : 'bg-white/5 border border-white/10 rounded-tl-none shadow-sm'
                                 }`}
                         >
                             {msg.text}
@@ -182,11 +205,14 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                 ))}
                 {isTyping && (
                     <div className="flex justify-start">
-                        <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
-                            <div className="flex gap-1">
-                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                        <div className="w-8 h-8 rounded-full bg-prodmast-accent/20 border border-prodmast-accent/30 flex items-center justify-center mr-3 flex-shrink-0 mt-1">
+                            <Bot className="w-4 h-4 text-prodmast-accent" />
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-none px-5 py-4 shadow-sm flex items-center">
+                            <div className="flex gap-1.5">
+                                <span className="w-2 h-2 bg-prodmast-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                <span className="w-2 h-2 bg-prodmast-accent rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                <span className="w-2 h-2 bg-prodmast-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                             </div>
                         </div>
                     </div>
@@ -194,13 +220,28 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <form onSubmit={handleSend} className="p-4 border-t bg-white flex-shrink-0">
-                <div className="flex items-center gap-2">
+            {/* AI Prompts & Input */}
+            <div className="p-4 border-t border-white/10 bg-black/20 flex-shrink-0">
+                <div className="flex gap-2 mb-4 overflow-x-auto pb-1 hide-scrollbar">
+                   <button 
+                     onClick={triggerSummarize}
+                     className="whitespace-nowrap px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-prodmast-accent/50 hover:bg-prodmast-accent/10 text-xs font-bold text-slate-300 transition-all focus:outline-none"
+                   >
+                     ⚡ Summarize Dashboard
+                   </button>
+                   <button 
+                     onClick={() => setInputText("What are the crop yields looking like?")}
+                     className="whitespace-nowrap px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-prodmast-accent/50 hover:bg-prodmast-accent/10 text-xs font-bold text-slate-300 transition-all focus:outline-none"
+                   >
+                     📈 Predict Yields
+                   </button>
+                </div>
+
+                <form onSubmit={handleSend} className="flex items-center gap-3">
                     <button
                         type="button"
                         onClick={toggleListening}
-                        className={`p-3 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`p-3.5 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_#ef4444]' : 'bg-white/10 text-slate-400 hover:bg-white/20 hover:text-white'}`}
                     >
                         {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                     </button>
@@ -209,19 +250,19 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                             type="text"
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
-                            placeholder={isListening ? "Listening..." : t('chatbot.placeholder')}
-                            className="w-full pl-4 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition text-sm text-gray-900 placeholder-gray-500 shadow-inner"
+                            placeholder={isListening ? "Listening..." : "Ask your farm copilot..."}
+                            className="w-full pl-5 pr-12 py-3.5 bg-black/40 border border-white/20 rounded-xl focus:ring-2 focus:ring-prodmast-accent focus:border-transparent transition text-sm text-white placeholder-slate-500 outline-none"
                         />
                         <button
                             type="submit"
                             disabled={!inputText.trim()}
-                            className="absolute right-2 top-2 p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md active:scale-95"
+                            className="absolute right-2 top-2 p-1.5 bg-prodmast-accent text-prodmast-dark rounded-lg hover:bg-prodmast-accent/90 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(163,230,53,0.3)] active:scale-95"
                         >
-                            <Send className="w-4 h-4" />
+                            <Send className="w-5 h-5" />
                         </button>
                     </div>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     );
 }

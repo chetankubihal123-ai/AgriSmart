@@ -26,7 +26,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-    const { signOut, isAdmin } = useAuth();
+    const { user, signOut, isAdmin } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -131,18 +131,33 @@ export function Layout({ children }: LayoutProps) {
                         <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300 overflow-hidden h-10">
                             <LanguageSelector className="w-full justify-center !text-sm border border-gray-200" />
                         </div>
-                        <button
-                            onClick={handleSignOut}
-                            className="w-full flex items-center gap-4 px-3 py-3 rounded-[18px] text-sm font-bold text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100"
-                            title={t('nav.signOut')}
-                        >
-                            <div className="shrink-0 flex items-center justify-center">
-                                <LogOut className="w-6 h-6 scale-90" />
-                            </div>
-                            <span className="whitespace-nowrap opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
-                                {t('nav.signOut')}
-                            </span>
-                        </button>
+                        {user ? (
+                            <button
+                                onClick={handleSignOut}
+                                className="w-full flex items-center gap-4 px-3 py-3 rounded-[18px] text-sm font-bold text-red-500 hover:bg-red-50 transition-all border border-transparent hover:border-red-100"
+                                title={t('nav.signOut')}
+                            >
+                                <div className="shrink-0 flex items-center justify-center">
+                                    <LogOut className="w-6 h-6 scale-90" />
+                                </div>
+                                <span className="whitespace-nowrap opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                                    {t('nav.signOut')}
+                                </span>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => navigate('/auth')}
+                                className="w-full flex items-center gap-4 px-3 py-3 rounded-[18px] text-sm font-bold text-prodmast-primary hover:bg-prodmast-primary/10 transition-all border border-transparent hover:border-prodmast-primary/20"
+                                title={t('landing.login') || 'Login'}
+                            >
+                                <div className="shrink-0 flex items-center justify-center">
+                                    <Users className="w-6 h-6 scale-90" />
+                                </div>
+                                <span className="whitespace-nowrap opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                                    {t('landing.login') || 'Login'}
+                                </span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </aside>

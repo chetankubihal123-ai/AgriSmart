@@ -1,13 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { AlertCircle, CheckCircle, Upload, X, Loader2, Camera, Bug } from 'lucide-react';
+import { AlertCircle, CheckCircle, Upload, X, Loader2, Camera, Bug, Sparkles } from 'lucide-react';
 import { useImageClassifier, CropType } from '../hooks/useImageClassifier';
 import { useLanguage } from '../contexts/LanguageContext';
+import { analyzeImageWithGemini, detectPlantBoundingBox, cropImage, detectPlantPolygon } from '../lib/gemini';
 
 interface AnalysisResult {
     disease: string;
     confidence: number;
     description: string;
     treatment: string[];
+    severity?: string;
+    alternatives?: { name: string, confidence: number }[];
+    lesions?: { box: number[], type: string }[];
+    spread?: string;
+    detailedTreatment?: { conventional: string[], biological: string[], prevention: string[] };
 }
 
 export function DiseaseDetection() {
@@ -17,10 +23,13 @@ export function DiseaseDetection() {
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [classificationError, setClassificationError] = useState<string | null>(null);
-    const [selectedCrop] = useState<CropType>('tomato');
+    const [selectedCrop, setSelectedCrop] = useState<CropType>('tomato');
+    const [isCropping, setIsCropping] = useState(false);
+    const [boundingBox, setBoundingBox] = useState<{ ymin: number, xmin: number, ymax: number, xmax: number } | null>(null);
+    const [polygon, setPolygon] = useState<[number, number][] | null>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
-    const { model, modelLoading, classifyImage, isCustomModelLoaded, initializeModels } = useImageClassifier();
+    const { model, modelLoading, modelError, classifyImage, isCustomModelLoaded, initializeModels } = useImageClassifier();
 
     useEffect(() => {
         initializeModels();
@@ -57,104 +66,100 @@ export function DiseaseDetection() {
 
     const handleFile = (file: File) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            setSelectedImage(e.target?.result as string);
+        reader.onload = async (e) => {
+            const dataUrl = e.target?.result as string;
+            setSelectedImage(dataUrl);
             setResult(null);
             setClassificationError(null);
+
+            // Trigger Instant Magic Crop & Cutout
+            setIsCropping(true);
+            try {
+                const [boxResult, polyResult] = await Promise.all([
+                    detectPlantBoundingBox(dataUrl),
+                    detectPlantPolygon(dataUrl, selectedCrop)
+                ]);
+
+                if (polyResult && polyResult.polygon) {
+                    setPolygon(polyResult.polygon);
+                }
+
+                if (boxResult) {
+                    setBoundingBox(boxResult);
+                    // No physical crop, we use CSS zoom now
+                }
+            } catch (err) {
+                console.warn("Magic cutout failed:", err);
+            } finally {
+                setIsCropping(false);
+            }
         };
         reader.readAsDataURL(file);
     };
 
     const analyzeImage = async () => {
-        if (!selectedImage || !model || !imageRef.current) return;
+        if (!selectedImage || !imageRef.current) return;
 
         setAnalyzing(true);
         setClassificationError(null);
-
         try {
-            // 1. Classify Image using reusable hook
-            const { isPlant, predictions, customPredictions, error } = await classifyImage(imageRef.current, selectedCrop);
+            let imageToAnalyze = selectedImage;
+            // Magic crop now happens on upload, so we just analyze what we have
 
-            if (error) {
-                setClassificationError(error);
-                setAnalyzing(false);
-                return;
-            }
-
-            // Check for fake images (non-plants)
-            if (!isPlant && predictions.length > 0) {
-                setClassificationError(`No crop detected. AI identified: ${predictions[0].className.split(',')[0]} (${Math.round(predictions[0].probability * 100)}%)`);
-                setAnalyzing(false);
-                return;
-            }
-
-            if (customPredictions && customPredictions.length > 0) {
-                // Use the custom model's top prediction
-                const topMatch = customPredictions[0];
+            // Use Detailed Analysis
+            const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop);
+            
+            if (detailedResult) {
                 setResult({
-                    disease: topMatch.className,
-                    confidence: topMatch.probability * 100,
-                    description: `Detected using the ${selectedCrop.toUpperCase()} custom model: ${topMatch.className}`,
-                    treatment: ['Consult specific treatment for this condition', 'Monitor daily']
+                    disease: detailedResult.topDiagnosis?.name || "Unknown Disease",
+                    confidence: detailedResult.topDiagnosis?.confidence || 0,
+                    description: detailedResult.causes || "No description available",
+                    treatment: detailedResult.treatment?.conventional || ["No treatment data found"],
+                    severity: detailedResult.topDiagnosis?.severity || "Moderate",
+                    alternatives: detailedResult.alternatives || [],
+                    lesions: detailedResult.lesions || [],
+                    spread: detailedResult.spread || "N/A",
+                    detailedTreatment: detailedResult.treatment
                 });
-            } else {
-                // Fallback to Simulated Disease Analysis
-
-                const diseases: AnalysisResult[] = [
-                    {
-                        disease: 'Late Blight',
-                        confidence: 96,
-                        description: 'A destructive fungal disease causing dark lesions on leaves and stems.',
-                        treatment: ['Apply copper-based fungicides', 'Remove infected plant parts', 'Ensure proper drainage']
-                    },
-                    {
-                        disease: 'Healthy',
-                        confidence: 98,
-                        description: 'No specific disease markers detected.',
-                        treatment: ['Continue regular care', 'Monitor for changes']
-                    },
-                    {
-                        disease: 'Bacterial Spot',
-                        confidence: 91,
-                        description: 'Small, dark, water-soaked spots on leaves and fruit.',
-                        treatment: ['Apply copper sprays', 'Use disease-free seeds', 'Rotate crops']
-                    },
-                    {
-                        disease: 'Leaf Rust',
-                        confidence: 94,
-                        description: 'Powdery, orange-brown pustules on the undersides of leaves, common in cereals.',
-                        treatment: ['Apply Tebuconazole fungicide', 'Remove infected debris', 'Reduce irrigation frequency']
-                    },
-                    {
-                        disease: 'Healthy',
-                        confidence: 99,
-                        description: 'Plant appears vigorous and disease-free.',
-                        treatment: ['Continue regular care', 'Monitor for changes']
-                    }
-                ];
-
-                const rustPrediction = predictions.find(p => p.className.toLowerCase().includes('rust'));
-                const isMaize = predictions.some(p => ['maize', 'corn', 'ear', 'leaf'].some(k => p.className.toLowerCase().includes(k)));
-                const otherSymptoms = predictions.some(p =>
-                    ['fungus', 'spot', 'blight', 'mildew', 'infection', 'parasite', 'brown', 'yellow', 'pustule'].some(k =>
-                        p.className.toLowerCase().includes(k)
-                    )
-                );
-
-                let randomResult;
-                if (rustPrediction || (isMaize && otherSymptoms)) {
-                    randomResult = diseases.find(d => d.disease === 'Leaf Rust') || diseases[3];
-                } else if (otherSymptoms) {
-                    const diseased = diseases.filter(d => d.disease !== 'Healthy');
-                    randomResult = diseased[Math.floor(Math.random() * diseased.length)];
-                } else {
-                    randomResult = diseases[Math.floor(Math.random() * diseases.length)];
-                }
-                setResult(randomResult);
+                return;
             }
-        } catch (error) {
-            console.error("Analysis error", error);
-            setClassificationError("Failed to identify disease. Please try again.");
+
+            // 2. Gemini Analysis with Fallback
+            try {
+                const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop);
+                if (geminiResult) {
+                    setResult({
+                        ...geminiResult,
+                        description: `[AI Powered] ${geminiResult.description}`
+                    });
+                    return;
+                }
+            } catch (geminiError) {
+                console.error("Gemini failed, falling back to local models:", geminiError);
+                
+                // Fallback to local models
+                if (model) {
+                    const { customPredictions, error: localError } = await classifyImage(imageRef.current!, selectedCrop);
+                    if (!localError && customPredictions && customPredictions.length > 0) {
+                        const top = customPredictions[0];
+                        const cleanName = top.className
+                            .replace(new RegExp(`^${selectedCrop}_`, 'i'), '')
+                            .replace(/_/g, ' ')
+                            .trim();
+
+                        setResult({
+                            disease: cleanName.toUpperCase(),
+                            confidence: Math.round(top.probability * 100),
+                            description: `Identified using specialized ${selectedCrop} model.`,
+                            treatment: ["Consult local experts", "Monitor closely"]
+                        });
+                        return;
+                    }
+                }
+            }
+        } catch (error: any) {
+            console.error("General analysis error", error);
+            setClassificationError("Failed to identify disease. Please try another image.");
         } finally {
             setAnalyzing(false);
         }
@@ -178,13 +183,27 @@ export function DiseaseDetection() {
                         <p className="text-slate-600 font-medium">{t('disease.subtitle')}</p>
                     </div>
 
+                    <div className="flex gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        {(['tomato', 'corn', 'chilli'] as CropType[]).map((crop) => (
+                            <button
+                                key={crop}
+                                onClick={() => setSelectedCrop(crop)}
+                                className={`px-4 py-2 rounded-md text-xs font-black uppercase tracking-widest transition-all ${selectedCrop === crop
+                                    ? 'bg-red-600 text-white shadow-md'
+                                    : 'text-slate-500 hover:bg-slate-200'
+                                    }`}
+                            >
+                                {crop}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
 
-                {classificationError && (
+                {(classificationError || modelError) && (
                     <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-2 border border-red-200">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                        <p className="font-medium">{classificationError}</p>
+                        <p className="font-medium">{classificationError || modelError}</p>
                     </div>
                 )}
 
@@ -249,9 +268,68 @@ export function DiseaseDetection() {
                                 ref={imageRef}
                                 src={selectedImage}
                                 alt="Disease analysis"
-                                className="w-full h-[400px] object-contain"
+                                className={`w-full h-[400px] object-contain transition-all duration-700 ${isCropping ? 'scale-110 blur-sm brightness-50' : 'scale-100 blur-0 brightness-100'}`}
                                 crossOrigin="anonymous"
                             />
+
+                            {/* Magic Cutout Experience (PicsArt Style) */}
+                            {!isCropping && selectedImage && !result && (
+                                <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-xl bg-white shadow-inner">
+                                    {/* 1. Professional Checkered Background */}
+                                    <div className="absolute inset-0 opacity-10" style={{ 
+                                        backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+                                        backgroundSize: '20px 20px',
+                                        backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                                    }} />
+                                    
+                                    {/* 2. Isolated Leaf Cutout (Zoomed & Clean) */}
+                                    <div 
+                                        className="absolute inset-0 transition-all duration-1000 ease-out"
+                                        style={{
+                                            transform: boundingBox ? `
+                                                scale(${1000 / (boundingBox.xmax - boundingBox.xmin) * 0.85}) 
+                                                translate(
+                                                    ${-(boundingBox.xmin + (boundingBox.xmax - boundingBox.xmin)/2 - 500) / 10}%, 
+                                                    ${-(boundingBox.ymin + (boundingBox.ymax - boundingBox.ymin)/2 - 500) / 10}%
+                                                )
+                                            ` : 'scale(1)',
+                                            transformOrigin: 'center center'
+                                        }}
+                                    >
+                                        <img 
+                                            src={selectedImage} 
+                                            className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_10px_40px_rgba(0,0,0,0.2)]"
+                                            style={{
+                                                clipPath: polygon 
+                                                    ? `polygon(${polygon.map(p => `${p[1]/10}% ${p[0]/10}%`).join(', ')})`
+                                                    : (boundingBox 
+                                                        ? `inset(${boundingBox.ymin/10}% ${100 - boundingBox.xmax/10}% ${100 - boundingBox.ymax/10}% ${boundingBox.xmin/10}% round 20px)`
+                                                        : 'inset(10% 10% 10% 10% round 20px)'),
+                                            }}
+                                            alt="leaf focus"
+                                        />
+                                        
+                                        {/* Visual Aids: Lesion Boxes */}
+                                        {result?.lesions?.map((lesion, i) => (
+                                            <div 
+                                                key={`lesion-${i}`}
+                                                className="absolute border-2 border-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                                                style={{
+                                                    top: `${lesion.box[0]/10}%`,
+                                                    left: `${lesion.box[1]/10}%`,
+                                                    width: `${(lesion.box[3] - lesion.box[1])/10}%`,
+                                                    height: `${(lesion.box[2] - lesion.box[0])/10}%`
+                                                }}
+                                            >
+                                                <div className="absolute -top-5 left-0 bg-red-500 text-white text-[8px] font-black px-1 uppercase whitespace-nowrap">
+                                                    {lesion.type} DETECTED
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {!analyzing && !result && (
                                 <button
                                     onClick={resetAnalysis}
@@ -259,6 +337,18 @@ export function DiseaseDetection() {
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
+                            )}
+
+                            {isCropping && (
+                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20 backdrop-blur-[2px]">
+                                    <div className="absolute inset-0 overflow-hidden">
+                                        <div className="w-full h-1 bg-red-400/80 shadow-[0_0_15px_rgba(248,113,113,0.8)] animate-[scan_1.5s_linear_infinite]" />
+                                    </div>
+                                    <div className="bg-white/90 px-6 py-3 rounded-lg flex items-center gap-3 z-10">
+                                        <Sparkles className="w-5 h-5 text-red-600 animate-pulse" />
+                                        <span className="font-semibold text-gray-800">Applying Magic Crop...</span>
+                                    </div>
+                                </div>
                             )}
 
                             {analyzing && (
@@ -284,7 +374,7 @@ export function DiseaseDetection() {
                                     <button
                                         onClick={analyzeImage}
                                         className="w-full md:w-auto bg-red-600 text-white px-8 py-3 rounded-lg font-bold text-lg hover:bg-red-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled={analyzing || modelLoading}
+                                        disabled={analyzing || modelLoading || isCropping}
                                     >
                                         {t('disease.identify')}
                                     </button>
@@ -297,44 +387,105 @@ export function DiseaseDetection() {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm premium-glow-red">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div>
-                                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">
-                                                {!isCustomModelLoaded ? t('disease.demoResult') : t('disease.diagnosis')}
-                                            </span>
-                                            <h3 className="text-2xl font-black text-slate-900 mt-1 uppercase tracking-tight">
-                                                {result.disease === 'Healthy' ? t('cropHealth.status.healthy') : result.disease}
-                                            </h3>
-                                        </div>
-                                        <div className={`px-4 py-2 rounded-full font-bold flex items-center gap-2 ${result.disease === 'Healthy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {result.disease === 'Healthy' ? <CheckCircle className="w-5 h-5" /> : <Bug className="w-5 h-5" />}
-                                            {Math.round(result.confidence)}% {t('disease.match')}
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+                                            {result.disease}
+                                        </h3>
+                                        <div className={`
+                                            px-3 py-1 rounded-full text-xs font-bold border
+                                            ${result.severity === 'High' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                                result.severity === 'Moderate' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                                                    'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}
+                                        `}>
+                                            {result.severity || 'Moderate'} Severity
                                         </div>
                                     </div>
 
-                                    <p className="text-gray-700 mb-6 italic border-l-4 border-gray-200 pl-4">
-                                        "{result.description}"
+                                    {/* Alternative Diagnoses */}
+                                    {result.alternatives && result.alternatives.length > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-full">Alternative Matches</span>
+                                            {result.alternatives.map((alt, i) => (
+                                                <span key={i} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold border border-slate-200">
+                                                    {alt.name} ({alt.confidence}%)
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
+                                        {result.description}
                                     </p>
 
-                                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                        <CheckCircle className="w-5 h-5 text-green-600" />
-                                        {t('disease.recommendedTreatment')}
-                                    </h4>
-                                    <ul className="space-y-3 mb-8">
-                                        {result.treatment.map((step, i) => (
-                                            <li key={i} className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
-                                                <div className="min-w-[6px] h-6 w-1.5 bg-red-400 rounded-full mt-0.5"></div>
-                                                <span className="text-gray-700">{step}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    {/* Causes & Spread */}
+                                    {result.spread && (
+                                        <div className="p-4 bg-slate-900/5 rounded-xl border border-slate-200">
+                                            <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Spread & Pattern</h5>
+                                            <p className="text-xs text-slate-700 font-medium">{result.spread}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Detailed Treatment Section */}
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-slate-900 flex items-center gap-2 uppercase text-xs tracking-widest">
+                                            <CheckCircle className="w-4 h-4 text-prodmast-primary" />
+                                            {t('disease.treatment')}
+                                        </h4>
+                                        
+                                        {result.detailedTreatment ? (
+                                            <div className="space-y-3">
+                                                <div className="bg-prodmast-primary/5 p-4 rounded-xl border border-prodmast-primary/10">
+                                                    <span className="text-[9px] font-black text-prodmast-darker uppercase tracking-tighter block mb-2">Conventional Remediation</span>
+                                                    <ul className="space-y-1.5">
+                                                        {result.detailedTreatment.conventional.map((step, i) => (
+                                                            <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
+                                                                <div className="min-w-[4px] h-4 w-1 bg-prodmast-primary rounded-full mt-0.5" />
+                                                                {step}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/10">
+                                                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter block mb-2">Biological Control</span>
+                                                    <ul className="space-y-1.5">
+                                                        {result.detailedTreatment.biological.map((step, i) => (
+                                                            <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
+                                                                <div className="min-w-[4px] h-4 w-1 bg-blue-500 rounded-full mt-0.5" />
+                                                                {step}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter block mb-2">Prevention Advice</span>
+                                                    <ul className="space-y-1.5">
+                                                        {result.detailedTreatment.prevention.map((step, i) => (
+                                                            <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
+                                                                <div className="min-w-[4px] h-4 w-1 bg-slate-400 rounded-full mt-0.5" />
+                                                                {step}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <ul className="space-y-2">
+                                                {result.treatment.map((step, i) => (
+                                                    <li key={i} className="text-sm text-slate-600 flex items-start gap-3">
+                                                        <div className="min-w-[6px] h-6 w-1.5 bg-prodmast-primary rounded-full mt-0.5"></div>
+                                                        {step}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
 
                                     <button
                                         onClick={resetAnalysis}
-                                        className="w-full bg-red-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition shadow-sm"
+                                        className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold hover:bg-slate-800 transition shadow-md"
                                     >
-                                        {t('disease.checkAnother')}
+                                        Analyze Another
                                     </button>
                                 </div>
                             )}

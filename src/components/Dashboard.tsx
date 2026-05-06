@@ -14,7 +14,7 @@ import {
   CloudSun,
   Bell,
   Droplets,
-  LineChart,
+  LineChart as LineChartIcon,
   ShoppingBag,
   Landmark,
   Calculator,
@@ -28,6 +28,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { DiseaseScanner } from './DiseaseScanner';
 import { useAuth } from '../contexts/AuthContext';
 import { AdminDashboard } from './AdminDashboard';
+import { ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export function Dashboard() {
   const { farms, selectedFarm, setSelectedFarm, loading: farmsLoading } = useFarm();
@@ -40,25 +41,59 @@ export function Dashboard() {
 
   const [locationName, setLocationName] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number, code: number } | null>(null);
+
+  const generateInitialHistory = (basePrice: number, isUp: boolean) => {
+    let currentPrice = basePrice;
+    // For green (up), we want an upward jagged trend, for red (down), downward.
+    return Array.from({ length: 6 }, (_, i) => {
+      // Create big jagged movements. 
+      const step = basePrice * (Math.random() * 0.08 + 0.02); // 2-10% jumps
+      if (isUp) {
+        // mostly up, sometimes down
+        currentPrice += (Math.random() > 0.3 ? step : -step * 0.5);
+      } else {
+        // mostly down, sometimes up
+        currentPrice -= (Math.random() > 0.3 ? step : -step * 0.5);
+      }
+      return { time: i, price: Math.round(currentPrice) };
+    });
+  };
+
   const [snapshotCrops, setSnapshotCrops] = useState([
-    { id: 'chilli', name: 'Red Chilli (Teja)', price: 21500, trend: '+4.2%', up: true, flash: null as 'up' | 'down' | null },
-    { id: 'corn', name: 'Maize / Corn', price: 2450, trend: '+1.5%', up: true, flash: null as 'up' | 'down' | null },
-    { id: 'tomato', name: 'Tomato (Local)', price: 1800, trend: '-12.4%', up: false, flash: null as 'up' | 'down' | null }
+    { id: 'chilli', name: 'Red Chilli (Teja)', basePrice: 21500, price: 21500, trend: '+4.2%', up: true, flash: null as 'up' | 'down' | null, history: generateInitialHistory(21500, true) },
+    { id: 'corn', name: 'Maize / Corn', basePrice: 2450, price: 2450, trend: '+1.5%', up: true, flash: null as 'up' | 'down' | null, history: generateInitialHistory(2450, true) },
+    { id: 'tomato', name: 'Tomato (Local)', basePrice: 1800, price: 1800, trend: '-12.4%', up: false, flash: null as 'up' | 'down' | null, history: generateInitialHistory(1800, false) }
   ]);
 
   useEffect(() => {
     const ticker = setInterval(() => {
       setSnapshotCrops(prev => prev.map(c => {
-        if (Math.random() > 0.4) return { ...c, flash: null };
-        const change = Math.round(c.price * (Math.random() * 0.004 - 0.002));
-        if (change === 0) return { ...c, flash: null };
+        // Use c.up to continue the primary trend with big zig-zags
+        const step = c.basePrice * (Math.random() * 0.06 + 0.01);
+        let newPrice = c.price;
+        if (c.up) {
+           newPrice += (Math.random() > 0.4 ? step : -step * 0.6);
+        } else {
+           newPrice -= (Math.random() > 0.4 ? step : -step * 0.6);
+        }
+        newPrice = Math.round(newPrice);
+        
+        if (newPrice === c.price) return { ...c, flash: null };
+        const change = newPrice - c.price;
+        const newHistory = [...c.history.slice(1), { time: Date.now(), price: newPrice }];
+        
+        const oldestPrice = newHistory[0].price;
+        const up = newPrice >= oldestPrice;
+
         return {
           ...c,
-          price: c.price + change,
+          price: newPrice,
+          history: newHistory,
+          up, 
           flash: change > 0 ? 'up' : 'down'
         };
       }));
-    }, 12000);
+    }, 2500);
     return () => clearInterval(ticker);
   }, []);
 
@@ -200,7 +235,7 @@ export function Dashboard() {
     {
       title: "Market Rates",
       desc: "Track daily commodity prices from local APMCs and mandis. Plan your harvest sales by monitoring real-time trends for Chilli, Corn, and Tomato.",
-      icon: <LineChart className="w-8 h-8" />,
+      icon: <LineChartIcon className="w-8 h-8" />,
       path: "/market-rates",
       iconColor: "text-emerald-600",
       bgHover: "group-hover:bg-emerald-50",
@@ -320,7 +355,7 @@ export function Dashboard() {
         <div className="bg-white rounded-[32px] border border-gray-200 shadow-sm p-8 hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => navigate('/market-rates')}>
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 tracking-wide uppercase">
-              <LineChart className="w-6 h-6 text-emerald-600" />
+              <LineChartIcon className="w-6 h-6 text-emerald-600" />
               Live Market Snapshot
             </h3>
             <span className="text-sm font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
@@ -328,87 +363,50 @@ export function Dashboard() {
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {snapshotCrops.map(c => (
-              <div key={c.name} className={`bg-gray-50 border rounded-[24px] p-6 flex justify-between items-center transition-all duration-500 overflow-hidden relative ${c.flash === 'up' ? 'border-green-400 bg-green-50 shadow-[0_0_15px_rgba(74,222,128,0.2)]' :
-                c.flash === 'down' ? 'border-red-400 bg-red-50 shadow-[0_0_15px_rgba(248,113,113,0.2)]' :
-                  'border-gray-100 hover:bg-emerald-50/30'
-                }`}>
-                <div className="relative z-10 transition-transform group-hover:translate-x-1">
-                  <p className="font-bold text-gray-500 text-xs mb-1 uppercase tracking-widest">{c.name}</p>
-                  <p className={`text-2xl font-black transition-colors duration-500 ${c.flash === 'up' ? 'text-green-600' : c.flash === 'down' ? 'text-red-600' : 'text-prodmast-dark'}`}>
-                    ₹{c.price.toLocaleString()}
-                  </p>
+            {snapshotCrops.map(c => {
+              const color = c.up ? '#10b981' : '#f43f5e'; // Emerald-500 or Rose-500
+              return (
+              <div key={c.name} className={`bg-white border rounded-[24px] overflow-hidden relative shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-500 min-h-[140px] flex flex-col justify-between ${c.flash === 'up' ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.2)]' : c.flash === 'down' ? 'border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.2)]' : 'border-gray-100 hover:border-emerald-200'}`}>
+                {/* Graph Background */}
+                <div className="absolute inset-x-4 bottom-4 top-1/3 pointer-events-none transition-opacity duration-500 opacity-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={c.history} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                      <Line 
+                         type="linear" 
+                         dataKey="price" 
+                         stroke={color} 
+                         strokeWidth={4} 
+                         dot={false} 
+                         isAnimationActive={true} 
+                         animationDuration={800}
+                         strokeLinecap="round"
+                         strokeLinejoin="round"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className={`relative z-10 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 transition-all ${c.up ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                  {c.up ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                  {c.trend}
+                
+                <div className="p-6 relative z-10 flex justify-between items-start h-full">
+                  <div className="flex flex-col justify-between h-full">
+                    <p className="font-bold text-gray-400 text-xs mb-2 uppercase tracking-widest">{c.name}</p>
+                    <p className={`text-4xl font-black mt-2 transition-colors duration-300 ${c.flash === 'up' ? 'text-green-600' : c.flash === 'down' ? 'text-rose-600' : 'text-prodmast-dark'}`}>
+                       ₹{c.price.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all bg-white/80 backdrop-blur-md ${c.up ? 'text-green-700 border border-green-100' : 'text-rose-700 border border-rose-100'}`}>
+                    {c.up ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
+                    {c.trend}
+                  </div>
                 </div>
-                {c.flash === 'up' && <div className="absolute inset-0 bg-green-400/10 animate-ping opacity-20"></div>}
-                {c.flash === 'down' && <div className="absolute inset-0 bg-red-400/10 animate-ping opacity-20"></div>}
+
+                {c.flash === 'up' && <div className="absolute inset-0 bg-green-400/5 animate-pulse rounded-[24px]"></div>}
+                {c.flash === 'down' && <div className="absolute inset-0 bg-rose-400/5 animate-pulse rounded-[24px]"></div>}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </div>
 
-      <div className="pt-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 mb-6 px-2 uppercase tracking-wide">
-          <Bell className="w-6 h-6 text-prodmast-primary" />
-          {t('dashboard.featuresAndAlerts')}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-blue-50 border border-blue-200 rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:shadow-blue-900/5 transition-all duration-300">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-blue-100 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-            <div className="flex flex-col relative z-10 h-full">
-              <div className="bg-white w-14 h-14 rounded-2xl shadow-sm border border-blue-100 flex items-center justify-center mb-6">
-                <CloudRain className="w-7 h-7 text-blue-500" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-blue-900 text-xl tracking-tight mb-2">{t('dashboard.rainAlert')}</h4>
-                <p className="text-blue-700 font-medium text-sm leading-relaxed mb-6">{t('dashboard.rainAlertDesc')}</p>
-              </div>
-              <button className="mt-auto self-start text-xs font-bold text-blue-800 uppercase tracking-widest bg-blue-100/50 hover:bg-blue-200 px-4 py-2 rounded-lg transition-colors">
-                {t('dashboard.viewWeatherRadar')}
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-red-50 border border-red-200 rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:shadow-red-900/5 transition-all duration-300">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-red-100 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-            <div className="flex flex-col relative z-10 h-full">
-              <div className="bg-white w-14 h-14 rounded-2xl shadow-sm border border-red-100 flex items-center justify-center mb-6">
-                <AlertTriangle className="w-7 h-7 text-red-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <h4 className="font-extrabold text-red-900 text-xl tracking-tight">{t('dashboard.diseaseOutbreakAlert')}</h4>
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                </div>
-                <p className="text-red-700 font-medium text-sm leading-relaxed mb-6">{t('dashboard.diseaseOutbreakDesc')}</p>
-              </div>
-              <button className="mt-auto self-start text-xs font-bold text-red-800 uppercase tracking-widest bg-red-100/50 hover:bg-red-200 px-4 py-2 rounded-lg transition-colors">
-                {t('dashboard.deployTreatment')}
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:shadow-amber-900/5 transition-all duration-300">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-100 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-            <div className="flex flex-col relative z-10 h-full">
-              <div className="bg-white w-14 h-14 rounded-2xl shadow-sm border border-amber-100 flex items-center justify-center mb-6">
-                <Droplets className="w-7 h-7 text-amber-500" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-amber-900 text-xl tracking-tight mb-2">{t('dashboard.irrigationReminder')}</h4>
-                <p className="text-amber-700 font-medium text-sm leading-relaxed mb-6">{t('dashboard.irrigationReminderDesc')}</p>
-              </div>
-              <button className="mt-auto self-start text-xs font-bold text-amber-800 uppercase tracking-widest bg-amber-100/50 hover:bg-amber-200 px-4 py-2 rounded-lg transition-colors">
-                {t('dashboard.startIrrigationNow')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="pt-6">
         <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 mb-10 px-2 uppercase tracking-wide">
@@ -537,6 +535,65 @@ export function Dashboard() {
           </div>
         </div>
       )}
+
+      <div className="pt-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 mb-6 px-2 uppercase tracking-wide">
+          <Bell className="w-6 h-6 text-prodmast-primary" />
+          {t('dashboard.featuresAndAlerts')}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="bg-blue-50 border border-blue-200 rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:shadow-blue-900/5 transition-all duration-300">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-blue-100 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div className="flex flex-col relative z-10 h-full">
+              <div className="bg-white w-14 h-14 rounded-2xl shadow-sm border border-blue-100 flex items-center justify-center mb-6">
+                <CloudRain className="w-7 h-7 text-blue-500" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-blue-900 text-xl tracking-tight mb-2">{t('dashboard.rainAlert')}</h4>
+                <p className="text-blue-700 font-medium text-sm leading-relaxed mb-6">{t('dashboard.rainAlertDesc')}</p>
+              </div>
+              <button className="mt-auto self-start text-xs font-bold text-blue-800 uppercase tracking-widest bg-blue-100/50 hover:bg-blue-200 px-4 py-2 rounded-lg transition-colors">
+                {t('dashboard.viewWeatherRadar')}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:shadow-red-900/5 transition-all duration-300">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-red-100 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div className="flex flex-col relative z-10 h-full">
+              <div className="bg-white w-14 h-14 rounded-2xl shadow-sm border border-red-100 flex items-center justify-center mb-6">
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="font-extrabold text-red-900 text-xl tracking-tight">{t('dashboard.diseaseOutbreakAlert')}</h4>
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                </div>
+                <p className="text-red-700 font-medium text-sm leading-relaxed mb-6">{t('dashboard.diseaseOutbreakDesc')}</p>
+              </div>
+              <button className="mt-auto self-start text-xs font-bold text-red-800 uppercase tracking-widest bg-red-100/50 hover:bg-red-200 px-4 py-2 rounded-lg transition-colors">
+                {t('dashboard.deployTreatment')}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:shadow-amber-900/5 transition-all duration-300">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-100 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
+            <div className="flex flex-col relative z-10 h-full">
+              <div className="bg-white w-14 h-14 rounded-2xl shadow-sm border border-amber-100 flex items-center justify-center mb-6">
+                <Droplets className="w-7 h-7 text-amber-500" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-amber-900 text-xl tracking-tight mb-2">{t('dashboard.irrigationReminder')}</h4>
+                <p className="text-amber-700 font-medium text-sm leading-relaxed mb-6">{t('dashboard.irrigationReminderDesc')}</p>
+              </div>
+              <button className="mt-auto self-start text-xs font-bold text-amber-800 uppercase tracking-widest bg-amber-100/50 hover:bg-amber-200 px-4 py-2 rounded-lg transition-colors">
+                {t('dashboard.startIrrigationNow')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

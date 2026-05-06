@@ -15,13 +15,13 @@ export function Shop() {
 
     const CROPS = [
         { id: 'Tomato', nameEN: 'Tomato', nameKN: 'ಟೊಮೆಟೊ', icon: 'https://cdn-icons-png.flaticon.com/512/1202/1202125.png' },
-        { id: 'Chilli', nameEN: 'Chilli', nameKN: 'ಮೆಣಸಿನಕಾಯಿ', icon: 'https://cdn-icons-png.flaticon.com/512/606/606693.png' },
-        { id: 'Onion', nameEN: 'Onion', nameKN: 'ಈರುಳ್ಳಿ', icon: 'https://cdn-icons-png.flaticon.com/512/1202/1202117.png' },
-        { id: 'Maize', nameEN: 'Maize', nameKN: 'ಮೆಕ್ಕೆಜೋಳ', icon: 'https://cdn-icons-png.flaticon.com/512/1202/1202111.png' },
-        { id: 'Okra', nameEN: 'Okra', nameKN: 'ಬೆಂಡೆಕಾಯಿ', icon: 'https://cdn-icons-png.flaticon.com/512/1231/1231464.png' },
-        { id: 'Brinjal', nameEN: 'Brinjal', nameKN: 'ಬದನೆಕಾಯಿ', icon: 'https://cdn-icons-png.flaticon.com/512/1202/1202105.png' },
-        { id: 'Cabbage', nameEN: 'Cabbage', nameKN: 'ಕೋಸು', icon: 'https://cdn-icons-png.flaticon.com/512/1202/1202102.png' },
-        { id: 'Cucumber', nameEN: 'Cucumber', nameKN: 'ಸೌತೆಕಾಯಿ', icon: 'https://cdn-icons-png.flaticon.com/512/3143/3143644.png' },
+        { id: 'Chilli', nameEN: 'Chilli', nameKN: 'ಮೆಣಸಿನಕಾಯಿ', icon: '/images/crops/chilli.png' },
+        { id: 'Onion', nameEN: 'Onion', nameKN: 'ಈರುಳ್ಳಿ', icon: '/images/crops/onion.png' },
+        { id: 'Maize', nameEN: 'Maize', nameKN: 'ಮೆಕ್ಕೆಜೋಳ', icon: '/images/crops/maize.png' },
+        { id: 'Okra', nameEN: 'Okra', nameKN: 'ಬೆಂಡೆಕಾಯಿ', icon: '/images/crops/okra.png' },
+        { id: 'Brinjal', nameEN: 'Brinjal', nameKN: 'ಬದನೆಕಾಯಿ', icon: '/images/crops/brinjal.png' },
+        { id: 'Cabbage', nameEN: 'Cabbage', nameKN: 'ಕೋಸು', icon: '/images/crops/cabbage.png' },
+        { id: 'Cucumber', nameEN: 'Cucumber', nameKN: 'ಸೌತೆಕಾಯಿ', icon: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&q=80&w=200' },
     ];
 
     const STATIC_CATALOG = [
