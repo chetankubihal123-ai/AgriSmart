@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Farm } from '../lib/types';
-import { 
-  Cloud, 
-  Droplets, 
-  Wind, 
-  Sun, 
-  CloudRain, 
-  AlertTriangle, 
-  ArrowRight, 
-  MapPin, 
-  Search, 
+import {
+  Cloud,
+  Droplets,
+  Wind,
+  Sun,
+  CloudRain,
+  AlertTriangle,
+  ArrowRight,
+  MapPin,
+  Search,
   Loader2,
   Thermometer,
   Tractor,
@@ -104,33 +104,33 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
       const stormyDays = newForecast.filter(d => d.condition === 'Stormy').length;
 
       if (stormyDays > 0) {
-        newAlerts.push({ 
-          type: 'critical', 
-          message: "Severe Thunderstorms Predicted", 
+        newAlerts.push({
+          type: 'critical',
+          message: "Severe Thunderstorms Predicted",
           icon: CloudLightning,
           recommendation: "Secure loose farm equipment and move livestock to sheltered areas immediately."
         });
       }
       if (rainDays > 2) {
-        newAlerts.push({ 
-          type: 'warning', 
-          message: t('weather.heavyRain'), 
+        newAlerts.push({
+          type: 'warning',
+          message: t('weather.heavyRain'),
           icon: Waves,
           recommendation: "Delay any sowing activities and ensure drainage channels are clear."
         });
       }
       if (heatwaveDays > 1) {
-        newAlerts.push({ 
-          type: 'critical', 
-          message: "Extreme Heat Warning", 
+        newAlerts.push({
+          type: 'critical',
+          message: "Extreme Heat Warning",
           icon: Zap,
           recommendation: "Increase irrigation frequency and provide shade for sensitive seedlings."
         });
       }
       if (newAlerts.length === 0) {
-        newAlerts.push({ 
-          type: 'info', 
-          message: t('weather.stable'), 
+        newAlerts.push({
+          type: 'info',
+          message: t('weather.stable'),
           icon: ShieldCheck,
           recommendation: "Ideal conditions for field work and routine monitoring."
         });
@@ -253,10 +253,10 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
 
   const getRecommendedCrops = (forecast: ForecastDay[]) => {
     if (forecast.length === 0) return [];
-    
+
     const avgTemp = forecast.reduce((acc, day) => acc + day.temp, 0) / forecast.length;
     const rainDays = forecast.filter(day => day.condition === 'Rainy' || day.condition === 'Stormy').length;
-    
+
     if (avgTemp > 30) {
       if (rainDays > 2) {
         return [
@@ -299,7 +299,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
   return (
     <div className="space-y-12 pb-20">
       {/* Search Bar - High Accessibility */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col md:flex-row items-center gap-8 bg-white/80 backdrop-blur-3xl border border-slate-200/60 p-6 rounded-[48px] shadow-2xl shadow-slate-200/20 sticky top-4 z-40"
@@ -315,7 +315,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
           />
           <AnimatePresence>
             {showSuggestions && suggestions.length > 0 && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
@@ -342,7 +342,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
             )}
           </AnimatePresence>
         </div>
-        
+
         <button
           onClick={handleCurrentLocation}
           className="flex items-center gap-4 px-12 py-6 bg-emerald-600 text-white rounded-[35px] font-black uppercase tracking-[0.2em] text-[13px] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 active:scale-95 whitespace-nowrap"
@@ -355,13 +355,13 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Main Forecast Panel */}
         <div className="lg:col-span-8 space-y-12">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-[64px] p-16 border border-slate-100 shadow-2xl shadow-slate-200/40 relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-50 rounded-full -mr-48 -mt-48 blur-[120px] opacity-60"></div>
-            
+
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-20 relative z-10">
               <div>
                 <h2 className="text-5xl font-black text-slate-900 tracking-tight mb-6 flex items-center gap-5">
@@ -375,7 +375,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
               </div>
               <div className="text-left md:text-right bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 shadow-inner">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Observation Sync</p>
-                <p className="text-sm font-extrabold text-slate-800">Satellite Stream • {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                <p className="text-sm font-extrabold text-slate-800">Satellite Stream • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
             </div>
 
@@ -387,32 +387,31 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-8">
                 {forecast.map((day, idx) => (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    key={idx} 
-                    className={`p-10 rounded-[48px] border transition-all duration-500 group relative ${
-                      idx === 0 
-                      ? 'bg-emerald-950 text-white border-emerald-900 shadow-2xl scale-110 z-10' 
+                    key={idx}
+                    className={`p-10 rounded-[48px] border transition-all duration-500 group relative ${idx === 0
+                      ? 'bg-emerald-950 text-white border-emerald-900 shadow-2xl scale-110 z-10'
                       : 'bg-slate-50/30 border-slate-100 hover:bg-white hover:border-emerald-200 hover:shadow-2xl'
-                    }`}
+                      }`}
                   >
                     {idx === 0 && (
                       <div className="absolute top-6 right-6 px-4 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-emerald-500/20">
                         LIVE
                       </div>
                     )}
-                    
+
                     <p className={`text-xs font-black uppercase tracking-[0.2em] mb-12 ${idx === 0 ? 'text-emerald-400/80' : 'text-slate-400'}`}>
                       {idx === 0 ? 'Today' : day.date.split(',')[0]}
                     </p>
-                    
+
                     <div className="mb-12 flex justify-center group-hover:scale-125 transition-transform duration-700">
                       {day.condition === 'Sunny' ? <Sun className={`w-14 h-14 ${idx === 0 ? 'text-amber-400' : 'text-amber-500'}`} /> :
                         day.condition === 'Rainy' ? <CloudRain className={`w-14 h-14 ${idx === 0 ? 'text-blue-300' : 'text-blue-500'}`} /> :
-                        day.condition === 'Stormy' ? <CloudLightning className={`w-14 h-14 ${idx === 0 ? 'text-emerald-400' : 'text-emerald-600'}`} /> :
-                        <Cloud className={`w-14 h-14 ${idx === 0 ? 'text-slate-400' : 'text-slate-300'}`} />}
+                          day.condition === 'Stormy' ? <CloudLightning className={`w-14 h-14 ${idx === 0 ? 'text-emerald-400' : 'text-emerald-600'}`} /> :
+                            <Cloud className={`w-14 h-14 ${idx === 0 ? 'text-slate-400' : 'text-slate-300'}`} />}
                     </div>
 
                     <div className="text-center">
@@ -426,14 +425,14 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
                     </div>
 
                     <div className={`mt-12 pt-10 border-t grid grid-cols-2 gap-6 ${idx === 0 ? 'border-white/10' : 'border-slate-100'}`}>
-                       <div className="text-center">
-                          <Droplets className={`w-5 h-5 mx-auto mb-3 ${idx === 0 ? 'text-emerald-400' : 'text-blue-400'}`} />
-                          <p className="text-xs font-black tracking-tight">{day.humidity}%</p>
-                       </div>
-                       <div className="text-center">
-                          <Wind className={`w-5 h-5 mx-auto mb-3 ${idx === 0 ? 'text-slate-400' : 'text-slate-400'}`} />
-                          <p className="text-xs font-black tracking-tight">{day.windSpeed}</p>
-                       </div>
+                      <div className="text-center">
+                        <Droplets className={`w-5 h-5 mx-auto mb-3 ${idx === 0 ? 'text-emerald-400' : 'text-blue-400'}`} />
+                        <p className="text-xs font-black tracking-tight">{day.humidity}%</p>
+                      </div>
+                      <div className="text-center">
+                        <Wind className={`w-5 h-5 mx-auto mb-3 ${idx === 0 ? 'text-slate-400' : 'text-slate-400'}`} />
+                        <p className="text-xs font-black tracking-tight">{day.windSpeed}</p>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -444,7 +443,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
           {/* Actionable Insights - More Legible */}
           {!loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -8 }}
                 className="bg-white rounded-[56px] p-12 border border-slate-100 shadow-xl group transition-all duration-500"
               >
@@ -453,8 +452,8 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
                 </div>
                 <h4 className="text-3xl font-extrabold text-slate-800 mb-6 tracking-tight">Irrigation Strategy</h4>
                 <p className="text-slate-600 font-semibold text-lg leading-relaxed mb-12">
-                  {forecast.some(d => d.condition === 'Rainy') 
-                    ? "Hydration Guard Active: Significant precipitation modeled in the current window. Suspend irrigation protocols to optimize water retention and prevent leaching." 
+                  {forecast.some(d => d.condition === 'Rainy')
+                    ? "Hydration Guard Active: Significant precipitation modeled in the current window. Suspend irrigation protocols to optimize water retention and prevent leaching."
                     : "Moisture Demand High: Clear skies and rising temperatures detected. Maintain consistent hydration cycles to prevent crop dehydration stress."}
                 </p>
                 <div className="flex items-center gap-4 bg-slate-50 px-6 py-4 rounded-2xl w-fit border border-slate-100">
@@ -463,7 +462,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -8 }}
                 className="bg-white rounded-[56px] p-12 border border-slate-100 shadow-xl group transition-all duration-500"
               >
@@ -472,8 +471,8 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
                 </div>
                 <h4 className="text-3xl font-extrabold text-slate-800 mb-6 tracking-tight">Nutrient Application</h4>
                 <p className="text-slate-600 font-semibold text-lg leading-relaxed mb-12">
-                  {forecast[0]?.condition === 'Rainy' 
-                    ? "Runoff Mitigation: Immediate rainfall risk detected. Delay foliar nutrient spraying to ensure maximum absorption and prevent environmental leaching." 
+                  {forecast[0]?.condition === 'Rainy'
+                    ? "Runoff Mitigation: Immediate rainfall risk detected. Delay foliar nutrient spraying to ensure maximum absorption and prevent environmental leaching."
                     : "Optimal Uptake Window: Ideal conditions for fertilizer application. Photosynthetic activity is expected to be high, maximizing nutrient assimilation."}
                 </p>
                 <div className="flex items-center gap-4 bg-slate-50 px-6 py-4 rounded-2xl w-fit border border-slate-100">
@@ -493,29 +492,26 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
             <div className="space-y-8">
               <AnimatePresence mode='wait'>
                 {alerts.map((alert, idx) => (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, x: 30 }}
                     animate={{ opacity: 1, x: 0 }}
-                    key={idx} 
-                    className={`p-10 rounded-[40px] border flex items-start gap-8 transition-all relative overflow-hidden group ${
-                      alert.type === 'critical' ? 'bg-red-50/50 border-red-100' :
+                    key={idx}
+                    className={`p-10 rounded-[40px] border flex items-start gap-8 transition-all relative overflow-hidden group ${alert.type === 'critical' ? 'bg-red-50/50 border-red-100' :
                       alert.type === 'warning' ? 'bg-amber-50/50 border-amber-100' :
-                      'bg-emerald-50/50 border-emerald-100'
-                    }`}
+                        'bg-emerald-50/50 border-emerald-100'
+                      }`}
                   >
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
-                      alert.type === 'critical' ? 'bg-red-500 text-white' :
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${alert.type === 'critical' ? 'bg-red-500 text-white' :
                       alert.type === 'warning' ? 'bg-amber-500 text-white' :
-                      'bg-emerald-500 text-white'
-                    }`}>
+                        'bg-emerald-500 text-white'
+                      }`}>
                       <alert.icon className="w-8 h-8" />
                     </div>
                     <div>
-                      <p className={`font-black text-xl tracking-tight mb-3 ${
-                        alert.type === 'critical' ? 'text-red-900' :
+                      <p className={`font-black text-xl tracking-tight mb-3 ${alert.type === 'critical' ? 'text-red-900' :
                         alert.type === 'warning' ? 'text-amber-900' :
-                        'text-emerald-900'
-                      }`}>{alert.message}</p>
+                          'text-emerald-900'
+                        }`}>{alert.message}</p>
                       <p className="text-sm font-bold opacity-70 leading-relaxed text-slate-600">{alert.recommendation}</p>
                     </div>
                   </motion.div>
@@ -526,25 +522,25 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
 
           {/* Suggested Crops */}
           {!loading && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="bg-emerald-950 rounded-[64px] p-12 text-white shadow-2xl relative overflow-hidden"
             >
               <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-500/20 rounded-full blur-[120px]"></div>
-              
+
               <div className="flex items-center justify-between mb-16">
                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-emerald-400/60">Viability Engine</h3>
                 <div className="px-5 py-2 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-500/20 shadow-sm">
-                   7-Day Accuracy
+                  7-Day Accuracy
                 </div>
               </div>
 
               <div className="space-y-8 relative z-10">
                 {recommendedCrops.map((crop, idx) => (
-                  <motion.div 
+                  <motion.div
                     whileHover={{ x: 15 }}
-                    key={idx} 
+                    key={idx}
                     className="p-8 bg-white/5 rounded-[40px] border border-white/5 hover:bg-white/10 transition-all cursor-default group"
                   >
                     <div className="flex items-center gap-6 mb-5">
@@ -566,10 +562,6 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
                 ))}
               </div>
 
-              <button className="w-full mt-16 py-7 bg-emerald-500 text-white rounded-[40px] font-black uppercase tracking-[0.2em] text-[11px] hover:bg-emerald-400 transition-all shadow-2xl shadow-emerald-900/40 flex items-center justify-center gap-5 group">
-                suitability Database
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-4 transition-transform duration-500" />
-              </button>
             </motion.div>
           )}
         </div>
