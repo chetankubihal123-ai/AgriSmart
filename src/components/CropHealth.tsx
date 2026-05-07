@@ -124,7 +124,7 @@ const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warnin
 
 
 export function CropHealth({ farm: _farm }: CropHealthProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -218,7 +218,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       let imageToAnalyze = selectedImage;
 
       // Use Detailed Analysis
-      const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop);
+      const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);
 
       if (detailedResult) {
         setResult({
@@ -241,7 +241,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
       // 2. Gemini Analysis with Fallback (Legacy)
       try {
-        const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop);
+        const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
         if (geminiResult) {
           setResult({
             status: geminiResult.status || 'Warning',
@@ -551,9 +551,9 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-8">
                       <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Overall Crop Vitality</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">{t('cropHealth.vitality')}</span>
                         <h3 className={`text-4xl font-black tracking-tighter ${result.status === 'Critical' ? 'text-red-600' : (result.status === 'Warning' ? 'text-orange-500' : 'text-green-600')}`}>
-                          {result.status === 'Healthy' ? 'PRIME HEALTH' : (result.status === 'Warning' ? 'VULNERABLE' : 'CRITICAL CONDITION')}
+                          {result.status === 'Healthy' ? t('cropHealth.primeHealth') : (result.status === 'Warning' ? t('cropHealth.vulnerable') : t('cropHealth.criticalCondition'))}
                         </h3>
                       </div>
                       <div className="flex items-center gap-3">
@@ -561,7 +561,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                           result.status === 'Critical' ? 'bg-red-50 text-red-600 border-red-200' : 
                           (result.status === 'Warning' ? 'bg-orange-50 text-orange-500 border-orange-200' : 'bg-green-50 text-green-600 border-green-200')
                         }`}>
-                          {result.status}
+                          {result.status === 'Healthy' ? t('cropHealth.status.healthy') : (result.status === 'Warning' ? t('cropHealth.status.warning') : t('cropHealth.status.critical'))}
                         </div>
                       </div>
                     </div>
@@ -570,7 +570,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                       <div className="bg-green-50/50 p-6 rounded-[24px] border border-green-100/50">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Good / Healthy</span>
+                          <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{t('cropHealth.goodHealthy')}</span>
                         </div>
                         <div className="text-5xl font-black text-green-600 tracking-tighter">
                           {result.healthScore || 0}%
@@ -579,7 +579,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                       <div className="bg-red-50/50 p-6 rounded-[24px] border border-red-100/50">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2 h-2 bg-red-500 rounded-full" />
-                          <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Bad / Affected</span>
+                          <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">{t('cropHealth.badAffected')}</span>
                         </div>
                         <div className="text-5xl font-black text-red-600 tracking-tighter">
                           {100 - (result.healthScore || 0)}%
@@ -598,7 +598,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                     
                     <div className="flex items-center gap-2 mt-4 text-[11px] font-bold text-slate-500 italic">
                       <Sparkles className="w-3.5 h-3.5 text-prodmast-primary" />
-                      Analysis indicates {result.disease?.toLowerCase() || 'no specific disease'} as the primary stressor.
+                      {t('cropHealth.primaryStressor').replace('{{disease}}', result.disease?.toLowerCase() || 'no specific disease')}
                     </div>
                   </div>
                 </div>
@@ -651,7 +651,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                   <div className="border-t border-slate-200 pt-8 mt-8">
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-2">
                       <Sparkles className="w-6 h-6 text-prodmast-primary" />
-                      Actionable Advice
+                      {t('cropHealth.actionableAdvice')}
                     </h3>
 
                     {/* Simplified Actionable Advice (2-3 Points) */}
@@ -673,18 +673,18 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                       <div className="mt-8 space-y-4 opacity-80">
                         <details className="group">
                           <summary className="list-none cursor-pointer flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest py-2 border-t border-slate-100 group-open:mb-4">
-                            <span>View Full Treatment Protocol</span>
+                            <span>{t('cropHealth.fullProtocol')}</span>
                             <Sparkles className="w-3 h-3 transition-transform group-open:rotate-180" />
                           </summary>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
-                              <h5 className="text-[10px] font-black text-blue-600 uppercase mb-2">Biological</h5>
+                              <h5 className="text-[10px] font-black text-blue-600 uppercase mb-2">{t('cropHealth.biological')}</h5>
                               <ul className="text-xs text-slate-600 space-y-1">
                                 {result.treatment.biological.map((t, i) => <li key={i}>• {t}</li>)}
                               </ul>
                             </div>
                             <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                              <h5 className="text-[10px] font-black text-slate-500 uppercase mb-2">Prevention</h5>
+                              <h5 className="text-[10px] font-black text-slate-500 uppercase mb-2">{t('cropHealth.prevention')}</h5>
                               <ul className="text-xs text-slate-600 space-y-1">
                                 {result.treatment.prevention.map((t, i) => <li key={i}>• {t}</li>)}
                               </ul>

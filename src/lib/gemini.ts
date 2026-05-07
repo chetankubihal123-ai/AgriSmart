@@ -6,10 +6,12 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 
 const MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"];
 
-export async function analyzeImageWithGemini(base64Image: string, cropType: string = 'plant') {
+export async function analyzeImageWithGemini(base64Image: string, cropType: string = 'plant', language: string = 'en') {
   const base64Data = base64Image.split(',')[1];
+  const langPrompt = language === 'kn' ? 'Return ONLY Kannada text for all fields.' : 'Return ONLY English text for all fields.';
   const prompt = `
     Analyze this image of a ${cropType}.
+    ${langPrompt}
     Return ONLY JSON: {"disease": "Name", "status": "Healthy"|"Warning"|"Critical", "confidence": 0-100, "description": "...", "treatment": ["..."]}
   `;
 
@@ -35,14 +37,16 @@ export async function analyzeImageWithGemini(base64Image: string, cropType: stri
   }
 }
 
-export async function analyzeDetailedPlantHealth(base64Image: string, cropType: string = 'plant') {
+export async function analyzeDetailedPlantHealth(base64Image: string, cropType: string = 'plant', language: string = 'en') {
   const base64Data = base64Image.split(',')[1];
+  const langPrompt = language === 'kn' ? 'IMPORTANT: Return ALL string values (names, descriptions, treatments, causes, spread) in KANNADA language. Use English for technical categories only if absolutely necessary.' : 'Return all values in English.';
   const prompt = `Analyze this ${cropType} image for health and disease. 
+  ${langPrompt}
   Return ONLY a JSON object with:
   {
     "healthScore": number (0-100),
     "growthStage": "Seedling" | "Vegetative" | "Flowering" | "Fruiting" | "Maturity",
-    "stressIndicators": [{"type": "Nitrogen low", "severity": "Low", "box": [ymin, xmin, ymax, xmax]}],
+    "stressIndicators": [{"type": "string", "severity": "Low" | "Moderate" | "High", "box": [ymin, xmin, ymax, xmax]}],
     "topDiagnosis": {"name": "string", "confidence": number, "severity": "Low" | "Moderate" | "High"},
     "alternatives": [{"name": "string", "confidence": number}],
     "lesions": [{"box": [ymin, xmin, ymax, xmax], "type": "Spot" | "Blight" | "Mold"}],

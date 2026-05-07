@@ -313,7 +313,18 @@ export const translations = {
                 healthy: 'Healthy',
                 warning: 'Warning',
                 critical: 'Critical'
-            }
+            },
+            vitality: 'Overall Crop Vitality',
+            goodHealthy: 'Good / Healthy',
+            badAffected: 'Bad / Affected',
+            primeHealth: 'PRIME HEALTH',
+            vulnerable: 'VULNERABLE',
+            criticalCondition: 'CRITICAL CONDITION',
+            actionableAdvice: 'Actionable Advice',
+            fullProtocol: 'View Full Treatment Protocol',
+            biological: 'Biological',
+            prevention: 'Prevention',
+            primaryStressor: 'Analysis indicates {{disease}} as the primary stressor.'
         },
         yield: {
             title: 'Yield Estimator',
@@ -742,7 +753,18 @@ export const translations = {
                 healthy: 'ಆರೋಗ್ಯಕರ',
                 warning: 'ಎಚ್ಚರಿಕೆ',
                 critical: 'ಗಂಭೀರ'
-            }
+            },
+            vitality: 'ಒಟ್ಟಾರೆ ಬೆಳೆ ಚೈತನ್ಯ',
+            goodHealthy: 'ಉತ್ತಮ / ಆರೋಗ್ಯಕರ',
+            badAffected: 'ಹಾನಿಗೊಳಗಾದ / ಬಾಧಿತ',
+            primeHealth: 'ಉತ್ತಮ ಆರೋಗ್ಯ',
+            vulnerable: 'ಅಪಾಯದಲ್ಲಿದೆ',
+            criticalCondition: 'ಗಂಭೀರ ಸ್ಥಿತಿ',
+            actionableAdvice: 'ಕಾರ್ಯಗತಗೊಳಿಸಬಹುದಾದ ಸಲಹೆಗಳು',
+            fullProtocol: 'ಪೂರ್ಣ ಚಿಕಿತ್ಸಾ ಕ್ರಮವನ್ನು ವೀಕ್ಷಿಸಿ',
+            biological: 'ಜೈವಿಕ',
+            prevention: 'ಮುನ್ನೆಚ್ಚರಿಕೆ',
+            primaryStressor: 'ವಿಶ್ಲೇಷಣೆಯು {{disease}} ಅನ್ನು ಪ್ರಾಥಮಿಕ ಒತ್ತಡದ ಅಂಶವೆಂದು ಸೂಚಿಸುತ್ತದೆ.'
         },
         yield: {
             title: 'ಇಳುವರಿ ಅಂದಾಜುಗಾರ',
