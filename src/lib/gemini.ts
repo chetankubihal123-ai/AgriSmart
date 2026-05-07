@@ -146,11 +146,11 @@ export async function detectPlantBoundingBox(base64Image: string) {
 
 export async function identifyCropType(base64Image: string): Promise<string> {
   const base64Data = base64Image.split(',')[1];
-  const prompt = `Task: Identify if this image contains a crop or plant.
-  1. If the image is NOT a plant (e.g., human, animal, furniture, abstract, or non-agricultural object), return "other".
-  2. If it is a plant, choose the most specific match from: "tomato", "corn", "chilli".
-  3. If it is a plant but not one of those three, return "plant".
-  Return ONLY the single word answer.`;
+  const prompt = `Analyze this image.
+  Is there any plant or leaf in this image? 
+  If YES, return the most specific one from: "tomato", "corn", "chilli", or "plant".
+  If NO (it is a person, object, or abstract), return "other".
+  Return ONLY the single word.`;
 
   for (const modelName of MODELS) {
     try {
@@ -163,9 +163,14 @@ export async function identifyCropType(base64Image: string): Promise<string> {
         prompt
       ]);
       const response = result.response.text().trim().toLowerCase();
-      if (['tomato', 'corn', 'chilli', 'plant', 'other'].includes(response)) {
-        return response;
-      }
+      
+      if (response.includes('tomato')) return 'tomato';
+      if (response.includes('corn')) return 'corn';
+      if (response.includes('chilli')) return 'chilli';
+      if (response.includes('plant')) return 'plant';
+      if (response.includes('other')) return 'other';
+
+      return 'plant'; // Default to plant if it said something else but didn't say "other"
     } catch (error) {
       console.warn(`Crop identification failed with ${modelName}:`, error);
       continue;
