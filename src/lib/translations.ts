@@ -315,6 +315,7 @@ export const translations = {
                 critical: 'Critical'
             },
             noCropDetected: 'No crop detected in the image. Please upload a clear photo of a plant.',
+            failedToIdentify: 'Failed to identify disease. Please try another clear image or check your connection.',
             vitality: 'Overall Crop Vitality',
             goodHealthy: 'Good / Healthy',
             badAffected: 'Bad / Affected',
@@ -770,6 +771,7 @@ export const translations = {
                 critical: 'ಗಂಭೀರ'
             },
             noCropDetected: 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಸಸ್ಯದ ಸ್ಪಷ್ಟ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.',
+            failedToIdentify: 'ರೋಗವನ್ನು ಪತ್ತೆಹಚ್ಚಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೊಂದು ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ.',
             vitality: 'ಒಟ್ಟಾರೆ ಬೆಳೆ ಚೈತನ್ಯ',
             goodHealthy: 'ಉತ್ತಮ / ಆರೋಗ್ಯಕರ',
             badAffected: 'ಹಾನಿಗೊಳಗಾದ / ಬಾಧಿತ',

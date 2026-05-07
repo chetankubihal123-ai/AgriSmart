@@ -17,7 +17,7 @@ interface AnalysisResult {
 }
 
 export function DiseaseDetection() {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -106,8 +106,8 @@ export function DiseaseDetection() {
             let imageToAnalyze = selectedImage;
             // Magic crop now happens on upload, so we just analyze what we have
 
-            // Use Detailed Analysis
-            const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop);
+            // 1. Detailed Analysis
+            const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);
             
             if (detailedResult) {
                 setResult({
@@ -126,11 +126,11 @@ export function DiseaseDetection() {
 
             // 2. Gemini Analysis with Fallback
             try {
-                const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop);
+                const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
                 if (geminiResult) {
                     setResult({
                         ...geminiResult,
-                        description: `[AI Powered] ${geminiResult.description}`
+                        description: `[AI] ${geminiResult.description}`
                     });
                     return;
                 }
@@ -159,7 +159,7 @@ export function DiseaseDetection() {
             }
         } catch (error: any) {
             console.error("General analysis error", error);
-            setClassificationError("Failed to identify disease. Please try another image.");
+            setClassificationError(t('cropHealth.failedToIdentify'));
         } finally {
             setAnalyzing(false);
         }
@@ -346,7 +346,9 @@ export function DiseaseDetection() {
                                     </div>
                                     <div className="bg-white/90 px-6 py-3 rounded-lg flex items-center gap-3 z-10">
                                         <Sparkles className="w-5 h-5 text-red-600 animate-pulse" />
-                                        <span className="font-semibold text-gray-800">Applying Magic Crop...</span>
+                                        <span className="font-bold text-gray-800 uppercase text-xs tracking-widest">
+                                          {language === 'kn' ? 'ಮ್ಯಾಜಿಕ್ ಕ್ರಾಪ್ ಅನ್ವಯಿಸಲಾಗುತ್ತಿದೆ...' : 'Applying Magic Crop...'}
+                                        </span>
                                     </div>
                                 </div>
                             )}
@@ -398,14 +400,17 @@ export function DiseaseDetection() {
                                                 result.severity === 'Moderate' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
                                                     'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}
                                         `}>
-                                            {result.severity || 'Moderate'} Severity
+                                            {result.severity === 'High' ? t('cropHealth.levels.high') : 
+                                             result.severity === 'Moderate' ? t('cropHealth.levels.moderate') : 
+                                             t('cropHealth.levels.low')} {language === 'kn' ? 'ತೀವ್ರತೆ' : 'Severity'}
                                         </div>
                                     </div>
 
                                     {/* Alternative Diagnoses */}
-                                    {result.alternatives && result.alternatives.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-full">Alternative Matches</span>
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-full">
+                                              {language === 'kn' ? 'ಪರ್ಯಾಯ ರೋಗನಿರ್ಣಯಗಳು' : 'Alternative Diagnoses'}
+                                            </span>
                                             {result.alternatives.map((alt, i) => (
                                                 <span key={i} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold border border-slate-200">
                                                     {alt.name} ({alt.confidence}%)
@@ -421,7 +426,9 @@ export function DiseaseDetection() {
                                     {/* Causes & Spread */}
                                     {result.spread && (
                                         <div className="p-4 bg-slate-900/5 rounded-xl border border-slate-200">
-                                            <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Spread & Pattern</h5>
+                                            <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                                              {language === 'kn' ? 'ಹರಡುವಿಕೆ ಮತ್ತು ಮಾದರಿ' : 'Spread & Pattern'}
+                                            </h5>
                                             <p className="text-xs text-slate-700 font-medium">{result.spread}</p>
                                         </div>
                                     )}
@@ -436,7 +443,9 @@ export function DiseaseDetection() {
                                         {result.detailedTreatment ? (
                                             <div className="space-y-3">
                                                 <div className="bg-prodmast-primary/5 p-4 rounded-xl border border-prodmast-primary/10">
-                                                    <span className="text-[9px] font-black text-prodmast-darker uppercase tracking-tighter block mb-2">Conventional Remediation</span>
+                                                    <span className="text-[9px] font-black text-prodmast-darker uppercase tracking-tighter block mb-2">
+                                                      {language === 'kn' ? 'ಸಾಂಪ್ರದಾಯಿಕ ಪರಿಹಾರ' : 'Conventional Remediation'}
+                                                    </span>
                                                     <ul className="space-y-1.5">
                                                         {result.detailedTreatment.conventional.map((step, i) => (
                                                             <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
@@ -447,7 +456,9 @@ export function DiseaseDetection() {
                                                     </ul>
                                                 </div>
                                                 <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/10">
-                                                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter block mb-2">Biological Control</span>
+                                                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter block mb-2">
+                                                      {language === 'kn' ? 'ಜೈವಿಕ ನಿಯಂತ್ರಣ' : 'Biological Control'}
+                                                    </span>
                                                     <ul className="space-y-1.5">
                                                         {result.detailedTreatment.biological.map((step, i) => (
                                                             <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
@@ -458,7 +469,9 @@ export function DiseaseDetection() {
                                                     </ul>
                                                 </div>
                                                 <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter block mb-2">Prevention Advice</span>
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter block mb-2">
+                                                      {language === 'kn' ? 'ತಡೆಗಟ್ಟುವ ಸಲಹೆ' : 'Prevention Advice'}
+                                                    </span>
                                                     <ul className="space-y-1.5">
                                                         {result.detailedTreatment.prevention.map((step, i) => (
                                                             <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
@@ -485,7 +498,7 @@ export function DiseaseDetection() {
                                         onClick={resetAnalysis}
                                         className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold hover:bg-slate-800 transition shadow-md"
                                     >
-                                        Analyze Another
+                                        {language === 'kn' ? 'ಇನ್ನೊಂದನ್ನು ವಿಶ್ಲೇಷಿಸಿ' : 'Analyze Another'}
                                     </button>
                                 </div>
                             )}
