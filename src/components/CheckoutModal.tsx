@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, CheckCircle, Loader2, ShoppingBag, MapPin, Phone, User, CreditCard, ChevronRight, ChevronLeft, Wallet, Truck, ShoppingCart, ArrowRight } from 'lucide-react';
+import { X, CheckCircle, Loader2, ShoppingBag, MapPin, Phone, User, CreditCard, ChevronRight, ChevronLeft, Wallet, Truck, ShoppingCart, ArrowRight, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { supabase } from '../lib/supabase';
@@ -23,8 +23,46 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     const [paymentMethod, setPaymentMethod] = useState<'phonepe' | 'gpay' | 'card' | 'cod'>('cod');
     
     const [loading, setLoading] = useState(false);
+    const [fetchingLocation, setFetchingLocation] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Auto-fill user info
+    React.useEffect(() => {
+        if (user && isOpen) {
+            if (!name) setName(user.user_metadata?.full_name || user.email?.split('@')[0] || '');
+            if (!phone && user.phone) {
+                const cleanPhone = user.phone.replace('+91', '').replace(/\D/g, '').slice(-10);
+                setPhone(cleanPhone);
+            }
+        }
+    }, [user, isOpen]);
+
+    const handleUseLiveLocation = () => {
+        if (!('geolocation' in navigator)) return;
+        
+        setFetchingLocation(true);
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            try {
+                const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+                const data = await res.json();
+                
+                const parts = [
+                    data.locality,
+                    data.city,
+                    data.principalSubdivision,
+                    data.postcode
+                ].filter(Boolean);
+                
+                setAddress(parts.join(', '));
+            } catch (e) {
+                console.error('Geocoding error:', e);
+            } finally {
+                setFetchingLocation(false);
+            }
+        }, () => setFetchingLocation(false));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -344,14 +382,25 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                                             if (val.length <= 10) setPhone(val);
                                         }}
                                         maxLength={10}
-                                        className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-300"
+                                        className={`w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-300 ${user?.phone ? 'opacity-80' : ''}`}
                                         placeholder="10-digit Mobile Number"
                                         inputMode="numeric"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-prodmast-muted uppercase tracking-[0.2em] mb-2 px-1 flex items-center gap-2">
-                                        <MapPin className="w-3 h-3" /> Shipping Address
+                                    <label className="block text-[10px] font-black text-prodmast-muted uppercase tracking-[0.2em] mb-2 px-1 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <MapPin className="w-3 h-3" /> Shipping Address
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={handleUseLiveLocation}
+                                            disabled={fetchingLocation}
+                                            className="text-[9px] text-prodmast-primary hover:text-prodmast-dark transition-colors flex items-center gap-1 bg-prodmast-primary/5 px-2 py-1 rounded-lg border border-prodmast-primary/10"
+                                        >
+                                            {fetchingLocation ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Activity className="w-2.5 h-2.5" />}
+                                            {fetchingLocation ? 'Fetching...' : 'Use Live Location'}
+                                        </button>
                                     </label>
                                     <textarea
                                         required rows={3} value={address}
