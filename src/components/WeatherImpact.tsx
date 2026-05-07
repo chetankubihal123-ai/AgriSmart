@@ -100,10 +100,36 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
     }
   };
 
-  // Initial load
+  // Initial load - try to get live location
   useEffect(() => {
-    // Default to a known location if no farm location, or try search
-    handleSearchLocation(locationName);
+    const initializeWeather = async () => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            try {
+              // Get city name for display
+              const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+              const geoData = await geoRes.json();
+              const city = geoData.city || geoData.locality || "Your Location";
+              await fetchWeather(latitude, longitude, city);
+            } catch (e) {
+              console.error("Reverse geocode failed, using coordinates", e);
+              await fetchWeather(latitude, longitude, "Your Location");
+            }
+          },
+          (error) => {
+            console.warn("Geolocation denied, falling back to default", error);
+            handleSearchLocation(locationName);
+          },
+          { timeout: 5000 }
+        );
+      } else {
+        handleSearchLocation(locationName);
+      }
+    };
+
+    initializeWeather();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
