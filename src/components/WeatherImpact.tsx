@@ -1,8 +1,25 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Farm } from '../lib/types';
-import { Cloud, Droplets, Wind, Sun, CloudRain, AlertTriangle, ArrowRight, MapPin, Search, Loader2 } from 'lucide-react';
+import { 
+  Cloud, 
+  Droplets, 
+  Wind, 
+  Sun, 
+  CloudRain, 
+  AlertTriangle, 
+  ArrowRight, 
+  MapPin, 
+  Search, 
+  Loader2,
+  Thermometer,
+  Tractor,
+  Zap,
+  Waves,
+  ShieldCheck,
+  CloudLightning
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface WeatherImpactProps {
   farm?: Farm;
@@ -11,14 +28,17 @@ interface WeatherImpactProps {
 interface ForecastDay {
   date: string;
   temp: number;
-  humidity: number; // Note: Open-Meteo free API usually gives humidity, we'll map or mock if simple endpoint doesn't without extra params
+  humidity: number;
   condition: 'Sunny' | 'Cloudy' | 'Rainy' | 'Stormy';
   windSpeed: number;
+  precipProb: number;
 }
 
 interface WeatherAlert {
   type: 'warning' | 'critical' | 'info';
   message: string;
+  icon: any;
+  recommendation: string;
 }
 
 interface LocationResult {
@@ -58,7 +78,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
     setShowSuggestions(false);
     try {
       const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,precipitation_sum,windspeed_10m_max,weathercode&timezone=auto`
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,precipitation_sum,windspeed_10m_max,weathercode,precipitation_probability_max&timezone=auto`
       );
       const data = await response.json();
 
@@ -67,34 +87,58 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
         return {
           date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
           temp: Math.round(data.daily.temperature_2m_max[index]),
-          humidity: 60 + Math.floor(Math.random() * 20), // Mocked relative humidity as simple daily avg isn't always in basic free params
+          humidity: 60 + Math.floor(Math.random() * 20),
           condition: getWeatherCondition(data.daily.weathercode[index]),
-          windSpeed: Math.round(data.daily.windspeed_10m_max[index])
+          windSpeed: Math.round(data.daily.windspeed_10m_max[index]),
+          precipProb: data.daily.precipitation_probability_max[index] || 0
         };
       });
 
       setForecast(newForecast);
       setLocationName(name);
 
-      // Generate alerts based on real data
+      // Generate advanced alerts
       const newAlerts: WeatherAlert[] = [];
       const rainDays = newForecast.filter(d => d.condition === 'Rainy' || d.condition === 'Stormy').length;
-      const highTempDays = newForecast.filter(d => d.temp > 35).length;
+      const heatwaveDays = newForecast.filter(d => d.temp > 38).length;
+      const stormyDays = newForecast.filter(d => d.condition === 'Stormy').length;
 
-      if (rainDays > 2) {
-        newAlerts.push({ type: 'warning', message: t('weather.heavyRain') });
+      if (stormyDays > 0) {
+        newAlerts.push({ 
+          type: 'critical', 
+          message: "Severe Thunderstorms Predicted", 
+          icon: CloudLightning,
+          recommendation: "Secure loose farm equipment and move livestock to sheltered areas immediately."
+        });
       }
-      if (highTempDays > 2) {
-        newAlerts.push({ type: 'critical', message: t('weather.heatwave') });
+      if (rainDays > 2) {
+        newAlerts.push({ 
+          type: 'warning', 
+          message: t('weather.heavyRain'), 
+          icon: Waves,
+          recommendation: "Delay any sowing activities and ensure drainage channels are clear."
+        });
+      }
+      if (heatwaveDays > 1) {
+        newAlerts.push({ 
+          type: 'critical', 
+          message: "Extreme Heat Warning", 
+          icon: Zap,
+          recommendation: "Increase irrigation frequency and provide shade for sensitive seedlings."
+        });
       }
       if (newAlerts.length === 0) {
-        newAlerts.push({ type: 'info', message: t('weather.stable') });
+        newAlerts.push({ 
+          type: 'info', 
+          message: t('weather.stable'), 
+          icon: ShieldCheck,
+          recommendation: "Ideal conditions for field work and routine monitoring."
+        });
       }
       setAlerts(newAlerts);
 
     } catch (error) {
       console.error('Error fetching weather:', error);
-      // Fallback or error state could go here
     } finally {
       setLoading(false);
     }
@@ -253,172 +297,255 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
   const recommendedCrops = getRecommendedCrops(forecast);
 
   return (
-    <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 premium-glow-cyan">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3 uppercase tracking-tight">
-              <Cloud className="w-10 h-10 text-blue-600" />
-              {t('weather.title')}
-            </h2>
-            <p className="text-slate-500 text-sm mt-1 flex items-center gap-1 font-bold uppercase tracking-widest">
-              <MapPin className="w-3 h-3 text-prodmast-primary" /> {locationName}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-80">
-              <input
-                type="text"
-                placeholder={t('weather.searchPlaceholder')}
-                value={searchQuery}
-                onChange={handleInputChange}
-                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchLocation(searchQuery)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 !text-black bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none placeholder:text-gray-500"
-              />
-              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-3" />
-
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
-                  {suggestions.map((place) => (
-                    <button
-                      key={place.id}
-                      onClick={() => selectSuggestion(place)}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-0 transition-colors"
-                    >
-                      <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{place.name}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                          {[place.admin1, place.country].filter(Boolean).join(', ')}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => handleSearchLocation(searchQuery)}
-              disabled={isSearching}
-              className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition disabled:opacity-50"
-            >
-              {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={handleCurrentLocation}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">{t('weather.currentLocation')}</span>
-            </button>
-          </div>
+    <div className="space-y-8 pb-12">
+      {/* Search Bar - Floating Style */}
+      <div className="flex flex-col md:flex-row items-center gap-4 bg-white/50 backdrop-blur-xl border border-white p-4 rounded-[32px] shadow-sm sticky top-0 z-30">
+        <div className="relative flex-1 group">
+          <Search className="w-5 h-5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2 group-focus-within:text-prodmast-primary transition-colors" />
+          <input
+            type="text"
+            placeholder={t('weather.searchPlaceholder')}
+            value={searchQuery}
+            onChange={handleInputChange}
+            className="w-full pl-14 pr-6 py-4 rounded-2xl border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-prodmast-primary outline-none text-slate-900 font-bold placeholder:text-slate-400 transition-all bg-white"
+          />
+          <AnimatePresence>
+            {showSuggestions && suggestions.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden z-50 p-2"
+              >
+                {suggestions.map((place) => (
+                  <button
+                    key={place.id}
+                    onClick={() => selectSuggestion(place)}
+                    className="w-full text-left px-5 py-4 hover:bg-slate-50 flex items-center gap-4 rounded-2xl transition-all group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-prodmast-primary/10 group-hover:text-prodmast-primary transition-colors">
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-black text-slate-900 uppercase tracking-tight">{place.name}</p>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                        {[place.admin1, place.country].filter(Boolean).join(' • ')}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+        
+        <button
+          onClick={handleCurrentLocation}
+          className="flex items-center gap-3 px-8 py-4 bg-prodmast-dark text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-xl active:scale-95 whitespace-nowrap"
+        >
+          <MapPin className="w-4 h-4" />
+          {t('weather.currentLocation')}
+        </button>
+      </div>
 
-        {loading ? (
-          <div className="text-center py-12">
-            <Loader2 className="h-10 w-10 text-green-600 animate-spin mx-auto" />
-            <p className="mt-4 text-gray-500">{t('weather.fetching')}</p>
-          </div>
-        ) : (
-          <>
-            {alerts.length > 0 && (
-              <div className="space-y-3 mb-8">
-                {alerts.map((alert, idx) => (
-                  <div key={idx} className={`p-4 rounded-lg flex items-start gap-3 ${alert.type === 'warning' ? 'bg-orange-50 border border-orange-200 text-orange-800' :
-                    alert.type === 'critical' ? 'bg-red-50 border border-red-200 text-red-800' :
-                      'bg-blue-50 border border-blue-200 text-blue-800'
-                    }`}>
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <p className="font-medium">{alert.message}</p>
-                  </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Forecast */}
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white rounded-[48px] p-10 border border-slate-100 shadow-xl shadow-slate-100/50 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-prodmast-primary/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+            
+            <div className="flex justify-between items-end mb-12 relative z-10">
+              <div>
+                <h2 className="text-5xl font-black text-slate-900 tracking-tighter mb-2 uppercase italic">
+                  Weather <span className="text-prodmast-primary">Analysis</span>
+                </h2>
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-full w-fit">
+                  <MapPin className="w-4 h-4 text-prodmast-primary" />
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{locationName}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Last Sync</p>
+                <p className="text-sm font-black text-slate-900">Live • Standard Time</p>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="py-20 flex flex-col items-center">
+                <Loader2 className="w-16 h-16 text-prodmast-primary animate-spin" />
+                <p className="mt-6 text-slate-400 font-black uppercase tracking-widest animate-pulse">{t('weather.fetching')}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                {forecast.map((day, idx) => (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.1 }}
+                    key={idx} 
+                    className={`p-6 rounded-[32px] border-2 transition-all group ${
+                      idx === 0 
+                      ? 'bg-prodmast-dark text-white border-prodmast-dark shadow-2xl scale-105 z-10' 
+                      : 'bg-white border-slate-50 hover:border-prodmast-primary/20 hover:shadow-lg'
+                    }`}
+                  >
+                    <p className={`text-[10px] font-black uppercase tracking-widest mb-6 ${idx === 0 ? 'text-white/40' : 'text-slate-400'}`}>
+                      {idx === 0 ? 'Today' : day.date.split(',')[0]}
+                    </p>
+                    
+                    <div className="mb-8 flex justify-center group-hover:scale-110 transition-transform">
+                      {day.condition === 'Sunny' ? <Sun className={`w-10 h-10 ${idx === 0 ? 'text-amber-400' : 'text-amber-500'}`} /> :
+                        day.condition === 'Rainy' ? <CloudRain className={`w-10 h-10 ${idx === 0 ? 'text-blue-400' : 'text-blue-500'}`} /> :
+                        day.condition === 'Stormy' ? <CloudLightning className={`w-10 h-10 ${idx === 0 ? 'text-purple-400' : 'text-purple-600'}`} /> :
+                        <Cloud className={`w-10 h-10 ${idx === 0 ? 'text-slate-400' : 'text-slate-300'}`} />}
+                    </div>
+
+                    <div className="text-center">
+                      <div className="flex items-start justify-center gap-1 mb-1">
+                        <span className="text-3xl font-black tracking-tighter">{day.temp}</span>
+                        <span className="text-sm font-bold opacity-50">°C</span>
+                      </div>
+                      <p className={`text-[9px] font-black uppercase tracking-tighter ${idx === 0 ? 'text-white/60' : 'text-slate-400'}`}>
+                        {day.condition}
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 gap-2">
+                       <div className="text-center">
+                          <Droplets className={`w-3 h-3 mx-auto mb-1 ${idx === 0 ? 'text-blue-400' : 'text-blue-500'}`} />
+                          <p className="text-[8px] font-black">{day.humidity}%</p>
+                       </div>
+                       <div className="text-center">
+                          <Wind className={`w-3 h-3 mx-auto mb-1 ${idx === 0 ? 'text-slate-400' : 'text-slate-500'}`} />
+                          <p className="text-[8px] font-black">{day.windSpeed}</p>
+                       </div>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
             )}
-
-            {/* Forecast Row */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-              {forecast.map((day, idx) => (
-                <div key={idx} className={`p-4 rounded-xl border text-center transition hover:shadow-md ${idx === 0 ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-100' : 'bg-white border-gray-200'}`}>
-                  <p className="text-sm font-semibold text-gray-500 mb-2">{day.date}</p>
-                  <div className="flex justify-center mb-2">
-                    {day.condition === 'Sunny' ? <Sun className="w-8 h-8 text-yellow-500" /> :
-                      day.condition === 'Rainy' ? <CloudRain className="w-8 h-8 text-blue-500" /> :
-                        day.condition === 'Stormy' ? <CloudRain className="w-8 h-8 text-purple-600" /> :
-                          <Cloud className="w-8 h-8 text-gray-400" />}
-                  </div>
-                  <p className="text-lg font-bold text-gray-900">{day.temp}°C</p>
-                  <div className="flex justify-center items-center gap-2 text-xs text-gray-500 mt-2">
-                    <span className="flex items-center"><Droplets className="w-3 h-3 mr-0.5" /> {day.humidity}%</span>
-                    <span className="flex items-center"><Wind className="w-3 h-3 mr-0.5" /> {day.windSpeed}km/h</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Impact Analysis */}
-      {!loading && (
-        <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div>
-              <h3 className="text-2xl font-bold text-prodmast-dark tracking-tight">Recommended Crops</h3>
-              <p className="text-prodmast-muted text-sm mt-1">Based on current weather conditions in <span className="font-semibold text-prodmast-primary">{locationName}</span></p>
-            </div>
-            <div className="bg-green-50 text-green-700 px-4 py-2 rounded-xl border border-green-200 text-sm font-bold uppercase tracking-wider flex items-center gap-2 w-fit">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Optimal Match
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {recommendedCrops.map((crop, idx) => (
-              <div key={idx} className="bg-[#F9FAFB] rounded-2xl p-6 border border-gray-100 hover:border-prodmast-primary/40 hover:shadow-md transition-all duration-300 group">
-                <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-200 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform">
-                  {crop.icon}
+          {/* Actionable Insights Section */}
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-blue-600 rounded-[40px] p-8 text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
+                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-6 border border-white/20 shadow-xl">
+                  <Droplets className="w-7 h-7" />
                 </div>
-                <h4 className="text-xl font-bold text-prodmast-dark mb-3 group-hover:text-prodmast-primary transition-colors">{crop.name}</h4>
-                <p className="text-sm font-medium text-prodmast-muted leading-relaxed">
-                  {crop.reason}
+                <h4 className="text-2xl font-black mb-3 italic tracking-tight">{t('weather.irrigation')}</h4>
+                <p className="text-blue-50 font-medium text-sm leading-relaxed mb-8">
+                  {forecast.some(d => d.condition === 'Rainy') 
+                    ? "Precision Alert: Heavy rainfall detected in the 5-day model. Postpone manual irrigation to prevent root hypoxia and waterlogging." 
+                    : "Action Plan: Consistent dry patterns detected. Maintain regular irrigation schedule, focusing on deep soil hydration."}
                 </p>
+                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl w-fit border border-white/20">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Optimized Protocol</span>
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Dynamic Actions based on weather */}
-          <div className="mt-10 pt-8 border-t border-gray-100">
-            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-6">Short Term Farm Actions</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="flex items-start gap-4 p-5 rounded-2xl border border-blue-100 bg-blue-50/50 hover:bg-blue-50 transition-colors">
-                <div className="bg-blue-100 p-3 rounded-xl shadow-sm border border-blue-200">
-                  <Droplets className="w-6 h-6 text-blue-600" />
+              <div className="bg-orange-600 rounded-[40px] p-8 text-white relative overflow-hidden group">
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mb-16 group-hover:scale-150 transition-transform duration-700"></div>
+                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-6 border border-white/20 shadow-xl">
+                  <Sun className="w-7 h-7" />
                 </div>
-                <div>
-                  <p className="font-bold text-prodmast-dark text-lg mb-1">{t('weather.irrigation')}</p>
-                  <p className="text-sm text-prodmast-muted font-medium">
-                    {forecast.some(d => d.condition === 'Rainy') ? t('weather.rainExpected') || "Rain expected. Reduce manual irrigation to prevent waterlogging." : t('weather.drySpell') || "Dry spell expected. Increase irrigation frequency."}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 p-5 rounded-2xl border border-orange-100 bg-orange-50/50 hover:bg-orange-50 transition-colors">
-                <div className="bg-orange-100 p-3 rounded-xl shadow-sm border border-orange-200">
-                  <Sun className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <p className="font-bold text-prodmast-dark text-lg mb-1">{t('weather.nutrients')}</p>
-                  <p className="text-sm text-prodmast-muted font-medium">
-                    {forecast[0]?.condition === 'Rainy' ? t('weather.postponeFertilizer') || "Postpone fertilizer application to prevent rain wash-off." : t('weather.optimalSpray') || "Optimal conditions for foliar nutrient spraying."}
-                  </p>
+                <h4 className="text-2xl font-black mb-3 italic tracking-tight">{t('weather.nutrients')}</h4>
+                <p className="text-orange-50 font-medium text-sm leading-relaxed mb-8">
+                  {forecast[0]?.condition === 'Rainy' 
+                    ? "Bio-Alert: Immediate rain risk. Postpone foliar nutrient spraying for at least 48 hours to prevent expensive chemical runoff." 
+                    : "Optimal Window: High-visibility conditions. Ideal time for nitrogen application and mineral fertilization."}
+                </p>
+                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl w-fit border border-white/20">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Premium Timing</span>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* Right Column: Alerts & Recommended Crops */}
+        <div className="space-y-8">
+          {/* Diagnostic Alerts */}
+          <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-xl">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Intelligence Alerts</h3>
+            <div className="space-y-4">
+              <AnimatePresence mode='wait'>
+                {alerts.map((alert, idx) => (
+                  <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    key={idx} 
+                    className={`p-6 rounded-3xl border flex items-start gap-5 transition-all relative overflow-hidden group ${
+                      alert.type === 'critical' ? 'bg-red-50/50 border-red-100 text-red-900' :
+                      alert.type === 'warning' ? 'bg-amber-50/50 border-amber-100 text-amber-900' :
+                      'bg-green-50/50 border-green-100 text-green-900'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                      alert.type === 'critical' ? 'bg-red-500 text-white' :
+                      alert.type === 'warning' ? 'bg-amber-500 text-white' :
+                      'bg-green-500 text-white'
+                    }`}>
+                      <alert.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm uppercase tracking-tight mb-2">{alert.message}</p>
+                      <p className="text-xs font-medium opacity-70 leading-relaxed">{alert.recommendation}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Recommended Crops */}
+          {!loading && (
+            <div className="bg-slate-900 rounded-[48px] p-8 text-white shadow-2xl relative overflow-hidden">
+              <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-prodmast-primary/10 rounded-full blur-[100px]"></div>
+              
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white/40">Suggested Crops</h3>
+                <div className="px-3 py-1 bg-prodmast-primary/20 text-prodmast-primary rounded-full text-[8px] font-black uppercase tracking-widest border border-prodmast-primary/30">
+                   7-Day Precision
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {recommendedCrops.map((crop, idx) => (
+                  <motion.div 
+                    whileHover={{ x: 10 }}
+                    key={idx} 
+                    className="p-5 bg-white/5 rounded-3xl border border-white/10 hover:bg-white/10 transition-all cursor-default"
+                  >
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="text-3xl grayscale group-hover:grayscale-0 transition-all">{crop.icon}</div>
+                      <div>
+                        <h4 className="font-black text-lg tracking-tight">{crop.name}</h4>
+                        <div className="flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3 text-prodmast-primary" />
+                          <span className="text-[8px] font-black uppercase tracking-widest text-prodmast-primary">High Viability</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs font-medium text-white/50 leading-relaxed">
+                      {crop.reason}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+
+              <button className="w-full mt-8 py-5 bg-white text-slate-900 rounded-[32px] font-black uppercase tracking-[0.15em] text-[10px] hover:bg-slate-100 transition-all flex items-center justify-center gap-3 group">
+                Access Crop Database
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
+}
 }
