@@ -309,9 +309,7 @@ export function Dashboard() {
               <span className="w-3 h-3 rounded-full bg-prodmast-accent animate-pulse shadow-[0_0_10px_#a3e635]"></span>
               <p className="text-slate-100 font-semibold">{t('dashboard.overview')} <span className="text-white font-extrabold ml-1">{selectedFarm.name}</span></p>
             </div>
-          ) : (
-            <p className="text-slate-200 text-sm font-semibold mt-2">Select a farm to explore analytics</p>
-          )}
+          ) : null}
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 relative z-10 w-full lg:w-auto">
@@ -356,7 +354,7 @@ export function Dashboard() {
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 tracking-wide uppercase">
               <LineChartIcon className="w-6 h-6 text-emerald-600" />
-              Live Market Snapshot
+              Live Market Rates
             </h3>
             <span className="text-sm font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
               View Full Board <ArrowRight className="w-4 h-4" />
