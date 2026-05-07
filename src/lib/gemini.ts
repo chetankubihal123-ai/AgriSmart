@@ -140,6 +140,35 @@ export async function detectPlantBoundingBox(base64Image: string) {
   return null;
 }
 
+export async function identifyCropType(base64Image: string): Promise<string> {
+  const base64Data = base64Image.split(',')[1];
+  const prompt = `Identify the crop in this image. 
+  Choose ONLY from these exact words: "tomato", "corn", "chilli".
+  If it's none of these, return "other".
+  Return ONLY the single word answer.`;
+
+  for (const modelName of MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: { temperature: 0.1 }
+      });
+      const result = await model.generateContent([
+        { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
+        prompt
+      ]);
+      const response = result.response.text().trim().toLowerCase();
+      if (['tomato', 'corn', 'chilli'].includes(response)) {
+        return response;
+      }
+    } catch (error) {
+      console.warn(`Crop identification failed with ${modelName}:`, error);
+      continue;
+    }
+  }
+  return 'other';
+}
+
 export async function cropImage(base64Image: string, box: { ymin: number, xmin: number, ymax: number, xmax: number }): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();

@@ -26,14 +26,14 @@ export function Shop() {
 
     const STATIC_CATALOG = [
         // Tomato Crop
-        { id: 's1', brand: 'Syngenta', name: 'Saaho (TO-3251) Tomato Seeds (ಸ್ಯಾಹೋ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 999, originalPrice: 1525, discount: 34, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600' },
+        { id: 's1', brand: 'Syngenta', name: 'Saaho (TO-3251) Tomato Seeds (ಸ್ಯಾಹೋ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 999, originalPrice: 1525, discount: 34, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
         { id: 's2', brand: 'Seminis', name: 'Abhilash Tomato Seeds (ಅಭಿಲಾಶ್ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 707, originalPrice: 813, discount: 13, unit: '10 gms', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
-        { id: 's3', brand: 'Syngenta', name: 'Heemsohna Tomato Seeds (ಹೀಮಸೋನಾ ಟೊಮೆಟೊ)', category: 'Seeds', crop: 'Tomato', price: 1065, originalPrice: 1231, discount: 13, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1590139704851-f0439bb752ee?auto=format&fit=crop&q=80&w=600' },
-        { id: 'n1', brand: 'Bayer', name: 'Antracol Fungicide (ಪರಾಗಸ್ಪರ್ಶ ಕೀಟನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 273, originalPrice: 350, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1628352081506-83c43123ed6d?auto=format&fit=crop&q=80&w=600' },
-        { id: 'n2', brand: 'Geolife', name: 'No-Virus Immunity Booster (ನೋ-ವೈರಸ್ ರೋಗನಿರೋಧಕ)', category: 'Nutrients', crop: 'Tomato', price: 369, originalPrice: 850, discount: 57, unit: '250 ml', image: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&q=80&w=600' },
-        { id: 'n3', brand: 'Biostadt', name: 'Roko Fungicide (ರೋಕೋ ಶಿಲೀಂಧ್ರನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 352, originalPrice: 450, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1589365278144-c9e7059c43ba?auto=format&fit=crop&q=80&w=600' },
-        { id: 'n4', brand: 'Bayer', name: 'Velum Prime Nematicide (ವೆಲಮ್ ಪ್ರೈಮ್)', category: 'Nutrients', crop: 'Tomato', price: 2223, originalPrice: 2920, discount: 24, unit: '250 ml', image: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&q=80&w=600' },
-        
+        { id: 's3', brand: 'Syngenta', name: 'Heemsohna Tomato Seeds (ಹೀಮಸೋನಾ ಟೊಮೆಟೊ)', category: 'Seeds', crop: 'Tomato', price: 1065, originalPrice: 1231, discount: 13, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
+        { id: 'n1', brand: 'Bayer', name: 'Antracol Fungicide (ಪರಾಗಸ್ಪರ್ಶ ಕೀಟನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 273, originalPrice: 350, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
+        { id: 'n2', brand: 'Geolife', name: 'No-Virus Immunity Booster (ನೋ-ವೈರಸ್ ರೋಗನಿರೋಧಕ)', category: 'Nutrients', crop: 'Tomato', price: 369, originalPrice: 850, discount: 57, unit: '250 ml', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
+        { id: 'n3', brand: 'Biostadt', name: 'Roko Fungicide (ರೋಕೋ ಶಿಲೀಂಧ್ರನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 352, originalPrice: 450, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
+        { id: 'n4', brand: 'Bayer', name: 'Velum Prime Nematicide (ವೆಲಮ್ ಪ್ರೈಮ್)', category: 'Nutrients', crop: 'Tomato', price: 2223, originalPrice: 2920, discount: 24, unit: '250 ml', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
+
         // Chilli Crop
         { id: 'c1', brand: 'Syngenta', name: 'Royal Bullet Chilli Seeds (ರಾಯಲ್ ಬುಲೆಟ್ ಮೆಣಸಿನಕಾಯಿ)', category: 'Seeds', crop: 'Chilli', price: 677, originalPrice: 781, discount: 13, unit: '1500 seeds', image: '/images/products/green-chilli.png' },
         { id: 'c2', brand: 'Syngenta', name: 'HPH 5531 Chilli Seeds (ಮೆಣಸಿನಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Chilli', price: 698, originalPrice: 961, discount: 27, unit: '1500 seeds', image: '/images/products/green-chilli.png' },
@@ -41,7 +41,7 @@ export function Shop() {
         { id: 'c4', brand: 'VNR', name: 'VNR 145 Chilli Seeds (ವಿಎನ್ಆರ್ 145 ಮೆಣಸಿನಕಾಯಿ)', category: 'Seeds', crop: 'Chilli', price: 543, originalPrice: 720, discount: 25, unit: '10 gms', image: '/images/products/green-chilli.png' },
         { id: 'c5', brand: 'Nunhems', name: 'US 341 Chilli Seeds (ಯುಎಸ್ 341 ಮೆಣಸಿನಕಾಯಿ)', category: 'Seeds', crop: 'Chilli', price: 649, originalPrice: 871, discount: 25, unit: '1500 seeds', image: '/images/products/green-chilli.png' },
         { id: 'c6', brand: 'Rudraksh', name: 'Rudra 101 Chilli Seeds (ರುದ್ರ 101 ಮೆಣಸಿನಕಾಯಿ)', category: 'Seeds', crop: 'Chilli', price: 570, originalPrice: 1000, discount: 43, unit: '10 gms', image: '/images/products/green-chilli.png' },
-        
+
         // Onion Crop
         { id: 'o1', brand: 'Seminis', name: 'Gulmohar Onion Seeds (ಗುಲ್ಮೊಹರ್ ಈರುಳ್ಳಿ ಬೀಜ)', category: 'Seeds', crop: 'Onion', price: 1585, originalPrice: 1689, discount: 6, unit: '500 gms', image: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&q=80&w=600' },
         { id: 'o2', brand: 'Rudraksh', name: 'Onion Glory Seeds (ಈರುಳ್ಳಿ ಗ್ಲೋರಿ ಬೀಜ)', category: 'Seeds', crop: 'Onion', price: 2000, originalPrice: 3200, discount: 38, unit: '1000 gms', image: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&q=80&w=600' },
@@ -49,13 +49,13 @@ export function Shop() {
         { id: 'o4', brand: 'URJA Seeds', name: 'Urja Kalyani Onion (ಉರ್ಜಾ ಕಲ್ಯಾಣಿ ಈರುಳ್ಳಿ)', category: 'Seeds', crop: 'Onion', price: 350, originalPrice: 650, discount: 46, unit: '25 gms', image: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&q=80&w=600' },
         { id: 'o5', brand: 'URJA Seeds', name: 'Urja Red Cosmo Onion (ರೆಡ್ ಕಾಸ್ಮೊ ಈರುಳ್ಳಿ)', category: 'Seeds', crop: 'Onion', price: 325, originalPrice: 600, discount: 46, unit: '25 gms', image: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&q=80&w=600' },
         { id: 'o6', brand: 'Rudraksh', name: 'Fursungi Onion Seeds (ಫುರ್ಸುಂಗಿ ಈರುಳ್ಳಿ)', category: 'Seeds', crop: 'Onion', price: 2400, originalPrice: 2640, discount: 9, unit: '1 kg', image: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&q=80&w=600' },
-        
+
         // Brinjal & Others
-        { id: 'b1', brand: 'VNR', name: 'VNR 212 Brinjal Seeds (ಬದನೆ ಬೀಜ)', category: 'Seeds', crop: 'Brinjal', price: 179, originalPrice: 240, discount: 25, unit: '10 gms', image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&q=80&w=600' },
+        { id: 'b1', brand: 'VNR', name: 'VNR 212 Brinjal Seeds (ಬದನೆ ಬೀಜ)', category: 'Seeds', crop: 'Brinjal', price: 179, originalPrice: 240, discount: 25, unit: '10 gms', image: 'https://images.unsplash.com/photo-4TyZMpEhYJs?auto=format&fit=crop&q=80&w=600' },
         { id: 'b2', brand: 'VNR', name: 'VNR Haruna Bottle Gourd (ಹವಳ ಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Brinjal', price: 399, originalPrice: 540, discount: 26, unit: '50 gms', image: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&q=80&w=600' },
         { id: 'k1', brand: 'VNR', name: 'Krish Cucumber Seeds (ಸೌತೆಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Cucumber', price: 349, originalPrice: 480, discount: 27, unit: '10 gms', image: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&q=80&w=600' },
         { id: 'k2', brand: 'Advanta', name: 'Raadhika Bhindi Hybrid (ಬೆಂಡೆಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Okra', price: 679, originalPrice: 990, discount: 31, unit: '1500 seeds', image: 'https://images.unsplash.com/photo-1627440221741-2a265675e2f7?auto=format&fit=crop&q=80&w=600' },
-        
+
         // Plant Nutrition
         { id: 'pn1', brand: 'Coromandel', name: 'Fantac Plus Growth Promoter (ಫಾಂಟಾಕ್ ಪ್ಲಸ್)', category: 'Nutrients', price: 259, originalPrice: 430, discount: 40, unit: '100 ml', image: 'https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&q=80&w=600' },
         { id: 'pn2', brand: 'Syngenta', name: 'Isabion Biostimulant (ಇಸಾಬಿಯಾನ್ ಬಯೋ)', category: 'Nutrients', price: 174, originalPrice: 225, discount: 23, unit: '100 ml', image: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&q=80&w=600' },
@@ -63,7 +63,7 @@ export function Shop() {
         { id: 'pn4', brand: 'Multiplex', name: 'General Liquid Micronutrient (ಲಿಕ್ವಿಡ್ ಮೈಕ್ರೊ)', category: 'Nutrients', price: 114, originalPrice: 170, discount: 33, unit: '200 ml', image: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&q=80&w=600' },
         { id: 'pn5', brand: 'Multiplex', name: 'Allbor Boron 20% (ಮಲ್ಟಿಪ್ಲೆಕ್ಸ್ ಬೋರಾನ್)', category: 'Nutrients', price: 176, originalPrice: 270, discount: 35, unit: '250 gms', image: 'https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?auto=format&fit=crop&q=80&w=600' },
         { id: 'pn6', brand: 'Multiplex', name: 'Samras Biostimulant (ಸಮ್ರಾಸ್ ಬಯೋ)', category: 'Nutrients', price: 363, originalPrice: 470, discount: 23, unit: '500 ml', image: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&q=80&w=600' },
-        
+
         // Farming Equipment
         { id: 'eq1', brand: 'Sickle Innovations', name: 'Mango Picker Without Pole (ಮಾವಿನ ಮಷೀನ್)', category: 'Farming Equipment', price: 540, originalPrice: 599, discount: 10, unit: '1 unit', image: 'https://images.unsplash.com/photo-1601598851547-4302969d0614?auto=format&fit=crop&q=80&w=600' },
         { id: 'eq2', brand: 'Bharat Agrotech', name: 'Bharat Goa Akadi (ಅಕಡಿ ಕುಡುಗೋಲು)', category: 'Farming Equipment', price: 355, originalPrice: 499, discount: 29, unit: '1 unit', image: 'https://images.unsplash.com/photo-1589923158776-cb4485d99fd6?auto=format&fit=crop&q=80&w=600' },
@@ -82,8 +82,8 @@ export function Shop() {
     const filteredProducts = useMemo(() => {
         return STATIC_CATALOG.filter(p => {
             const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                 p.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                 p.category.toLowerCase().includes(searchQuery.toLowerCase());
+                p.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                p.category.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
             const matchesCrop = !selectedCrop || p.crop === selectedCrop;
             return matchesSearch && matchesCategory && matchesCrop;
@@ -105,7 +105,7 @@ export function Shop() {
                     <img src={getCategoryBanner()} alt="Shop Header" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-r from-prodmast-dark/95 via-prodmast-dark/70 to-transparent"></div>
                 </div>
-                
+
                 <div className="relative z-10 px-12 py-20 lg:py-24">
                     <div className="flex items-center gap-3 mb-6 bg-prodmast-accent/20 backdrop-blur-xl w-fit px-5 py-2 rounded-2xl border border-white/20 shadow-xl">
                         <Tag className="w-4 h-4 text-prodmast-accent" />
@@ -115,8 +115,8 @@ export function Shop() {
                         Agri<span className="text-prodmast-accent">Market</span>
                     </h1>
                     <p className="text-gray-200 text-lg font-medium max-w-2xl leading-relaxed opacity-90 drop-shadow-md">
-                        {selectedCategory === 'All' 
-                            ? 'The largest online destination for certified Nutrients, Seeds, and Equipment. Reliable, branded, and delivered at best prices.' 
+                        {selectedCategory === 'All'
+                            ? 'The largest online destination for certified Nutrients, Seeds, and Equipment. Reliable, branded, and delivered at best prices.'
                             : `Browse our massive catalog of premium ${selectedCategory.toLowerCase()} from trusted global brands.`}
                     </p>
                 </div>
@@ -133,7 +133,7 @@ export function Shop() {
                         View All <ChevronRight className="w-4 h-4" />
                     </button>
                 </div>
-                
+
                 <div className="flex items-center gap-6 overflow-x-auto pb-4 scrollbar-hide no-scrollbar px-2">
                     {CROPS.map((crop) => (
                         <button
@@ -144,11 +144,10 @@ export function Shop() {
                             }}
                             className={`flex flex-col items-center gap-3 group transition-all shrink-0 outline-none`}
                         >
-                            <div className={`w-28 h-28 rounded-full flex items-center justify-center border-[3px] p-4 transition-all ${
-                                selectedCrop === crop.id 
-                                ? 'bg-prodmast-accent/10 border-prodmast-accent shadow-2xl scale-110' 
+                            <div className={`w-28 h-28 rounded-full flex items-center justify-center border-[3px] p-4 transition-all ${selectedCrop === crop.id
+                                ? 'bg-prodmast-accent/10 border-prodmast-accent shadow-2xl scale-110'
                                 : 'bg-white border-gray-100 hover:border-prodmast-primary/50'
-                            }`}>
+                                }`}>
                                 <img src={crop.icon} alt={crop.nameEN} className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
                             </div>
                             <div className="text-center">
@@ -167,11 +166,10 @@ export function Shop() {
                         <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
-                            className={`px-8 py-3.5 rounded-2xl font-black transition-all text-xs whitespace-nowrap uppercase tracking-widest border-2 outline-none ${
-                                selectedCategory === cat 
-                                ? 'bg-prodmast-dark text-white border-prodmast-dark shadow-xl shadow-prodmast-dark/30 transform -translate-y-1' 
+                            className={`px-8 py-3.5 rounded-2xl font-black transition-all text-xs whitespace-nowrap uppercase tracking-widest border-2 outline-none ${selectedCategory === cat
+                                ? 'bg-prodmast-dark text-white border-prodmast-dark shadow-xl shadow-prodmast-dark/30 transform -translate-y-1'
                                 : 'bg-gray-50 text-gray-400 border-transparent hover:border-prodmast-primary/50 hover:text-prodmast-primary hover:bg-white'
-                            }`}
+                                }`}
                         >
                             {cat}
                         </button>
@@ -215,7 +213,7 @@ export function Shop() {
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 {/* Product Image Area */}
                                 <div className="relative w-full h-52 bg-gray-50 rounded-[24px] mb-6 overflow-hidden border border-gray-100/50">
                                     <img
@@ -242,7 +240,7 @@ export function Shop() {
                                     <h3 className="text-[14px] font-extrabold text-prodmast-dark mb-2 group-hover:text-prodmast-primary transition-colors line-clamp-3 leading-snug tracking-tight min-h-[42px]" title={product.name}>
                                         {product.name}
                                     </h3>
-                                    
+
                                     <div className="flex flex-wrap items-center gap-2 mb-4">
                                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-100">Size: {product.unit}</span>
                                         {product.crop && (
@@ -272,14 +270,14 @@ export function Shop() {
 
                                     {cartItem ? (
                                         <div className="flex items-center justify-between bg-prodmast-primary/5 rounded-2xl p-1.5 border border-prodmast-primary/10 scale-in shadow-inner">
-                                            <button 
+                                            <button
                                                 onClick={() => addToCart(product as any, -1)}
                                                 className="w-11 h-11 flex items-center justify-center bg-white rounded-xl shadow-md text-prodmast-primary hover:bg-prodmast-primary hover:text-white transition-all active:scale-90"
                                             >
                                                 <Minus className="w-4 h-4" />
                                             </button>
                                             <span className="font-black text-prodmast-dark text-lg px-4">{cartItem.quantity}</span>
-                                            <button 
+                                            <button
                                                 onClick={() => addToCart(product as any, 1)}
                                                 className="w-11 h-11 flex items-center justify-center bg-white rounded-xl shadow-md text-prodmast-primary hover:bg-prodmast-primary hover:text-white transition-all active:scale-90"
                                             >
@@ -312,7 +310,7 @@ export function Shop() {
                     <p className="text-gray-500 font-medium max-w-sm leading-relaxed mb-8">
                         We don't have these items for {selectedCrop ? selectedCrop : 'this category'} yet. Try exploring other crops or clearing your filters.
                     </p>
-                    <button 
+                    <button
                         onClick={() => { setSelectedCrop(null); setSelectedCategory('All'); setSearchQuery(''); }}
                         className="px-10 py-5 bg-prodmast-primary text-white font-black rounded-2xl shadow-xl hover:bg-prodmast-dark transition-all uppercase text-[11px] tracking-widest italic"
                     >

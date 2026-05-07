@@ -3,7 +3,7 @@ import { Farm } from '../lib/types';
 import { AlertCircle, CheckCircle, Upload, X, Loader2, Camera, Sparkles } from 'lucide-react';
 import { useImageClassifier, CropType } from '../hooks/useImageClassifier';
 import { useLanguage } from '../contexts/LanguageContext';
-import { analyzeImageWithGemini, detectPlantBoundingBox, cropImage, detectPlantPolygon, analyzeDetailedPlantHealth } from '../lib/gemini';
+import { analyzeImageWithGemini, detectPlantBoundingBox, cropImage, detectPlantPolygon, analyzeDetailedPlantHealth, identifyCropType } from '../lib/gemini';
 
 interface CropHealthProps {
   farm?: Farm;
@@ -177,12 +177,19 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       setResult(null);
       setClassificationError(null);
 
-      // Trigger Instant Magic Cutout (CSS-based)
+      // Trigger AI Identity & Magic Cutout
       setIsCropping(true);
       try {
+        // 1. Identify Crop Type first
+        const identifiedCrop = await identifyCropType(dataUrl);
+        if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
+          setSelectedCrop(identifiedCrop as any);
+        }
+
+        // 2. Run analysis with the identified (or existing) crop
         const [boxResult, polyResult] = await Promise.all([
           detectPlantBoundingBox(dataUrl),
-          detectPlantPolygon(dataUrl, selectedCrop)
+          detectPlantPolygon(dataUrl, (identifiedCrop && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop)
         ]);
 
         if (polyResult && polyResult.polygon) {
@@ -191,8 +198,6 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
         if (boxResult) {
           setBoundingBox(boxResult);
-          // NOTE: We no longer physically crop the image here.
-          // We use CSS transforms to zoom in.
         }
       } catch (err) {
         console.warn("Magic cutout failed:", err);
@@ -214,7 +219,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
       // Use Detailed Analysis
       const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop);
-      
+
       if (detailedResult) {
         setResult({
           status: detailedResult.topDiagnosis?.severity === 'High' ? 'Critical' : (detailedResult.topDiagnosis?.severity === 'Moderate' ? 'Warning' : 'Healthy'),
@@ -250,54 +255,54 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       } catch (geminiError) {
         console.error("Gemini failed, using local custom model:", geminiError);
       }
-        
-        // Use Teachable Machine model for the selected crop
-        const { customPredictions, error: localError } = await classifyImage(imageRef.current!, selectedCrop);
-        
-        if (!localError && customPredictions && customPredictions.length > 0) {
-          const top = customPredictions[0];
-          // Find original key like "Tomato_Late_blight"
-          const dbKey = top.className;
-          const dbEntry = (DISEASE_GUIDE as any)[dbKey];
 
-          if (dbEntry) {
-            setResult({
-              status: dbEntry.status,
-              disease: dbEntry.title.toUpperCase(),
-              confidence: Math.round(top.probability * 100),
-              recommendations: dbEntry.recs
-            });
-          } else {
-            // Fallback for names not in DB
-            const cleanName = top.className
-                .replace(new RegExp(`^${selectedCrop}_`, 'i'), '')
-                .replace(/_/g, ' ')
-                .trim();
+      // Use Teachable Machine model for the selected crop
+      const { customPredictions, error: localError } = await classifyImage(imageRef.current!, selectedCrop);
 
-            setResult({
-              status: top.probability > 0.8 ? 'Warning' : 'Healthy',
-              disease: cleanName.toUpperCase(),
-              confidence: Math.round(top.probability * 100),
-              recommendations: ['Monitor plant daily', 'Ensure proper watering', 'Check for spreading symptoms']
-            });
-          }
-          return;
+      if (!localError && customPredictions && customPredictions.length > 0) {
+        const top = customPredictions[0];
+        // Find original key like "Tomato_Late_blight"
+        const dbKey = top.className;
+        const dbEntry = (DISEASE_GUIDE as any)[dbKey];
+
+        if (dbEntry) {
+          setResult({
+            status: dbEntry.status,
+            disease: dbEntry.title.toUpperCase(),
+            confidence: Math.round(top.probability * 100),
+            recommendations: dbEntry.recs
+          });
+        } else {
+          // Fallback for names not in DB
+          const cleanName = top.className
+            .replace(new RegExp(`^${selectedCrop}_`, 'i'), '')
+            .replace(/_/g, ' ')
+            .trim();
+
+          setResult({
+            status: top.probability > 0.8 ? 'Warning' : 'Healthy',
+            disease: cleanName.toUpperCase(),
+            confidence: Math.round(top.probability * 100),
+            recommendations: ['Monitor plant daily', 'Ensure proper watering', 'Check for spreading symptoms']
+          });
         }
-
-        // Final generic fallback
-        setResult({
-          status: 'Healthy',
-          disease: 'Healthy / No issues detected',
-          confidence: 88,
-          recommendations: ['Monitor plant daily', 'Ensure proper watering']
-        });
-      } catch (error: any) {
-        console.error("General analysis error", error);
-        setClassificationError(error.message || "Failed to analyze image.");
-      } finally {
-        setAnalyzing(false);
+        return;
       }
-    };
+
+      // Final generic fallback
+      setResult({
+        status: 'Healthy',
+        disease: 'Healthy / No issues detected',
+        confidence: 88,
+        recommendations: ['Monitor plant daily', 'Ensure proper watering']
+      });
+    } catch (error: any) {
+      console.error("General analysis error", error);
+      setClassificationError(error.message || "Failed to analyze image.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const resetAnalysis = () => {
     setSelectedImage(null);
@@ -312,7 +317,6 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
           <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{t('cropHealth.title')}</h2>
           <span className="bg-blue-600/10 px-3 py-1 rounded-full text-[10px] font-black text-blue-600 border border-blue-200 uppercase tracking-widest flex items-center gap-1 shadow-sm">
             <Sparkles className="w-3 h-3" />
-            Powered by Gemini Pro Vision
           </span>
         </div>
 
@@ -332,7 +336,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
         </div>
         <p className="text-slate-600 font-medium mb-8 max-w-2xl">
           {t('cropHealth.subtitle')}
-          <br /><span className="text-xs text-blue-600 font-black mt-1 block uppercase tracking-wide">Dataset: 15+ Crop Categories Identified</span>
+          <br /><span className="text-xs text-blue-600 font-black mt-1 block uppercase tracking-wide"></span>
         </p>
 
 
@@ -411,78 +415,78 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
               {/* Magic Cutout Experience (PicsArt Style) */}
               {!isCropping && selectedImage && !result && (
                 <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-2xl bg-white shadow-inner">
-                   {/* 1. Professional Checkered/White Background */}
-                   <div className="absolute inset-0 opacity-10" style={{ 
-                     backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
-                     backgroundSize: '20px 20px',
-                     backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-                   }} />
-                   
-                   {/* 2. Isolated Leaf Cutout (Zoomed & Clean) */}
-                   <div 
+                  {/* 1. Professional Checkered/White Background */}
+                  <div className="absolute inset-0 opacity-10" style={{
+                    backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+                    backgroundSize: '20px 20px',
+                    backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                  }} />
+
+                  {/* 2. Isolated Leaf Cutout (Zoomed & Clean) */}
+                  <div
                     className="absolute inset-0 transition-all duration-1000 ease-out"
                     style={{
-                        transform: boundingBox ? `
+                      transform: boundingBox ? `
                             scale(${1000 / (boundingBox.xmax - boundingBox.xmin) * 0.85}) 
                             translate(
-                                ${-(boundingBox.xmin + (boundingBox.xmax - boundingBox.xmin)/2 - 500) / 10}%, 
-                                ${-(boundingBox.ymin + (boundingBox.ymax - boundingBox.ymin)/2 - 500) / 10}%
+                                ${-(boundingBox.xmin + (boundingBox.xmax - boundingBox.xmin) / 2 - 500) / 10}%, 
+                                ${-(boundingBox.ymin + (boundingBox.ymax - boundingBox.ymin) / 2 - 500) / 10}%
                             )
                         ` : 'scale(1)',
-                        transformOrigin: 'center center'
+                      transformOrigin: 'center center'
                     }}
-                   >
-                        {/* The Cutout Leaf */}
-                        <img 
-                            src={selectedImage} 
-                            className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
-                            style={{
-                                clipPath: polygon 
-                                    ? `polygon(${polygon.map(p => `${p[1]/10}% ${p[0]/10}%`).join(', ')})`
-                                    : (boundingBox 
-                                        ? `inset(${boundingBox.ymin/10}% ${100 - boundingBox.xmax/10}% ${100 - boundingBox.ymax/10}% ${boundingBox.xmin/10}% round 20px)`
-                                        : 'inset(10% 10% 10% 10% round 20px)'),
-                            }}
-                            alt="leaf isolate"
-                        />
-                        
-                        {/* 3. Red Selection Border (Always Visible Highlight) */}
-                        <div className="absolute inset-0">
-                            {/* Removed red highlights as per user request */}
-                        </div>
+                  >
+                    {/* The Cutout Leaf */}
+                    <img
+                      src={selectedImage}
+                      className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
+                      style={{
+                        clipPath: polygon
+                          ? `polygon(${polygon.map(p => `${p[1] / 10}% ${p[0] / 10}%`).join(', ')})`
+                          : (boundingBox
+                            ? `inset(${boundingBox.ymin / 10}% ${100 - boundingBox.xmax / 10}% ${100 - boundingBox.ymax / 10}% ${boundingBox.xmin / 10}% round 20px)`
+                            : 'inset(10% 10% 10% 10% round 20px)'),
+                      }}
+                      alt="leaf isolate"
+                    />
 
-                            {/* Lesion Boxes (Visual Aids) */}
-                            {result?.lesions?.map((lesion, i) => (
-                                <div 
-                                    key={`lesion-${i}`}
-                                    className="absolute border-2 border-red-500 bg-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.5)] flex items-center justify-center"
-                                    style={{
-                                        top: `${lesion.box[0]/10}%`,
-                                        left: `${lesion.box[1]/10}%`,
-                                        width: `${(lesion.box[3] - lesion.box[1])/10}%`,
-                                        height: `${(lesion.box[2] - lesion.box[0])/10}%`
-                                    }}
-                                >
-                                    <span className="bg-red-500 text-white text-[8px] font-black px-1 absolute -top-4 left-0 uppercase">{lesion.type}</span>
-                                </div>
-                            ))}
+                    {/* 3. Red Selection Border (Always Visible Highlight) */}
+                    <div className="absolute inset-0">
+                      {/* Removed red highlights as per user request */}
+                    </div>
 
-                            {/* Stress Boxes */}
-                            {result?.stressIndicators?.map((stress, i) => (
-                                <div 
-                                    key={`stress-${i}`}
-                                    className="absolute border-2 border-yellow-500 bg-yellow-500/20 shadow-[0_0_10px_rgba(234,179,8,0.5)]"
-                                    style={{
-                                        top: `${stress.box[0]/10}%`,
-                                        left: `${stress.box[1]/10}%`,
-                                        width: `${(stress.box[3] - stress.box[1])/10}%`,
-                                        height: `${(stress.box[2] - stress.box[0])/10}%`
-                                    }}
-                                >
-                                    <span className="bg-yellow-500 text-white text-[8px] font-black px-1 absolute -top-4 left-0 uppercase">{stress.type}</span>
-                                </div>
-                            ))}
-                   </div>
+                    {/* Lesion Boxes (Visual Aids) */}
+                    {result?.lesions?.map((lesion, i) => (
+                      <div
+                        key={`lesion-${i}`}
+                        className="absolute border-2 border-red-500 bg-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.5)] flex items-center justify-center"
+                        style={{
+                          top: `${lesion.box[0] / 10}%`,
+                          left: `${lesion.box[1] / 10}%`,
+                          width: `${(lesion.box[3] - lesion.box[1]) / 10}%`,
+                          height: `${(lesion.box[2] - lesion.box[0]) / 10}%`
+                        }}
+                      >
+                        <span className="bg-red-500 text-white text-[8px] font-black px-1 absolute -top-4 left-0 uppercase">{lesion.type}</span>
+                      </div>
+                    ))}
+
+                    {/* Stress Boxes */}
+                    {result?.stressIndicators?.map((stress, i) => (
+                      <div
+                        key={`stress-${i}`}
+                        className="absolute border-2 border-yellow-500 bg-yellow-500/20 shadow-[0_0_10px_rgba(234,179,8,0.5)]"
+                        style={{
+                          top: `${stress.box[0] / 10}%`,
+                          left: `${stress.box[1] / 10}%`,
+                          width: `${(stress.box[3] - stress.box[1]) / 10}%`,
+                          height: `${(stress.box[2] - stress.box[0]) / 10}%`
+                        }}
+                      >
+                        <span className="bg-yellow-500 text-white text-[8px] font-black px-1 absolute -top-4 left-0 uppercase">{stress.type}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -569,112 +573,112 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                   {/* Health Score Gauge */}
                   {result.healthScore !== undefined && (
                     <div className="mb-8 bg-slate-900/5 p-6 rounded-2xl border border-slate-200">
-                        <div className="flex justify-between items-center mb-4">
-                            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Health Score</h4>
-                            <span className={`text-2xl font-black ${result.healthScore > 80 ? 'text-green-500' : 'text-yellow-500'}`}>{result.healthScore}%</span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden border border-slate-300">
-                            <div 
-                                className={`h-full transition-all duration-1000 ease-out ${result.healthScore > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}
-                                style={{ width: `${result.healthScore}%` }}
-                            />
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">Vitality indicators based on leaf color and texture analysis.</p>
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Health Score</h4>
+                        <span className={`text-2xl font-black ${result.healthScore > 80 ? 'text-green-500' : 'text-yellow-500'}`}>{result.healthScore}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden border border-slate-300">
+                        <div
+                          className={`h-full transition-all duration-1000 ease-out ${result.healthScore > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}
+                          style={{ width: `${result.healthScore}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">Vitality indicators based on leaf color and texture analysis.</p>
                     </div>
                   )}
 
                   {/* Growth Stage & Stress */}
                   <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/20">
-                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Growth Stage</span>
-                        <span className="text-sm font-bold text-slate-900">{result.growthStage || 'Vegetative'}</span>
+                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Growth Stage</span>
+                      <span className="text-sm font-bold text-slate-900">{result.growthStage || 'Vegetative'}</span>
                     </div>
                     <div className="bg-orange-500/5 p-4 rounded-xl border border-orange-500/20">
-                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-1">Stress Level</span>
-                        <span className="text-sm font-bold text-slate-900">{result.stressIndicators?.length ? 'Moderate' : 'Low'}</span>
+                      <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-1">Stress Level</span>
+                      <span className="text-sm font-bold text-slate-900">{result.stressIndicators?.length ? 'Moderate' : 'Low'}</span>
                     </div>
                   </div>
 
                   {/* Alternative Diagnoses */}
                   {result.alternatives && result.alternatives.length > 0 && (
                     <div className="mb-8">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Alternative Matches</h4>
-                        <div className="flex flex-wrap gap-2">
-                            {result.alternatives.map((alt, i) => (
-                                <span key={i} className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 border border-slate-200">
-                                    {alt.name} ({alt.confidence}%)
-                                </span>
-                            ))}
-                        </div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Alternative Matches</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {result.alternatives.map((alt, i) => (
+                          <span key={i} className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 border border-slate-200">
+                            {alt.name} ({alt.confidence}%)
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
 
                   {/* Causes & Spread */}
                   {(result.causes || result.spread) && (
                     <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {result.causes && (
-                            <div className="space-y-2">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Causes</h4>
-                                <p className="text-xs text-slate-600 leading-relaxed font-medium">{result.causes}</p>
-                            </div>
-                        )}
-                        {result.spread && (
-                            <div className="space-y-2">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Spread Method</h4>
-                                <p className="text-xs text-slate-600 leading-relaxed font-medium">{result.spread}</p>
-                            </div>
-                        )}
+                      {result.causes && (
+                        <div className="space-y-2">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Causes</h4>
+                          <p className="text-xs text-slate-600 leading-relaxed font-medium">{result.causes}</p>
+                        </div>
+                      )}
+                      {result.spread && (
+                        <div className="space-y-2">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Spread Method</h4>
+                          <p className="text-xs text-slate-600 leading-relaxed font-medium">{result.spread}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Actionable Advice Section */}
                   <div className="border-t border-slate-200 pt-8 mt-8">
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-2">
-                        <Sparkles className="w-6 h-6 text-prodmast-primary" />
-                        Actionable Advice
+                      <Sparkles className="w-6 h-6 text-prodmast-primary" />
+                      Actionable Advice
                     </h3>
 
                     {result.treatment && (
-                        <div className="space-y-6">
-                            {/* Treatment Tabs/Sections */}
-                            <div className="space-y-4">
-                                <div className="bg-prodmast-primary/10 p-5 rounded-2xl border border-prodmast-primary/20">
-                                    <h4 className="text-xs font-black text-prodmast-darker uppercase tracking-widest mb-3">Conventional Treatment</h4>
-                                    <ul className="space-y-2">
-                                        {result.treatment.conventional.map((t, i) => (
-                                            <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 bg-prodmast-primary rounded-full shadow-[0_0_5px_rgba(132,204,22,0.5)]" />
-                                                {t}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                      <div className="space-y-6">
+                        {/* Treatment Tabs/Sections */}
+                        <div className="space-y-4">
+                          <div className="bg-prodmast-primary/10 p-5 rounded-2xl border border-prodmast-primary/20">
+                            <h4 className="text-xs font-black text-prodmast-darker uppercase tracking-widest mb-3">Conventional Treatment</h4>
+                            <ul className="space-y-2">
+                              {result.treatment.conventional.map((t, i) => (
+                                <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 bg-prodmast-primary rounded-full shadow-[0_0_5px_rgba(132,204,22,0.5)]" />
+                                  {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
 
-                                <div className="bg-blue-500/5 p-5 rounded-2xl border border-blue-500/20">
-                                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-3">Biological/Organic Remedies</h4>
-                                    <ul className="space-y-2">
-                                        {result.treatment.biological.map((t, i) => (
-                                            <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                                                {t}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                          <div className="bg-blue-500/5 p-5 rounded-2xl border border-blue-500/20">
+                            <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-3">Biological/Organic Remedies</h4>
+                            <ul className="space-y-2">
+                              {result.treatment.biological.map((t, i) => (
+                                <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                  {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
 
-                                <div className="bg-slate-900/5 p-5 rounded-2xl border border-slate-200">
-                                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Prevention Tips</h4>
-                                    <ul className="space-y-2">
-                                        {result.treatment.prevention.map((t, i) => (
-                                            <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
-                                                {t}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
+                          <div className="bg-slate-900/5 p-5 rounded-2xl border border-slate-200">
+                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Prevention Tips</h4>
+                            <ul className="space-y-2">
+                              {result.treatment.prevention.map((t, i) => (
+                                <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
+                                  {t}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         </div>
+                      </div>
                     )}
                   </div>
 
