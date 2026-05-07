@@ -6,6 +6,8 @@ import { Phone, Lock, Loader2, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
 
+import authFarmerImg from '../assets/auth-farmer.png';
+
 export function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -238,144 +240,138 @@ export function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f0fdf4] flex items-center justify-center p-4 lg:p-8 font-sans overflow-hidden relative">
+    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 lg:p-8 font-sans overflow-hidden relative">
       {/* Enhanced Background Decorative Elements */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         {/* Farm Field Patterns */}
-        <div className="absolute top-0 left-0 w-full h-full opacity-[0.03]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 40, 50 50 T 100 50' stroke='%2315803d' fill='none' stroke-width='1'/%3E%3Cpath d='M0 70 Q 25 60, 50 70 T 100 70' stroke='%2315803d' fill='none' stroke-width='1'/%3E%3Cpath d='M0 30 Q 25 20, 50 30 T 100 30' stroke='%2315803d' fill='none' stroke-width='1'/%3E%3C/svg%3E")`,
+        <div className="absolute top-0 left-0 w-full h-full opacity-[0.05]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 40, 50 50 T 100 50' stroke='%2316a34a' fill='none' stroke-width='1'/%3E%3Cpath d='M0 70 Q 25 60, 50 70 T 100 70' stroke='%2316a34a' fill='none' stroke-width='1'/%3E%3Cpath d='M0 30 Q 25 20, 50 30 T 100 30' stroke='%2316a34a' fill='none' stroke-width='1'/%3E%3C/svg%3E")`,
           backgroundSize: '200px 200px'
         }} />
 
-        {/* Scattered Farming Icons (Abstract) */}
-        <div className="absolute top-[10%] left-[5%] w-24 h-24 text-green-200/40 rotate-12">
-          <SproutIcon className="w-full h-full" />
-        </div>
-        <div className="absolute top-[20%] right-[8%] w-32 h-32 text-green-200/30 -rotate-12">
-          <TractorIcon className="w-full h-full" />
-        </div>
-        <div className="absolute bottom-[10%] left-[10%] w-40 h-40 text-green-200/20 rotate-45">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
-          </svg>
-        </div>
-
         {/* Soft Blobs */}
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-green-200/40 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-green-100/40 rounded-full blur-[120px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-green-200/30 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-100/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
       {/* Back to Home Button */}
       <div className="absolute top-6 left-6 z-20 flex items-center gap-4">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-green-700 hover:text-green-800 transition-colors bg-white/40 hover:bg-white/60 backdrop-blur-md px-4 py-2 rounded-full border border-green-100 shadow-sm"
+          className="flex items-center gap-2 text-slate-700 hover:text-green-700 transition-all bg-white/80 hover:bg-white backdrop-blur-md px-5 py-2.5 rounded-full border border-slate-200 shadow-sm hover:shadow-md active:scale-95"
         >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm font-bold">{t('auth.backToHome')}</span>
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm font-bold tracking-tight">{t('auth.backToHome')}</span>
         </button>
         <LanguageSelector />
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.12)] w-full max-w-5xl overflow-hidden flex flex-col lg:flex-row min-h-[650px] relative z-10 border border-green-50">
+      <div className="bg-white rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.15)] w-full max-w-6xl overflow-hidden flex flex-col lg:flex-row min-h-[700px] relative z-10 border border-slate-100">
 
         {/* Left Section: Welcome Card */}
-        <div className="lg:w-1/2 bg-gradient-to-br from-green-600 to-green-700 p-8 lg:p-12 text-white flex flex-col relative overflow-hidden">
+        <div className="lg:w-5/12 bg-gradient-to-br from-[#16a34a] via-[#15803d] to-[#14532d] p-10 lg:p-14 text-white flex flex-col relative overflow-hidden">
           {/* Subtle pattern overlay */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
+          <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
 
           <div className="mb-auto relative z-10">
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-medium mb-8 border border-white/10">
-              <SproutIcon className="w-4 h-4" />
+            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-xl px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest mb-10 border border-white/20">
+              <SproutIcon className="w-4 h-4 text-green-300" />
               <span>Smart Farming AI</span>
             </div>
-            <h2 className="text-4xl lg:text-5xl font-extrabold leading-tight mb-6">
+            <h2 className="text-4xl lg:text-5xl font-black leading-[1.1] mb-8">
               {t('auth.welcomeBack')}<br />
-              <span className="text-green-200">AgriSmart</span>
+              <span className="text-green-300">AgriSmart</span>
             </h2>
-            <p className="text-green-50 text-lg max-w-md leading-relaxed opacity-90">
+            <p className="text-green-50/80 text-lg max-w-sm leading-relaxed font-medium">
               {t('auth.joinThousands')}
             </p>
           </div>
 
-          <div className="mt-8 flex justify-center relative z-10">
+          <div className="my-10 flex justify-center relative z-10">
             <div className="relative group">
-              <div className="absolute inset-0 bg-white/20 rounded-full blur-2xl group-hover:bg-white/30 transition-all duration-500 scale-110"></div>
-              <div className="bg-white/10 backdrop-blur-md p-6 rounded-[3rem] border border-white/20 shadow-2xl relative">
-                <div className="w-80 h-80 flex items-center justify-center overflow-hidden">
+              <div className="absolute -inset-8 bg-green-400/20 rounded-full blur-[60px] group-hover:bg-green-400/30 transition-all duration-700 scale-125"></div>
+              <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[4rem] border border-white/10 shadow-2xl relative transition-transform duration-500 group-hover:scale-105">
+                <div className="w-64 h-64 lg:w-72 lg:h-72 flex items-center justify-center overflow-hidden">
                   <img
-                    src="/src/assets/farmer.png"
-                    alt="Friendly Farmer"
-                    className="w-full h-full object-contain transform group-hover:scale-110 transition-transform duration-500"
+                    src={authFarmerImg}
+                    alt="AgriSmart AI Assistant"
+                    className="w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
                     onError={(e) => {
-                      // Fallback if image not found
                       (e.target as HTMLImageElement).src = 'https://illustrations.popsy.co/green/farmer.svg';
                     }}
                   />
                 </div>
-                <div className="mt-4 text-center">
-                  <div className="text-sm font-bold uppercase tracking-widest text-green-100">Ready to help</div>
+                <div className="mt-8 text-center">
+                  <div className="inline-block px-4 py-1.5 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-green-100 border border-white/10">
+                    Ready to help
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-auto pt-8 flex items-center gap-4 text-sm font-medium opacity-80 relative z-10">
-            <div className="flex -space-x-2">
+
+          <div className="mt-auto pt-10 flex items-center gap-5 text-sm font-semibold text-green-100/70 relative z-10 border-t border-white/10">
+            <div className="flex -space-x-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className={`w-8 h-8 rounded-full border-2 border-green-600 bg-green-${200 + i * 100} flex items-center justify-center text-[10px] text-green-800 font-bold`}>
+                <div key={i} className={`w-10 h-10 rounded-full border-2 border-[#15803d] bg-green-${100 + i * 100} flex items-center justify-center text-[10px] text-green-900 font-black shadow-lg shadow-black/10`}>
                   {i}
                 </div>
               ))}
             </div>
-            <p>{t('auth.empoweringFarmers')}</p>
+            <p className="tracking-tight">{t('auth.empoweringFarmers')}</p>
           </div>
         </div>
 
         {/* Right Section: Flip Card Container */}
-        <div className="lg:w-1/2 relative perspective-1000 bg-white">
+        <div className="lg:w-7/12 relative perspective-1000 bg-white">
           <div className={`w-full h-full relative transition-transform duration-1000 preserve-3d ${!isLogin ? 'rotate-y-180' : ''}`}>
 
             {/* Login Side (Front) */}
-            <div className="absolute inset-0 backface-hidden flex flex-col justify-center p-8 lg:p-16">
+            <div className="absolute inset-0 backface-hidden flex flex-col justify-center p-8 lg:p-20">
               <div className="max-w-md mx-auto w-full">
-                <div className="mb-10 lg:hidden text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-2xl mb-4">
-                    <SproutIcon className="w-8 h-8 text-green-600" />
+                <div className="mb-12 lg:hidden text-center">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-green-50 rounded-[2rem] mb-6 shadow-inner">
+                    <SproutIcon className="w-10 h-10 text-green-600" />
                   </div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">AgriSmart AI</h1>
-                  <p className="text-gray-600">Login to manage your farm</p>
+                  <h1 className="text-4xl font-black text-slate-900 mb-2">AgriSmart AI</h1>
+                  <p className="text-slate-500 font-medium tracking-tight">Login to manage your farm</p>
                 </div>
 
-                <div className="hidden lg:block mb-10">
-                  <h3 className="text-3xl font-black text-gray-900 mb-2">{t('auth.signIn')}</h3>
+                <div className="hidden lg:block mb-12">
+                  <h3 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">{t('auth.signIn')}</h3>
+                  <p className="text-slate-500 font-medium">Welcome back! Please enter your details.</p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-6">
-                  <div className="space-y-2">
-                    <label htmlFor="phone-login" className="text-sm font-bold text-gray-700 ml-1">{t('auth.mobileNumber')}</label>
+                <form onSubmit={handleLogin} className="space-y-7">
+                  <div className="space-y-2.5">
+                    <label htmlFor="phone-login" className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">{t('auth.mobileNumber')}</label>
                     <div className="relative group">
-                      <Phone className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                      </div>
                       <input
                         id="phone-login"
                         type="tel"
                         value={phone}
                         onChange={handlePhoneChange}
                         required
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-500"
+                        className="w-full pl-12 pr-4 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
                         placeholder="9876543210"
                       />
                     </div>
                     <div className="flex justify-between px-1">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">10 digits required</p>
-                      <p className="text-[10px] text-gray-400 font-bold">{phone.length}/10</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-[0.1em] font-bold">10 digits required</p>
+                      <p className="text-[10px] text-slate-400 font-bold">{phone.length}/10</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="password-login" className="text-sm font-bold text-gray-700 ml-1">{t('auth.password')}</label>
+                  <div className="space-y-2.5">
+                    <label htmlFor="password-login" className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">{t('auth.password')}</label>
                     <div className="relative group">
-                      <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                      </div>
                       <input
                         id="password-login"
                         type={showPassword ? "text" : "password"}
@@ -383,13 +379,13 @@ export function Auth() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         maxLength={12}
-                        className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-500"
+                        className="w-full pl-12 pr-12 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
                         placeholder="••••••••"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-4 text-gray-400 hover:text-green-600 transition-colors"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
@@ -397,64 +393,80 @@ export function Auth() {
                   </div>
 
                   <div className="flex justify-end p-1">
-                    <button type="button" onClick={() => setIsForgotPassword(true)} className="text-sm font-bold text-green-600 hover:text-green-700 transition">{t('auth.forgotPassword')}</button>
+                    <button type="button" onClick={() => setIsForgotPassword(true)} className="text-sm font-bold text-green-600 hover:text-green-700 transition tracking-tight decoration-2 underline-offset-4 hover:underline">{t('auth.forgotPassword')}</button>
                   </div>
 
-                  {error && <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-medium">{error}</div>}
+                  {error && (
+                    <div className="p-4.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold animate-shake flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                      {error}
+                    </div>
+                  )}
 
-                  <button type="submit" disabled={loading || !isPhoneValid} className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-700 transition shadow-xl shadow-green-200 active:scale-[0.98] disabled:opacity-50 flex justify-center items-center gap-2 transform">
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>{t('auth.signIn')} <ArrowRight className="w-6 h-6" /></>}
+                  <button 
+                    type="submit" 
+                    disabled={loading || !isPhoneValid} 
+                    className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-8 py-5 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 opacity-0 transition-opacity group-hover:opacity-100"></div>
+                    <div className="relative flex items-center justify-center gap-2 text-lg tracking-tight">
+                      {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>{t('auth.signIn')} <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>}
+                    </div>
                   </button>
                 </form>
 
-                <div className="mt-8 text-center">
-                  <button onClick={() => { setIsLogin(false); setError(''); setMessage(''); }} className="text-gray-500 font-bold hover:text-green-600 transition group">
-                    {t('auth.dontHaveAccount')} <span className="text-green-600 group-hover:underline">{t('auth.signUp')}</span>
+                <div className="mt-12 text-center">
+                  <button onClick={() => { setIsLogin(false); setError(''); setMessage(''); }} className="text-slate-500 font-bold hover:text-green-600 transition group tracking-tight">
+                    {t('auth.dontHaveAccount')} <span className="text-green-600 group-hover:underline decoration-2 underline-offset-4">{t('auth.signUp')}</span>
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Signup Side (Back) */}
-            <div className="absolute inset-0 backface-hidden rotate-y-180 flex flex-col justify-center p-8 lg:p-16">
+            <div className="absolute inset-0 backface-hidden rotate-y-180 flex flex-col justify-center p-8 lg:p-20">
               <div className="max-w-md mx-auto w-full">
-                <div className="mb-10 lg:hidden text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-2xl mb-4">
-                    <SproutIcon className="w-8 h-8 text-green-600" />
+                <div className="mb-12 lg:hidden text-center">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-green-50 rounded-[2rem] mb-6">
+                    <SproutIcon className="w-10 h-10 text-green-600" />
                   </div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+                  <h1 className="text-4xl font-black text-slate-900 mb-2">Create Account</h1>
                 </div>
 
-                <div className="hidden lg:block mb-10">
-                  <h3 className="text-3xl font-black text-gray-900 mb-2">{t('auth.signUp')}</h3>
-                  <p className="text-gray-500">Start your journey with smart farming today.</p>
+                <div className="hidden lg:block mb-12">
+                  <h3 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">{t('auth.signUp')}</h3>
+                  <p className="text-slate-500 font-medium">Join the revolution of smart farming today.</p>
                 </div>
 
-                <form onSubmit={handleSignUp} className="space-y-6">
-                  <div className="space-y-2">
-                    <label htmlFor="phone-signup" className="text-sm font-bold text-gray-700 ml-1">{t('auth.mobileNumber')}</label>
+                <form onSubmit={handleSignUp} className="space-y-7">
+                  <div className="space-y-2.5">
+                    <label htmlFor="phone-signup" className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">{t('auth.mobileNumber')}</label>
                     <div className="relative group">
-                      <Phone className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                      </div>
                       <input
                         id="phone-signup"
                         type="tel"
                         value={phone}
                         onChange={handlePhoneChange}
                         required
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-500"
+                        className="w-full pl-12 pr-4 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
                         placeholder="9876543210"
                       />
                     </div>
                     <div className="flex justify-between px-1">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{t('auth.digitsRequired')}</p>
-                      <p className="text-[10px] text-gray-400 font-bold">{phone.length}/10</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-[0.1em] font-bold">{t('auth.digitsRequired')}</p>
+                      <p className="text-[10px] text-slate-400 font-bold">{phone.length}/10</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="password-signup" className="text-sm font-bold text-gray-700 ml-1">{t('auth.password')}</label>
+                  <div className="space-y-2.5">
+                    <label htmlFor="password-signup" className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">{t('auth.password')}</label>
                     <div className="relative group">
-                      <Lock className="absolute left-4 top-4 h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                      </div>
                       <input
                         id="password-signup"
                         type={showPassword ? "text" : "password"}
@@ -462,30 +474,47 @@ export function Auth() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         maxLength={12}
-                        className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent transition-all outline-none"
+                        className="w-full pl-12 pr-12 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
                         placeholder="••••••••"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-4 text-gray-400 hover:text-green-600 transition-colors"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
 
-                  {error && <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-medium">{error}</div>}
-                  {message && <div className="p-4 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-sm font-medium">{message}</div>}
+                  {error && (
+                    <div className="p-4.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold animate-shake flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                      {error}
+                    </div>
+                  )}
+                  {message && (
+                    <div className="p-4.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-sm font-bold flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></div>
+                      {message}
+                    </div>
+                  )}
 
-                  <button type="submit" disabled={loading || !isPhoneValid} className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-700 transition shadow-xl shadow-green-200 active:scale-[0.98] disabled:opacity-50 flex justify-center items-center gap-2 transform">
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : t('auth.signUp')}
+                  <button 
+                    type="submit" 
+                    disabled={loading || !isPhoneValid} 
+                    className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-8 py-5 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 opacity-0 transition-opacity group-hover:opacity-100"></div>
+                    <div className="relative flex items-center justify-center gap-2 text-lg tracking-tight">
+                      {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>{t('auth.signUp')} <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>}
+                    </div>
                   </button>
                 </form>
 
-                <div className="mt-8 text-center">
-                  <button onClick={() => { setIsLogin(true); setError(''); setMessage(''); }} className="text-gray-500 font-bold hover:text-green-600 transition group">
-                    {t('auth.alreadyHaveAccount')} <span className="text-green-600 group-hover:underline">{t('auth.signIn')}</span>
+                <div className="mt-12 text-center">
+                  <button onClick={() => { setIsLogin(true); setError(''); setMessage(''); }} className="text-slate-500 font-bold hover:text-green-600 transition group tracking-tight">
+                    {t('auth.alreadyHaveAccount')} <span className="text-green-600 group-hover:underline decoration-2 underline-offset-4">{t('auth.signIn')}</span>
                   </button>
                 </div>
               </div>
@@ -493,6 +522,7 @@ export function Auth() {
 
           </div>
         </div>
+
       </div>
     </div>
   );
