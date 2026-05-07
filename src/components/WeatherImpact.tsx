@@ -548,4 +548,3 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
     </div>
   );
 }
-}
