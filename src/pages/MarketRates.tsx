@@ -259,6 +259,9 @@ export function MarketRates() {
 
     setIsLoading(true);
     try {
+      // Create a minimum 5-second delay to ensure smooth fetching experience
+      const delay = new Promise(resolve => setTimeout(resolve, 5000));
+      
       const resourceId = '9ef273d1-c1aa-42da-ad35-3c544bd3503c';
       const baseUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=150`;
       
@@ -266,7 +269,7 @@ export function MarketRates() {
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
 
       console.log('Fetching from Agmarknet API via proxy...');
-      const response = await fetch(proxyUrl);
+      const [response] = await Promise.all([fetch(proxyUrl), delay]);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
       const data = await response.json();
