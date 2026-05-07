@@ -166,7 +166,9 @@ export function MarketRates() {
     };
 
     // Historical data starts before the current price
-    let current = base * (timeRange === '1D' ? 0.98 : timeRange === '1M' ? 0.92 : 0.85);
+    // If trend is up, start LOWER. If trend is down, start HIGHER.
+    const startOffset = timeRange === '1D' ? 0.02 : timeRange === '1M' ? 0.08 : 0.15;
+    let current = base * (selectedCommodity.trendUp ? (1 - startOffset) : (1 + startOffset));
     
     // If it's a forecast, we start from today (the current price)
     if (isForecast) {
@@ -613,11 +615,11 @@ export function MarketRates() {
                        <div className="relative z-10">
                           <p className="text-white/40 text-[10px] font-black uppercase tracking-tighter mb-1">{timeRange === '3F' ? 'Predicted Growth' : `${t('market.change')} (${timeRange})`}</p>
                           <p className={`text-3xl font-black ${stats.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                             {stats.change >= 0 ? '+' : ''}{timeRange === '3F' ? '₹' : '₹'}{Math.abs(stats.change * (timeRange === '3F' ? 1.4 : 1)).toLocaleString()}
+                             {stats.change >= 0 ? '+' : '-'}{'₹'}{Math.abs(stats.change).toLocaleString()}
                           </p>
                        </div>
                        <div className={`relative z-10 px-4 py-2 rounded-xl font-black text-lg ${stats.change >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {stats.change >= 0 ? '↑' : '↓'} {Math.abs(stats.changePercent + (timeRange === '3F' ? 12 : 0))}%
+                          {stats.change >= 0 ? '↑' : '↓'} {Math.abs(stats.changePercent)}%
                        </div>
                        {timeRange === '3F' && (
                            <div className="absolute inset-0 bg-prodmast-accent/10 animate-pulse"></div>
@@ -636,9 +638,9 @@ export function MarketRates() {
                         </p>
                      </div>
                  ) : (
-                    <button className="w-full bg-prodmast-accent hover:bg-prodmast-accent/90 text-prodmast-dark font-black py-4 rounded-2xl transition-all shadow-lg active:scale-95">
-                        SET PRICE ALERT
-                    </button>
+                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div className={`h-full transition-all duration-1000 ${stats.change >= 0 ? 'bg-green-500 w-3/4' : 'bg-red-500 w-1/4'}`}></div>
+                     </div>
                  )}
               </div>
 
