@@ -430,19 +430,6 @@ export function DiseaseDetection() {
                                 </button>
                             )}
 
-                            {isCropping && (
-                                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20 backdrop-blur-[2px]">
-                                    <div className="absolute inset-0 overflow-hidden">
-                                        <div className="w-full h-1 bg-red-400/80 shadow-[0_0_15px_rgba(248,113,113,0.8)] animate-[scan_1.5s_linear_infinite]" />
-                                    </div>
-                                    <div className="bg-white/90 px-6 py-3 rounded-lg flex items-center gap-3 z-10">
-                                        <Sparkles className="w-5 h-5 text-red-600 animate-pulse" />
-                                        <span className="font-bold text-gray-800 uppercase text-xs tracking-widest">
-                                          {language === 'kn' ? 'ಮ್ಯಾಜಿಕ್ ಕ್ರಾಪ್ ಅನ್ವಯಿಸಲಾಗುತ್ತಿದೆ...' : 'Applying Magic Crop...'}
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
 
                             {analyzing && (
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
