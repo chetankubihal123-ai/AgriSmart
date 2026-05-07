@@ -654,46 +654,43 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                       Actionable Advice
                     </h3>
 
-                    {result.treatment && (
-                      <div className="space-y-6">
-                        {/* Treatment Tabs/Sections */}
-                        <div className="space-y-4">
-                          <div className="bg-prodmast-primary/10 p-5 rounded-2xl border border-prodmast-primary/20">
-                            <h4 className="text-xs font-black text-prodmast-darker uppercase tracking-widest mb-3">Conventional Treatment</h4>
-                            <ul className="space-y-2">
-                              {result.treatment.conventional.map((t, i) => (
-                                <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 bg-prodmast-primary rounded-full shadow-[0_0_5px_rgba(132,204,22,0.5)]" />
-                                  {t}
-                                </li>
-                              ))}
-                            </ul>
+                    {/* Simplified Actionable Advice (2-3 Points) */}
+                    <div className="space-y-4">
+                      {(result.treatment?.conventional || result.recommendations)?.slice(0, 3).map((point, i) => (
+                        <div key={i} className="flex items-start gap-4 p-4 rounded-2xl bg-prodmast-primary/5 border border-prodmast-primary/10 transition-all hover:bg-prodmast-primary/10">
+                          <div className="w-8 h-8 rounded-full bg-prodmast-primary/20 flex items-center justify-center shrink-0">
+                            <span className="text-prodmast-darker font-black text-xs">{i + 1}</span>
                           </div>
-
-                          <div className="bg-blue-500/5 p-5 rounded-2xl border border-blue-500/20">
-                            <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-3">Biological/Organic Remedies</h4>
-                            <ul className="space-y-2">
-                              {result.treatment.biological.map((t, i) => (
-                                <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                                  {t}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div className="bg-slate-900/5 p-5 rounded-2xl border border-slate-200">
-                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Prevention Tips</h4>
-                            <ul className="space-y-2">
-                              {result.treatment.prevention.map((t, i) => (
-                                <li key={i} className="text-sm text-slate-700 font-medium flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
-                                  {t}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                          <p className="text-sm text-slate-700 font-bold leading-relaxed pt-1">
+                            {point}
+                          </p>
                         </div>
+                      ))}
+                    </div>
+
+                    {/* Detailed Treatment (Hidden by default or shown below) */}
+                    {result.treatment && (
+                      <div className="mt-8 space-y-4 opacity-80">
+                        <details className="group">
+                          <summary className="list-none cursor-pointer flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest py-2 border-t border-slate-100 group-open:mb-4">
+                            <span>View Full Treatment Protocol</span>
+                            <Sparkles className="w-3 h-3 transition-transform group-open:rotate-180" />
+                          </summary>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
+                              <h5 className="text-[10px] font-black text-blue-600 uppercase mb-2">Biological</h5>
+                              <ul className="text-xs text-slate-600 space-y-1">
+                                {result.treatment.biological.map((t, i) => <li key={i}>• {t}</li>)}
+                              </ul>
+                            </div>
+                            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                              <h5 className="text-[10px] font-black text-slate-500 uppercase mb-2">Prevention</h5>
+                              <ul className="text-xs text-slate-600 space-y-1">
+                                {result.treatment.prevention.map((t, i) => <li key={i}>• {t}</li>)}
+                              </ul>
+                            </div>
+                          </div>
+                        </details>
                       </div>
                     )}
                   </div>
