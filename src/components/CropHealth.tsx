@@ -606,12 +606,18 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                   {/* Growth Stage & Stress */}
                   <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/20">
-                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Growth Stage</span>
-                      <span className="text-sm font-bold text-slate-900">{result.growthStage || 'Vegetative'}</span>
+                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">{t('cropHealth.growthStage')}</span>
+                      <span className="text-sm font-bold text-slate-900">
+                        {result.growthStage ? t(`cropHealth.stages.${result.growthStage.toLowerCase()}` as any) : t('cropHealth.stages.vegetative')}
+                      </span>
                     </div>
                     <div className="bg-orange-500/5 p-4 rounded-xl border border-orange-500/20">
-                      <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-1">Stress Level</span>
-                      <span className="text-sm font-bold text-slate-900">{result.stressIndicators?.length ? 'Moderate' : 'Low'}</span>
+                      <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-1">{t('cropHealth.stressLevel')}</span>
+                      <span className="text-sm font-bold text-slate-900">
+                        {result.stressIndicators?.length 
+                          ? t(`cropHealth.levels.${result.stressIndicators[0].severity.toLowerCase()}` as any) 
+                          : t('cropHealth.levels.low')}
+                      </span>
                     </div>
                   </div>
 

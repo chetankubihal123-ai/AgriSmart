@@ -324,7 +324,21 @@ export const translations = {
             fullProtocol: 'View Full Treatment Protocol',
             biological: 'Biological',
             prevention: 'Prevention',
-            primaryStressor: 'Analysis indicates {{disease}} as the primary stressor.'
+            primaryStressor: 'Analysis indicates {{disease}} as the primary stressor.',
+            growthStage: 'Growth Stage',
+            stressLevel: 'Stress Level',
+            stages: {
+                seedling: 'Seedling',
+                vegetative: 'Vegetative',
+                flowering: 'Flowering',
+                fruiting: 'Fruiting',
+                maturity: 'Maturity'
+            },
+            levels: {
+                low: 'Low',
+                moderate: 'Moderate',
+                high: 'High'
+            }
         },
         yield: {
             title: 'Yield Estimator',
@@ -764,7 +778,21 @@ export const translations = {
             fullProtocol: 'ಪೂರ್ಣ ಚಿಕಿತ್ಸಾ ಕ್ರಮವನ್ನು ವೀಕ್ಷಿಸಿ',
             biological: 'ಜೈವಿಕ',
             prevention: 'ಮುನ್ನೆಚ್ಚರಿಕೆ',
-            primaryStressor: 'ವಿಶ್ಲೇಷಣೆಯು {{disease}} ಅನ್ನು ಪ್ರಾಥಮಿಕ ಒತ್ತಡದ ಅಂಶವೆಂದು ಸೂಚಿಸುತ್ತದೆ.'
+            primaryStressor: 'ವಿಶ್ಲೇಷಣೆಯು {{disease}} ಅನ್ನು ಪ್ರಾಥಮಿಕ ಒತ್ತಡದ ಅಂಶವೆಂದು ಸೂಚಿಸುತ್ತದೆ.',
+            growthStage: 'ಬೆಳವಣಿಗೆಯ ಹಂತ',
+            stressLevel: 'ಒತ್ತಡದ ಮಟ್ಟ',
+            stages: {
+                seedling: 'ಸಸಿ ಹಂತ',
+                vegetative: 'ಸಸ್ಯದ ಬೆಳವಣಿಗೆ',
+                flowering: 'ಹೂಬಿಡುವಿಕೆ',
+                fruiting: 'ಕಾಯಿ ಬಿಡುವಿಕೆ',
+                maturity: 'ಪಕ್ವವಾಗುವಿಕೆ'
+            },
+            levels: {
+                low: 'ಕಡಿಮೆ',
+                moderate: 'ಮಧ್ಯಮ',
+                high: 'ಹೆಚ್ಚು'
+            }
         },
         yield: {
             title: 'ಇಳುವರಿ ಅಂದಾಜುಗಾರ',
