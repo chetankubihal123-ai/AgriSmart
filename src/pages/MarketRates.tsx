@@ -326,11 +326,12 @@ export function MarketRates() {
 
   // 2. Search filtering on existing real data
   useEffect(() => {
-    if (searchQuery.trim().length < 3) return;
-    
     const queryRaw = searchQuery.trim();
-    // Parse "Hubli, Karnataka" -> "Hubli"
+    if (queryRaw.length < 2) return;
+    
+    // Parse "Dharwad, Karnataka" -> "Dharwad"
     const query = queryRaw.split(',')[0].trim().toLowerCase();
+    const locationDisplayName = queryRaw.includes(',') ? queryRaw : `${query.charAt(0).toUpperCase() + query.slice(1)}, Karnataka`;
     
     const fetchFilteredData = async () => {
         const apiKey = import.meta.env.VITE_AGMARKNET_API_KEY;
@@ -338,7 +339,7 @@ export function MarketRates() {
         
         setIsLoading(true);
         try {
-            // Try searching by Market (Mandi) name first as it's more specific
+            // Try searching by Market (Mandi) name first
             const marketUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[market]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
             const proxyMarket = `https://api.allorigins.win/raw?url=${encodeURIComponent(marketUrl)}`;
             
@@ -373,17 +374,21 @@ export function MarketRates() {
                 });
                 setCommodities(mapped);
             } else {
-                // If no API results, at least update the FALLBACK data to show the searched location name
-                // as requested by the user ("atleast I should get here name as that searched location")
-                const locationName = query.charAt(0).toUpperCase() + query.slice(1);
+                // UPDATE FALLBACK NAMES TO MATCH SEARCH
                 const localizedFallbacks = FALLBACK_COMMODITIES.map(c => ({
                     ...c,
-                    market: `${locationName} Mandi, ${queryRaw.includes(',') ? queryRaw.split(',')[1].trim() : 'Local Region'}`
+                    market: locationDisplayName
                 }));
                 setCommodities(localizedFallbacks);
             }
         } catch (e) {
             console.error('Search error:', e);
+            // Even on error, show the searched location name
+            const errorFallbacks = FALLBACK_COMMODITIES.map(c => ({
+                ...c,
+                market: locationDisplayName
+            }));
+            setCommodities(errorFallbacks);
         } finally {
             setIsLoading(false);
         }
