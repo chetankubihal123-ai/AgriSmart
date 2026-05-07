@@ -505,10 +505,6 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                   <div className="absolute inset-0 overflow-hidden">
                     <div className="w-full h-1 bg-blue-500/80 shadow-[0_0_20px_rgba(59,130,246,0.8)] animate-[scan_1.5s_linear_infinite]" />
                   </div>
-                  <div className="bg-black/80 px-6 py-4 rounded-xl flex items-center gap-3 z-10 border border-blue-500/30 shadow-2xl">
-                    <Sparkles className="w-6 h-6 text-blue-400 animate-pulse" />
-                    <span className="font-bold text-white tracking-widest uppercase text-xs">Applying Magic Crop...</span>
-                  </div>
                 </div>
               )}
 
