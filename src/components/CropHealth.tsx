@@ -243,11 +243,18 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       try {
         const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
         if (geminiResult) {
+          const status = geminiResult.status || 'Warning';
           setResult({
-            status: geminiResult.status || 'Warning',
+            status: status as any,
             disease: geminiResult.disease,
             confidence: geminiResult.confidence,
-            recommendations: geminiResult.treatment
+            recommendations: geminiResult.treatment,
+            healthScore: status === 'Healthy' ? 95 : (status === 'Warning' ? 65 : 25),
+            treatment: {
+              conventional: geminiResult.treatment || [],
+              biological: [],
+              prevention: []
+            }
           });
           setAnalyzing(false);
           return;
@@ -270,7 +277,13 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
             status: dbEntry.status,
             disease: dbEntry.title.toUpperCase(),
             confidence: Math.round(top.probability * 100),
-            recommendations: dbEntry.recs
+            recommendations: dbEntry.recs,
+            healthScore: dbEntry.status === 'Healthy' ? 95 : (dbEntry.status === 'Warning' ? 65 : 25),
+            treatment: {
+              conventional: dbEntry.recs,
+              biological: [],
+              prevention: []
+            }
           });
         } else {
           // Fallback for names not in DB
@@ -279,11 +292,18 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
             .replace(/_/g, ' ')
             .trim();
 
+          const status = top.probability > 0.8 ? 'Warning' : 'Healthy';
           setResult({
-            status: top.probability > 0.8 ? 'Warning' : 'Healthy',
+            status: status,
             disease: cleanName.toUpperCase(),
             confidence: Math.round(top.probability * 100),
-            recommendations: ['Monitor plant daily', 'Ensure proper watering', 'Check for spreading symptoms']
+            recommendations: ['Monitor plant daily', 'Ensure proper watering', 'Check for spreading symptoms'],
+            healthScore: status === 'Healthy' ? 95 : 65,
+            treatment: {
+              conventional: ['Monitor plant daily', 'Ensure proper watering'],
+              biological: [],
+              prevention: []
+            }
           });
         }
         return;
@@ -294,7 +314,13 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
         status: 'Healthy',
         disease: 'Healthy / No issues detected',
         confidence: 88,
-        recommendations: ['Monitor plant daily', 'Ensure proper watering']
+        recommendations: ['Monitor plant daily', 'Ensure proper watering'],
+        healthScore: 95,
+        treatment: {
+          conventional: ['Monitor plant daily', 'Ensure proper watering'],
+          biological: [],
+          prevention: []
+        }
       });
     } catch (error: any) {
       console.error("General analysis error", error);
