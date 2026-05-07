@@ -271,7 +271,7 @@ export function DiseaseDetection() {
                 </div>
 
 
-                {(classificationError || modelError) && (
+                {(classificationError || modelError) && !result && (
                     <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-2 border border-red-200">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
                         <p className="font-medium">{classificationError || modelError}</p>
