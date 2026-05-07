@@ -134,7 +134,7 @@ export function MarketRates() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [commodities, setCommodities] = useState<Commodity[]>([]);
   const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<'1D' | '1M' | '1Y' | '3F'>('1D'); // 3F = 3 Month Forecast
+  const [timeRange, setTimeRange] = useState<'1D' | '1M' | '1Y'>('1D');
   const [now, setNow] = useState(new Date());
   const { t } = useLanguage();
 
@@ -170,34 +170,6 @@ export function MarketRates() {
     const startOffset = timeRange === '1D' ? 0.02 : timeRange === '1M' ? 0.08 : 0.15;
     let current = base * (selectedCommodity.trendUp ? (1 - startOffset) : (1 + startOffset));
     
-    // If it's a forecast, we start from today (the current price)
-    if (isForecast) {
-        current = base;
-        const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-        const startMonthIndex = new Date().getMonth();
-        
-        for (let i = 0; i < 90; i++) {
-            const volatility = 0.015;
-            // Simulated seasonal trend: Tomato/Chilli usually go up in late summer/monsoon
-            const seasonalFactor = Math.sin((i + startMonthIndex * 30) / 180 * Math.PI) * 0.005;
-            const trend = (selectedCommodity.trendUp ? 1.003 : 1.001) + seasonalFactor;
-            
-            current = current * trend * (1 + (rnd() * volatility * 2 - volatility));
-            
-            if (i % 30 === 0 || i === 89) {
-                const month = months[(startMonthIndex + Math.floor(i/30) + 1) % 12];
-                points.push({ 
-                    time: i === 0 ? 'Today' : month, 
-                    price: Math.round(current),
-                    isForecast: i > 0 
-                });
-            } else {
-                // Just add the data point for the curve but don't label it to keep X-axis clean
-                points.push({ time: `Day ${i}`, price: Math.round(current), isForecast: true });
-            }
-        }
-        return points;
-    }
 
     // Standard historical logic
     for (let i = 0; i < count; i++) {
@@ -621,34 +593,19 @@ export function MarketRates() {
                        <div className={`relative z-10 px-4 py-2 rounded-xl font-black text-lg ${stats.change >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                           {stats.change >= 0 ? '↑' : '↓'} {Math.abs(stats.changePercent)}%
                        </div>
-                       {timeRange === '3F' && (
-                           <div className="absolute inset-0 bg-prodmast-accent/10 animate-pulse"></div>
-                       )}
                     </div>
                  </div>
 
-                 {timeRange === '3F' ? (
-                     <div className="bg-prodmast-accent/10 border border-prodmast-accent/30 rounded-2xl p-6 mb-8 text-prodmast-accent">
-                        <div className="flex items-center gap-2 mb-2">
-                           <TrendingUp className="w-5 h-5" />
-                           <span className="font-black uppercase tracking-wider text-xs">Profit Maximization Strategy</span>
-                        </div>
-                        <p className="font-bold text-sm text-white/80">
-                           AI forecasts a supply shortage in <span className="text-prodmast-accent underline">90 days</span>. We recommend holding your current inventory to sell at <span className="text-prodmast-accent">15-20% higher</span> profit margin.
-                        </p>
-                     </div>
-                 ) : (
-                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                        <div className={`h-full transition-all duration-1000 ${stats.change >= 0 ? 'bg-green-500 w-3/4' : 'bg-red-500 w-1/4'}`}></div>
-                     </div>
-                 )}
+                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className={`h-full transition-all duration-1000 ${stats.change >= 0 ? 'bg-green-500 w-3/4' : 'bg-red-500 w-1/4'}`}></div>
+                 </div>
               </div>
 
               {/* Right Column: Chart */}
               <div className="w-full lg:w-2/3 flex flex-col pt-4">
                  <div className="flex justify-between items-center mb-8">
                     <div className="flex flex-wrap gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/10">
-                       {(['1D', '1M', '1Y', '3F'] as const).map(range => (
+                       {(['1D', '1M', '1Y'] as const).map(range => (
                           <button
                             key={range}
                             onClick={() => setTimeRange(range)}
@@ -656,8 +613,7 @@ export function MarketRates() {
                                 timeRange === range ? 'bg-prodmast-accent text-prodmast-dark shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'
                             }`}
                           >
-                            {range === '3F' && <Activity className="w-4 h-4" />}
-                            {range === '3F' ? 'AI FORECAST (3M)' : t(`market.${range === '1D' ? 'oneDay' : range === '1M' ? 'oneMonth' : 'oneYear'}`)}
+                            {t(`market.${range === '1D' ? 'oneDay' : range === '1M' ? 'oneMonth' : 'oneYear'}`)}
                           </button>
                        ))}
                     </div>
@@ -703,7 +659,7 @@ export function MarketRates() {
                             dataKey="price" 
                             stroke={stats.change >= 0 ? "#4ade80" : "#f87171"} 
                             strokeWidth={4} 
-                            strokeDasharray={timeRange === '3F' ? "8 6" : "0"}
+                            strokeDasharray="0"
                             fillOpacity={1} 
                             fill="url(#colorPrice)" 
                             animationDuration={1500}
