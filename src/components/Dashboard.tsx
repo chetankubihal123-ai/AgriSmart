@@ -176,7 +176,7 @@ export function Dashboard() {
       bgHover: "group-hover:bg-indigo-50",
       image: "https://images.unsplash.com/photo-1492496913980-501348b61469?auto=format&fit=crop&q=80&w=1200",
       stats: [
-        { label: "Matches", value: "8 Active" },
+        { label: "Matches", value: "5 Active" },
         { label: "State", value: "Karnataka" },
       ]
     },
@@ -202,8 +202,6 @@ export function Dashboard() {
       bgHover: "group-hover:bg-green-50",
       image: "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&q=80&w=800",
       stats: [
-        { label: "Scanned", value: "1.2k acres" },
-        { label: "Status", value: "Optimal" },
       ]
     },
     {
@@ -215,8 +213,8 @@ export function Dashboard() {
       bgHover: "group-hover:bg-amber-50",
       image: "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?auto=format&fit=crop&q=80&w=800",
       stats: [
-        { label: "Diseases", value: "45+ tracked" },
-        { label: "Prevention", value: "92%" },
+        { label: "Diseases", value: "10+ tracked" },
+        { label: "Prevention", value: "90%" },
       ]
     },
     {
@@ -229,7 +227,7 @@ export function Dashboard() {
       image: "https://images.unsplash.com/photo-1561553543-e4c7b608b98d?auto=format&fit=crop&q=80&w=800",
       stats: [
         { label: "Radar", value: "Doppler" },
-        { label: "Forecast", value: "14-Day" },
+        { label: "Forecast", value: "4-5 Days" },
       ]
     },
     {

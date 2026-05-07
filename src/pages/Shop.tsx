@@ -27,8 +27,8 @@ export function Shop() {
     const STATIC_CATALOG = [
         // Tomato Crop
         { id: 's1', brand: 'Syngenta', name: 'Saaho (TO-3251) Tomato Seeds (ಸ್ಯಾಹೋ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 999, originalPrice: 1525, discount: 34, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1592841608277-33d2f837a962?auto=format&fit=crop&q=80&w=600' },
-        { id: 's2', brand: 'Seminis', name: 'Abhilash Tomato Seeds (ಅಭಿಲಾಶ್ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 707, originalPrice: 813, discount: 13, unit: '10 gms', image: 'https://images.unsplash.com/photo-1599839619722-39751411ea63?auto=format&fit=crop&q=80&w=600' },
-        { id: 's3', brand: 'Syngenta', name: 'Heemsohna Tomato Seeds (ಹೀಮಸೋನಾ ಟೊಮೆಟೊ)', category: 'Seeds', crop: 'Tomato', price: 1065, originalPrice: 1231, discount: 13, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1594282486512-0a88af64bc95?auto=format&fit=crop&q=80&w=600' },
+        { id: 's2', brand: 'Seminis', name: 'Abhilash Tomato Seeds (ಅಭಿಲಾಶ್ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 707, originalPrice: 813, discount: 13, unit: '10 gms', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=600' },
+        { id: 's3', brand: 'Syngenta', name: 'Heemsohna Tomato Seeds (ಹೀಮಸೋನಾ ಟೊಮೆಟೊ)', category: 'Seeds', crop: 'Tomato', price: 1065, originalPrice: 1231, discount: 13, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1590139704851-f0439bb752ee?auto=format&fit=crop&q=80&w=600' },
         { id: 'n1', brand: 'Bayer', name: 'Antracol Fungicide (ಪರಾಗಸ್ಪರ್ಶ ಕೀಟನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 273, originalPrice: 350, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1628352081506-83c43123ed6d?auto=format&fit=crop&q=80&w=600' },
         { id: 'n2', brand: 'Geolife', name: 'No-Virus Immunity Booster (ನೋ-ವೈರಸ್ ರೋಗನಿರೋಧಕ)', category: 'Nutrients', crop: 'Tomato', price: 369, originalPrice: 850, discount: 57, unit: '250 ml', image: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&q=80&w=600' },
         { id: 'n3', brand: 'Biostadt', name: 'Roko Fungicide (ರೋಕೋ ಶಿಲೀಂಧ್ರನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 352, originalPrice: 450, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1589365278144-c9e7059c43ba?auto=format&fit=crop&q=80&w=600' },
@@ -52,9 +52,9 @@ export function Shop() {
         
         // Brinjal & Others
         { id: 'b1', brand: 'VNR', name: 'VNR 212 Brinjal Seeds (ಬದನೆ ಬೀಜ)', category: 'Seeds', crop: 'Brinjal', price: 179, originalPrice: 240, discount: 25, unit: '10 gms', image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&q=80&w=600' },
-        { id: 'b2', brand: 'VNR', name: 'VNR Haruna Bottle Gourd (ಹವಳ ಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Brinjal', price: 399, originalPrice: 540, discount: 26, unit: '50 gms', image: 'https://images.unsplash.com/photo-1601598851547-4302969d0614?auto=format&fit=crop&q=80&w=600' },
+        { id: 'b2', brand: 'VNR', name: 'VNR Haruna Bottle Gourd (ಹವಳ ಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Brinjal', price: 399, originalPrice: 540, discount: 26, unit: '50 gms', image: 'https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&q=80&w=600' },
         { id: 'k1', brand: 'VNR', name: 'Krish Cucumber Seeds (ಸೌತೆಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Cucumber', price: 349, originalPrice: 480, discount: 27, unit: '10 gms', image: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&q=80&w=600' },
-        { id: 'k2', brand: 'Advanta', name: 'Raadhika Bhindi Hybrid (ಬೆಂಡೆಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Okra', price: 679, originalPrice: 990, discount: 31, unit: '1500 seeds', image: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&q=80&w=600' },
+        { id: 'k2', brand: 'Advanta', name: 'Raadhika Bhindi Hybrid (ಬೆಂಡೆಕಾಯಿ ಬೀಜ)', category: 'Seeds', crop: 'Okra', price: 679, originalPrice: 990, discount: 31, unit: '1500 seeds', image: 'https://images.unsplash.com/photo-1627440221741-2a265675e2f7?auto=format&fit=crop&q=80&w=600' },
         
         // Plant Nutrition
         { id: 'pn1', brand: 'Coromandel', name: 'Fantac Plus Growth Promoter (ಫಾಂಟಾಕ್ ಪ್ಲಸ್)', category: 'Nutrients', price: 259, originalPrice: 430, discount: 40, unit: '100 ml', image: 'https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&q=80&w=600' },
