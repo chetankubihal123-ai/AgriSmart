@@ -550,42 +550,62 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                 </div>
               ) : (
                 <div className="bg-white/5 rounded-2xl border border-white/10 p-8 shadow-2xl backdrop-blur-sm">
-                  <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">{t('cropHealth.analysisResult')}</span>
-                      <h3 className="text-3xl font-black text-slate-900 mt-1 uppercase tracking-tight">
-                        {result.disease === 'Healthy' ? t('cropHealth.status.healthy') : result.disease || t('cropHealth.status.healthy')}
-                      </h3>
+
+                <div className="mb-10 p-8 rounded-[32px] bg-white border border-slate-100 shadow-xl relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Overall Crop Vitality</span>
+                        <h3 className={`text-4xl font-black tracking-tighter ${result.status === 'Critical' ? 'text-red-600' : (result.status === 'Warning' ? 'text-orange-500' : 'text-green-600')}`}>
+                          {result.status === 'Healthy' ? 'PRIME HEALTH' : (result.status === 'Warning' ? 'VULNERABLE' : 'CRITICAL CONDITION')}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={`px-5 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border-2 ${
+                          result.status === 'Critical' ? 'bg-red-50 text-red-600 border-red-200' : 
+                          (result.status === 'Warning' ? 'bg-orange-50 text-orange-500 border-orange-200' : 'bg-green-50 text-green-600 border-green-200')
+                        }`}>
+                          {result.status}
+                        </div>
+                      </div>
                     </div>
-                    <div className={`
-                      px-5 py-2 rounded-xl font-bold flex items-center gap-2 border shadow-lg
-                      ${result.status === 'Healthy' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                        result.status === 'Warning' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                          'bg-red-500/20 text-red-400 border-red-500/30'}
-                    `}>
-                      {result.status === 'Healthy' ? <CheckCircle className="w-5 h-5" /> :
-                        <AlertCircle className="w-5 h-5" />}
-                      {result.status === 'Healthy' ? t('cropHealth.status.healthy') :
-                        result.status === 'Warning' ? t('cropHealth.status.warning') : t('cropHealth.status.critical')}
+
+                    <div className="grid grid-cols-2 gap-6 mb-8">
+                      <div className="bg-green-50/50 p-6 rounded-[24px] border border-green-100/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Good / Healthy</span>
+                        </div>
+                        <div className="text-5xl font-black text-green-600 tracking-tighter">
+                          {result.healthScore || 0}%
+                        </div>
+                      </div>
+                      <div className="bg-red-50/50 p-6 rounded-[24px] border border-red-100/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-red-500 rounded-full" />
+                          <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Bad / Affected</span>
+                        </div>
+                        <div className="text-5xl font-black text-red-600 tracking-tighter">
+                          {100 - (result.healthScore || 0)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50 mb-4">
+                      <div 
+                        className={`absolute left-0 top-0 h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(34,197,94,0.3)] ${
+                          result.status === 'Critical' ? 'bg-red-500' : (result.status === 'Warning' ? 'bg-orange-500' : 'bg-green-500')
+                        }`}
+                        style={{ width: `${result.healthScore}%` }}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-4 text-[11px] font-bold text-slate-500 italic">
+                      <Sparkles className="w-3.5 h-3.5 text-prodmast-primary" />
+                      Analysis indicates {result.disease?.toLowerCase() || 'no specific disease'} as the primary stressor.
                     </div>
                   </div>
-
-                  {/* Health Score Gauge */}
-                  {result.healthScore !== undefined && (
-                    <div className="mb-8 bg-slate-900/5 p-6 rounded-2xl border border-slate-200">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Health Score</h4>
-                        <span className={`text-2xl font-black ${result.healthScore > 80 ? 'text-green-500' : 'text-yellow-500'}`}>{result.healthScore}%</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden border border-slate-300">
-                        <div
-                          className={`h-full transition-all duration-1000 ease-out ${result.healthScore > 80 ? 'bg-green-500' : 'bg-yellow-500'}`}
-                          style={{ width: `${result.healthScore}%` }}
-                        />
-                      </div>
-                      <p className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-tighter">Vitality indicators based on leaf color and texture analysis.</p>
-                    </div>
-                  )}
+                </div>
 
                   {/* Growth Stage & Stress */}
                   <div className="grid grid-cols-2 gap-4 mb-8">
