@@ -16,6 +16,59 @@ interface AnalysisResult {
     detailedTreatment?: { conventional: string[], biological: string[], prevention: string[] };
 }
 
+const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warning' | 'Critical', recs: string[] }> = {
+    'Tomato_healthy': {
+        title: 'Tomato (Healthy)',
+        status: 'Healthy',
+        recs: ['Maintain current irrigation', 'Continue regular soil testing', 'Monitor for early pest signs']
+    },
+    'Tomato__Tomato_mosaic_virus': {
+        title: 'Tomato Mosaic Virus',
+        status: 'Critical',
+        recs: ['Remove and destroy infected plants', 'Control aphids and whiteflies', 'Disinfect tools between use']
+    },
+    'Tomato__Tomato_YellowLeaf_Curl_Virus': {
+        title: 'Tomato Yellow Leaf Curl Virus',
+        status: 'Critical',
+        recs: ['Use silver-colored mulches', 'Remove nearby weed hosts', 'Plant resistant varieties']
+    },
+    'Tomato_Late_blight': {
+        title: 'Tomato Late Blight',
+        status: 'Critical',
+        recs: ['Apply copper-based fungicides', 'Improve air circulation', 'Avoid overhead watering']
+    },
+    'Tomato_Early_blight': {
+        title: 'Tomato Early Blight',
+        status: 'Warning',
+        recs: ['Prune lower leaves', 'Apply organic fungicide', 'Rotate crops every 3 years']
+    },
+    'Tomato_Septoria_leaf_spot': {
+        title: 'Tomato Septoria Leaf Spot',
+        status: 'Warning',
+        recs: ['Remove infected foliage', 'Mulch around base', 'Use drip irrigation']
+    },
+    'Tomato_Bacterial_spot': {
+        title: 'Tomato Bacterial Spot',
+        status: 'Warning',
+        recs: ['Use treated seeds', 'Apply copper-based sprays', 'Avoid working in wet fields']
+    },
+    'Tomato_Spider_mites_Two_spotted_spider_mite': {
+        title: 'Tomato Spider Mites',
+        status: 'Warning',
+        recs: ['Spray plants with water', 'Introduce natural predators', 'Use neem oil spray']
+    },
+    'Tomato_Leaf_Mold': {
+        title: 'Tomato Leaf Mold',
+        status: 'Warning',
+        recs: ['Reduce humidity in greenhouse', 'Plant resistant hybrids', 'Increase plant spacing']
+    },
+    'Tomato_Target_Spot': {
+        title: 'Tomato Target Spot',
+        status: 'Warning',
+        recs: ['Apply fungicides early', 'Remove old plant debris', 'Improve field drainage']
+    }
+};
+
 export function DiseaseDetection() {
     const { t, language } = useLanguage();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -104,9 +157,48 @@ export function DiseaseDetection() {
         setClassificationError(null);
         try {
             let imageToAnalyze = selectedImage;
-            // Magic crop now happens on upload, so we just analyze what we have
 
-            // 1. Detailed Analysis
+            // 1. FOCUS: Teachable Machine Local Analysis First
+            const { customPredictions, error: localError } = await classifyImage(imageRef.current!, selectedCrop);
+            
+            if (!localError && customPredictions && customPredictions.length > 0) {
+                const top = customPredictions[0];
+                const dbKey = top.className;
+                const dbEntry = (DISEASE_GUIDE as any)[dbKey];
+
+                if (dbEntry && top.probability > 0.4) {
+                    // Use Local Data primarily
+                    setResult({
+                        disease: dbEntry.title.toUpperCase(),
+                        confidence: Math.round(top.probability * 100),
+                        description: `[Local Model] ${dbEntry.title} detected with high confidence.`,
+                        treatment: dbEntry.recs,
+                        severity: dbEntry.status === 'Healthy' ? 'Low' : (dbEntry.status === 'Warning' ? 'Moderate' : 'High'),
+                        detailedTreatment: {
+                            conventional: dbEntry.recs,
+                            biological: [],
+                            prevention: []
+                        }
+                    });
+
+                    // Optional: Try to enrich with Gemini in background if possible
+                    analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language).then(enriched => {
+                        if (enriched) {
+                            setResult(prev => prev ? {
+                                ...prev,
+                                description: enriched.causes || prev.description,
+                                spread: enriched.spread || prev.spread,
+                                detailedTreatment: enriched.treatment || prev.detailedTreatment
+                            } : null);
+                        }
+                    });
+                    
+                    setAnalyzing(false);
+                    return;
+                }
+            }
+
+            // 2. Fallback to Gemini Detailed Analysis
             const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);
             
             if (detailedResult) {
@@ -121,42 +213,21 @@ export function DiseaseDetection() {
                     spread: detailedResult.spread || "N/A",
                     detailedTreatment: detailedResult.treatment
                 });
+                setAnalyzing(false);
                 return;
             }
 
-            // 2. Gemini Analysis with Fallback
-            try {
-                const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
-                if (geminiResult) {
-                    setResult({
-                        ...geminiResult,
-                        description: `[AI] ${geminiResult.description}`
-                    });
-                    return;
-                }
-            } catch (geminiError) {
-                console.error("Gemini failed, falling back to local models:", geminiError);
-                
-                // Fallback to local models
-                if (model) {
-                    const { customPredictions, error: localError } = await classifyImage(imageRef.current!, selectedCrop);
-                    if (!localError && customPredictions && customPredictions.length > 0) {
-                        const top = customPredictions[0];
-                        const cleanName = top.className
-                            .replace(new RegExp(`^${selectedCrop}_`, 'i'), '')
-                            .replace(/_/g, ' ')
-                            .trim();
-
-                        setResult({
-                            disease: cleanName.toUpperCase(),
-                            confidence: Math.round(top.probability * 100),
-                            description: `Identified using specialized ${selectedCrop} model.`,
-                            treatment: ["Consult local experts", "Monitor closely"]
-                        });
-                        return;
-                    }
-                }
+            // 3. Last Resort: Generic Gemini
+            const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
+            if (geminiResult) {
+                setResult({
+                    ...geminiResult,
+                    description: `[AI] ${geminiResult.description}`
+                });
+                setAnalyzing(false);
+                return;
             }
+
         } catch (error: any) {
             console.error("General analysis error", error);
             setClassificationError(t('cropHealth.failedToIdentify'));
