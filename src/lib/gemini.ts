@@ -146,9 +146,10 @@ export async function detectPlantBoundingBox(base64Image: string) {
 
 export async function identifyCropType(base64Image: string): Promise<string> {
   const base64Data = base64Image.split(',')[1];
-  const prompt = `Identify the crop in this image. 
-  Choose ONLY from these exact words: "tomato", "corn", "chilli".
-  If it's none of these, return "other".
+  const prompt = `Task: Identify if this image contains a crop or plant.
+  1. If the image is NOT a plant (e.g., human, animal, furniture, abstract, or non-agricultural object), return "other".
+  2. If it is a plant, choose the most specific match from: "tomato", "corn", "chilli".
+  3. If it is a plant but not one of those three, return "plant".
   Return ONLY the single word answer.`;
 
   for (const modelName of MODELS) {
@@ -162,7 +163,7 @@ export async function identifyCropType(base64Image: string): Promise<string> {
         prompt
       ]);
       const response = result.response.text().trim().toLowerCase();
-      if (['tomato', 'corn', 'chilli'].includes(response)) {
+      if (['tomato', 'corn', 'chilli', 'plant', 'other'].includes(response)) {
         return response;
       }
     } catch (error) {

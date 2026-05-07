@@ -182,6 +182,12 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       try {
         // 1. Identify Crop Type first
         const identifiedCrop = await identifyCropType(dataUrl);
+        if (identifiedCrop === 'other') {
+          setClassificationError(t('cropHealth.noCropDetected'));
+          setIsCropping(false);
+          return;
+        }
+
         if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
           setSelectedCrop(identifiedCrop as any);
         }
@@ -216,6 +222,14 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
     try {
       let imageToAnalyze = selectedImage;
+
+      // Re-verify crop before deep analysis
+      const identifiedCrop = await identifyCropType(imageToAnalyze);
+      if (identifiedCrop === 'other') {
+        setClassificationError(t('cropHealth.noCropDetected'));
+        setAnalyzing(false);
+        return;
+      }
 
       // Use Detailed Analysis
       const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);

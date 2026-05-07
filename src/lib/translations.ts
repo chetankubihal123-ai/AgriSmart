@@ -314,6 +314,7 @@ export const translations = {
                 warning: 'Warning',
                 critical: 'Critical'
             },
+            noCropDetected: 'No crop detected in the image. Please upload a clear photo of a plant.',
             vitality: 'Overall Crop Vitality',
             goodHealthy: 'Good / Healthy',
             badAffected: 'Bad / Affected',
@@ -768,6 +769,7 @@ export const translations = {
                 warning: 'ಎಚ್ಚರಿಕೆ',
                 critical: 'ಗಂಭೀರ'
             },
+            noCropDetected: 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ಸಸ್ಯದ ಸ್ಪಷ್ಟ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.',
             vitality: 'ಒಟ್ಟಾರೆ ಬೆಳೆ ಚೈತನ್ಯ',
             goodHealthy: 'ಉತ್ತಮ / ಆರೋಗ್ಯಕರ',
             badAffected: 'ಹಾನಿಗೊಳಗಾದ / ಬಾಧಿತ',
