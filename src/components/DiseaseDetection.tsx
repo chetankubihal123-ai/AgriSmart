@@ -460,16 +460,15 @@ export function DiseaseDetection() {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">
                                             {result.disease}
                                         </h3>
                                         <div className={`
-                                            px-3 py-1 rounded-full text-xs font-bold border
-                                            ${result.severity === 'High' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                                                result.severity === 'Moderate' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
-                                                    'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}
+                                            px-4 py-1.5 rounded-full text-sm font-black border-2 shadow-sm
+                                            ${result.severity === 'High' ? 'bg-red-600 text-white border-red-700' :
+                                                result.severity === 'Moderate' ? 'bg-orange-500 text-white border-orange-600' :
+                                                    'bg-green-500 text-white border-green-600'}
                                         `}>
                                             {result.severity === 'High' ? t('cropHealth.levels.high') : 
                                              result.severity === 'Moderate' ? t('cropHealth.levels.moderate') : 
@@ -491,63 +490,63 @@ export function DiseaseDetection() {
                                         </div>
                                     )}
 
-                                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
+                                    <p className="text-slate-700 text-lg leading-relaxed font-bold">
                                         {result.description}
                                     </p>
 
                                     {/* Causes & Spread */}
                                     {result.spread && (
-                                        <div className="p-4 bg-slate-900/5 rounded-xl border border-slate-200">
-                                            <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                                        <div className="p-5 bg-slate-900/5 rounded-2xl border-2 border-slate-200/50">
+                                            <h5 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
                                               {language === 'kn' ? 'ಹರಡುವಿಕೆ ಮತ್ತು ಮಾದರಿ' : 'Spread & Pattern'}
                                             </h5>
-                                            <p className="text-xs text-slate-700 font-medium">{result.spread}</p>
+                                            <p className="text-sm text-slate-800 font-bold leading-relaxed">{result.spread}</p>
                                         </div>
                                     )}
 
                                     {/* Detailed Treatment Section */}
-                                    <div className="space-y-4">
-                                        <h4 className="font-bold text-slate-900 flex items-center gap-2 uppercase text-xs tracking-widest">
-                                            <CheckCircle className="w-4 h-4 text-prodmast-primary" />
+                                    <div className="space-y-6">
+                                        <h4 className="font-black text-slate-900 flex items-center gap-3 uppercase text-sm tracking-widest border-b-2 border-slate-100 pb-2">
+                                            <CheckCircle className="w-6 h-6 text-prodmast-primary" />
                                             {t('disease.treatment')}
                                         </h4>
                                         
                                         {result.detailedTreatment ? (
                                             <div className="space-y-3">
-                                                <div className="bg-prodmast-primary/5 p-4 rounded-xl border border-prodmast-primary/10">
-                                                    <span className="text-[9px] font-black text-prodmast-darker uppercase tracking-tighter block mb-2">
+                                                <div className="bg-emerald-500/5 p-6 rounded-2xl border-2 border-emerald-500/20 shadow-sm">
+                                                    <span className="text-xs font-black text-emerald-700 uppercase tracking-widest block mb-4 border-b border-emerald-500/20 pb-2">
                                                       {language === 'kn' ? 'ಸಾಂಪ್ರದಾಯಿಕ ಪರಿಹಾರ' : 'Conventional Remediation'}
                                                     </span>
-                                                    <ul className="space-y-1.5">
+                                                    <ul className="space-y-3">
                                                         {result.detailedTreatment.conventional.map((step, i) => (
-                                                            <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
-                                                                <div className="min-w-[4px] h-4 w-1 bg-prodmast-primary rounded-full mt-0.5" />
+                                                            <li key={i} className="text-sm text-emerald-900 font-bold flex items-start gap-3">
+                                                                <div className="min-w-[8px] h-5 w-2 bg-emerald-500 rounded-full mt-0.5 shadow-sm" />
                                                                 {step}
                                                             </li>
                                                         ))}
                                                     </ul>
                                                 </div>
-                                                <div className="bg-blue-500/5 p-4 rounded-xl border border-blue-500/10">
-                                                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter block mb-2">
+                                                <div className="bg-blue-500/5 p-6 rounded-2xl border-2 border-blue-500/20 shadow-sm">
+                                                    <span className="text-xs font-black text-blue-700 uppercase tracking-widest block mb-4 border-b border-blue-500/20 pb-2">
                                                       {language === 'kn' ? 'ಜೈವಿಕ ನಿಯಂತ್ರಣ' : 'Biological Control'}
                                                     </span>
-                                                    <ul className="space-y-1.5">
+                                                    <ul className="space-y-3">
                                                         {result.detailedTreatment.biological.map((step, i) => (
-                                                            <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
-                                                                <div className="min-w-[4px] h-4 w-1 bg-blue-500 rounded-full mt-0.5" />
+                                                            <li key={i} className="text-sm text-blue-900 font-bold flex items-start gap-3">
+                                                                <div className="min-w-[8px] h-5 w-2 bg-blue-500 rounded-full mt-0.5 shadow-sm" />
                                                                 {step}
                                                             </li>
                                                         ))}
                                                     </ul>
                                                 </div>
-                                                <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
-                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter block mb-2">
+                                                <div className="bg-slate-500/5 p-6 rounded-2xl border-2 border-slate-500/20 shadow-sm">
+                                                    <span className="text-xs font-black text-slate-700 uppercase tracking-widest block mb-4 border-b border-slate-500/20 pb-2">
                                                       {language === 'kn' ? 'ತಡೆಗಟ್ಟುವ ಸಲಹೆ' : 'Prevention Advice'}
                                                     </span>
-                                                    <ul className="space-y-1.5">
+                                                    <ul className="space-y-3">
                                                         {result.detailedTreatment.prevention.map((step, i) => (
-                                                            <li key={i} className="text-xs text-slate-700 font-medium flex items-start gap-2">
-                                                                <div className="min-w-[4px] h-4 w-1 bg-slate-400 rounded-full mt-0.5" />
+                                                            <li key={i} className="text-sm text-slate-800 font-bold flex items-start gap-3">
+                                                                <div className="min-w-[8px] h-5 w-2 bg-slate-400 rounded-full mt-0.5 shadow-sm" />
                                                                 {step}
                                                             </li>
                                                         ))}

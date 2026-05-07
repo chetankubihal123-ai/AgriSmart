@@ -289,6 +289,7 @@ export const translations = {
             demoResult: 'Simulated Result (Demo)',
             match: 'Match',
             recommendedTreatment: 'Recommended Treatment',
+            treatment: 'Treatment Protocol',
             checkAnother: 'Check Another Plant'
         },
         cropHealth: {
@@ -745,7 +746,8 @@ export const translations = {
             demoResult: 'ಸಿಮ್ಯುಲೇಟೆಡ್ ಫಲಿತಾಂಶ (ಡೆಮೊ)',
             match: 'ಹೊಂದಾಣಿಕೆ',
             recommendedTreatment: 'ಶಿಫಾರಸು ಮಾಡಿದ ಚಿಕಿತ್ಸೆ',
-            checkAnother: 'ಇನ್ನೊಂದು ಸಸ್ಯವನ್ನು ಪರೀಕ್ಷಿಸಿ'
+            treatment: 'ಚಿಕಿತ್ಸಾ ಪ್ರೋಟೋಕಾಲ್',
+            checkAnother: 'ಮತ್ತೊಂದು ಸಸ್ಯವನ್ನು ಪರಿಶೀಲಿಸಿ'
         },
         cropHealth: {
             title: 'ಬೆಳೆ ಆರೋಗ್ಯ ತಪಾಸಣೆ',
