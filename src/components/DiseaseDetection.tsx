@@ -460,6 +460,7 @@ export function DiseaseDetection() {
                                     </button>
                                 </div>
                             ) : (
+                                <div className="space-y-6">
                                     <div className="flex items-center justify-between mb-2">
                                         <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">
                                             {result.disease}
