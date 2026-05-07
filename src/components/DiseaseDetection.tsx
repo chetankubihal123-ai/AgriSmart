@@ -16,56 +16,76 @@ interface AnalysisResult {
     detailedTreatment?: { conventional: string[], biological: string[], prevention: string[] };
 }
 
-const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warning' | 'Critical', recs: string[] }> = {
+const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warning' | 'Critical', recs: string[], bio: string[], prev: string[] }> = {
     'Tomato_healthy': {
         title: 'Tomato (Healthy)',
         status: 'Healthy',
-        recs: ['Maintain current irrigation', 'Continue regular soil testing', 'Monitor for early pest signs']
+        recs: ['Maintain current irrigation', 'Continue regular soil testing'],
+        bio: ['Encourage beneficial insects', 'Use organic compost'],
+        prev: ['Rotate crops annually', 'Monitor soil pH levels']
     },
     'Tomato__Tomato_mosaic_virus': {
         title: 'Tomato Mosaic Virus',
         status: 'Critical',
-        recs: ['Remove and destroy infected plants', 'Control aphids and whiteflies', 'Disinfect tools between use']
+        recs: ['Remove and destroy infected plants', 'Control aphids and whiteflies'],
+        bio: ['Use predatory mites', 'Apply neem oil sprays'],
+        prev: ['Disinfect tools between use', 'Use certified virus-free seeds']
     },
     'Tomato__Tomato_YellowLeaf_Curl_Virus': {
         title: 'Tomato Yellow Leaf Curl Virus',
         status: 'Critical',
-        recs: ['Use silver-colored mulches', 'Remove nearby weed hosts', 'Plant resistant varieties']
+        recs: ['Use silver-colored mulches', 'Remove nearby weed hosts'],
+        bio: ['Introduce parasitic wasps', 'Use microbial insecticides'],
+        prev: ['Plant resistant varieties', 'Install fine mesh netting']
     },
     'Tomato_Late_blight': {
         title: 'Tomato Late Blight',
         status: 'Critical',
-        recs: ['Apply copper-based fungicides', 'Improve air circulation', 'Avoid overhead watering']
+        recs: ['Apply copper-based fungicides', 'Avoid overhead watering'],
+        bio: ['Apply Bacillus subtilis', 'Use seaweed extracts'],
+        prev: ['Improve air circulation', 'Space plants properly']
     },
     'Tomato_Early_blight': {
         title: 'Tomato Early Blight',
         status: 'Warning',
-        recs: ['Prune lower leaves', 'Apply organic fungicide', 'Rotate crops every 3 years']
+        recs: ['Prune lower leaves', 'Apply organic fungicide'],
+        bio: ['Use Trichoderma harzianum', 'Apply compost tea'],
+        prev: ['Rotate crops every 3 years', 'Remove plant debris']
     },
     'Tomato_Septoria_leaf_spot': {
         title: 'Tomato Septoria Leaf Spot',
         status: 'Warning',
-        recs: ['Remove infected foliage', 'Mulch around base', 'Use drip irrigation']
+        recs: ['Remove infected foliage', 'Mulch around base'],
+        bio: ['Use beneficial fungi sprays', 'Apply liquid kelp'],
+        prev: ['Use drip irrigation only', 'Avoid working in wet fields']
     },
     'Tomato_Bacterial_spot': {
         title: 'Tomato Bacterial Spot',
         status: 'Warning',
-        recs: ['Use treated seeds', 'Apply copper-based sprays', 'Avoid working in wet fields']
+        recs: ['Use treated seeds', 'Apply copper-based sprays'],
+        bio: ['Apply bacteriophages', 'Use essential oil sprays'],
+        prev: ['Avoid overhead irrigation', 'Manage weeds aggressively']
     },
     'Tomato_Spider_mites_Two_spotted_spider_mite': {
         title: 'Tomato Spider Mites',
         status: 'Warning',
-        recs: ['Spray plants with water', 'Introduce natural predators', 'Use neem oil spray']
+        recs: ['Spray plants with water', 'Use neem oil spray'],
+        bio: ['Introduce Phytoseiulus persimilis', 'Use lacewing larvae'],
+        prev: ['Maintain high humidity', 'Control dust on leaves']
     },
     'Tomato_Leaf_Mold': {
         title: 'Tomato Leaf Mold',
         status: 'Warning',
-        recs: ['Reduce humidity in greenhouse', 'Plant resistant hybrids', 'Increase plant spacing']
+        recs: ['Reduce humidity in greenhouse', 'Increase plant spacing'],
+        bio: ['Apply Bacillus amyloliquefaciens', 'Use potassium bicarbonate'],
+        prev: ['Plant resistant hybrids', 'Improve greenhouse ventilation']
     },
     'Tomato_Target_Spot': {
         title: 'Tomato Target Spot',
         status: 'Warning',
-        recs: ['Apply fungicides early', 'Remove old plant debris', 'Improve field drainage']
+        recs: ['Apply fungicides early', 'Remove old plant debris'],
+        bio: ['Apply Streptomyces lydicus', 'Use humic acid'],
+        prev: ['Improve field drainage', 'Wider row spacing']
     }
 };
 
@@ -176,8 +196,8 @@ export function DiseaseDetection() {
                         severity: dbEntry.status === 'Healthy' ? 'Low' : (dbEntry.status === 'Warning' ? 'Moderate' : 'High'),
                         detailedTreatment: {
                             conventional: dbEntry.recs,
-                            biological: [],
-                            prevention: []
+                            biological: dbEntry.bio,
+                            prevention: dbEntry.prev
                         }
                     });
 
