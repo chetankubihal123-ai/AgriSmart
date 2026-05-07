@@ -72,16 +72,16 @@ export function Dashboard() {
         const step = c.basePrice * (Math.random() * 0.06 + 0.01);
         let newPrice = c.price;
         if (c.up) {
-           newPrice += (Math.random() > 0.4 ? step : -step * 0.6);
+          newPrice += (Math.random() > 0.4 ? step : -step * 0.6);
         } else {
-           newPrice -= (Math.random() > 0.4 ? step : -step * 0.6);
+          newPrice -= (Math.random() > 0.4 ? step : -step * 0.6);
         }
         newPrice = Math.round(newPrice);
-        
+
         if (newPrice === c.price) return { ...c, flash: null };
         const change = newPrice - c.price;
         const newHistory = [...c.history.slice(1), { time: Date.now(), price: newPrice }];
-        
+
         const oldestPrice = newHistory[0].price;
         const up = newPrice >= oldestPrice;
 
@@ -89,7 +89,7 @@ export function Dashboard() {
           ...c,
           price: newPrice,
           history: newHistory,
-          up, 
+          up,
           flash: change > 0 ? 'up' : 'down'
         };
       }));
@@ -169,7 +169,7 @@ export function Dashboard() {
   const allFeatures = [
     {
       title: "Smart Schemes",
-      desc: "Find government subsidies and agricultural schemes tailored specifically to your farm profile and crop selection.",
+      desc: "Explore Government Subsidies & Schemes",
       icon: <Landmark className="w-8 h-8" />,
       path: "/schemes",
       iconColor: "text-indigo-600",
@@ -182,7 +182,7 @@ export function Dashboard() {
     },
     {
       title: "Land Analysis",
-      desc: "Analyze farm health and soil metrics comprehensively using satellite imagery and IoT soil sensors. Track moisture, pH, and nutrient density in real-time.",
+      desc: "Analyze farm health and soil metrics comprehensively using satellite imagery. Track moisture, pH, and nutrient density in real-time.",
       icon: <FileText className="w-8 h-8" />,
       path: "/land-analysis",
       iconColor: "text-blue-600",
@@ -234,7 +234,7 @@ export function Dashboard() {
     },
     {
       title: "Market Rates",
-      desc: "Track daily commodity prices from local APMCs and mandis. Plan your harvest sales by monitoring real-time trends for Chilli, Corn, and Tomato.",
+      desc: "Track daily commodity prices from local APMCs and mandis. Plan your harvest sales by monitoring real-time trends.",
       icon: <LineChartIcon className="w-8 h-8" />,
       path: "/market-rates",
       iconColor: "text-emerald-600",
@@ -296,10 +296,10 @@ export function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 text-white bg-indigo-500/80 backdrop-blur-xl w-fit px-4 py-2 rounded-2xl border border-indigo-400 shadow-xl group/roi cursor-pointer transition-all hover:bg-indigo-500 hover:scale-105 active:scale-95" onClick={() => navigate('/dashboard')}>
-                   <Calculator className="w-5 h-5 text-amber-300" />
-                   <span className="font-extrabold text-lg tracking-tight">28.4%</span>
-                   <div className="w-[1px] h-3 bg-white/30 mx-1"></div>
-                   <span className="text-[10px] font-black uppercase tracking-widest opacity-90">Expected ROI</span>
+                  <Calculator className="w-5 h-5 text-amber-300" />
+                  <span className="font-extrabold text-lg tracking-tight">28.4%</span>
+                  <div className="w-[1px] h-3 bg-white/30 mx-1"></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-90">Expected ROI</span>
                 </div>
               </div>
             )}
@@ -364,43 +364,44 @@ export function Dashboard() {
             {snapshotCrops.map(c => {
               const color = c.up ? '#10b981' : '#f43f5e'; // Emerald-500 or Rose-500
               return (
-              <div key={c.name} className={`bg-white border rounded-[24px] overflow-hidden relative shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-500 min-h-[140px] flex flex-col justify-between ${c.flash === 'up' ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.2)]' : c.flash === 'down' ? 'border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.2)]' : 'border-gray-100 hover:border-emerald-200'}`}>
-                {/* Graph Background */}
-                <div className="absolute inset-x-4 bottom-4 top-1/3 pointer-events-none transition-opacity duration-500 opacity-60">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={c.history} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                      <Line 
-                         type="linear" 
-                         dataKey="price" 
-                         stroke={color} 
-                         strokeWidth={4} 
-                         dot={false} 
-                         isAnimationActive={true} 
-                         animationDuration={800}
-                         strokeLinecap="round"
-                         strokeLinejoin="round"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                <div className="p-6 relative z-10 flex justify-between items-start h-full">
-                  <div className="flex flex-col justify-between h-full">
-                    <p className="font-bold text-gray-400 text-xs mb-2 uppercase tracking-widest">{c.name}</p>
-                    <p className={`text-4xl font-black mt-2 transition-colors duration-300 ${c.flash === 'up' ? 'text-green-600' : c.flash === 'down' ? 'text-rose-600' : 'text-prodmast-dark'}`}>
-                       ₹{c.price.toLocaleString()}
-                    </p>
+                <div key={c.name} className={`bg-white border rounded-[24px] overflow-hidden relative shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-500 min-h-[140px] flex flex-col justify-between ${c.flash === 'up' ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.2)]' : c.flash === 'down' ? 'border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.2)]' : 'border-gray-100 hover:border-emerald-200'}`}>
+                  {/* Graph Background */}
+                  <div className="absolute inset-x-4 bottom-4 top-1/3 pointer-events-none transition-opacity duration-500 opacity-60">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={c.history} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <Line
+                          type="linear"
+                          dataKey="price"
+                          stroke={color}
+                          strokeWidth={4}
+                          dot={false}
+                          isAnimationActive={true}
+                          animationDuration={800}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all bg-white/80 backdrop-blur-md ${c.up ? 'text-green-700 border border-green-100' : 'text-rose-700 border border-rose-100'}`}>
-                    {c.up ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
-                    {c.trend}
-                  </div>
-                </div>
 
-                {c.flash === 'up' && <div className="absolute inset-0 bg-green-400/5 animate-pulse rounded-[24px]"></div>}
-                {c.flash === 'down' && <div className="absolute inset-0 bg-rose-400/5 animate-pulse rounded-[24px]"></div>}
-              </div>
-            )})}
+                  <div className="p-6 relative z-10 flex justify-between items-start h-full">
+                    <div className="flex flex-col justify-between h-full">
+                      <p className="font-bold text-gray-400 text-xs mb-2 uppercase tracking-widest">{c.name}</p>
+                      <p className={`text-4xl font-black mt-2 transition-colors duration-300 ${c.flash === 'up' ? 'text-green-600' : c.flash === 'down' ? 'text-rose-600' : 'text-prodmast-dark'}`}>
+                        ₹{c.price.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all bg-white/80 backdrop-blur-md ${c.up ? 'text-green-700 border border-green-100' : 'text-rose-700 border border-rose-100'}`}>
+                      {c.up ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
+                      {c.trend}
+                    </div>
+                  </div>
+
+                  {c.flash === 'up' && <div className="absolute inset-0 bg-green-400/5 animate-pulse rounded-[24px]"></div>}
+                  {c.flash === 'down' && <div className="absolute inset-0 bg-rose-400/5 animate-pulse rounded-[24px]"></div>}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -409,7 +410,7 @@ export function Dashboard() {
       <div className="pt-6">
         <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 mb-10 px-2 uppercase tracking-wide">
           <Activity className="w-6 h-6 text-prodmast-primary" />
-          {t('dashboard.agriculturalModules')}
+          {t('Functionalities')}
         </h3>
 
         <div className="space-y-12">

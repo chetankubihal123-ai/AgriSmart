@@ -13,7 +13,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [role, setRoleState] = useState<Role>(() => {
     const savedRole = localStorage.getItem('user_role');
-    return (savedRole as Role) || null;
+    return (savedRole as Role) || 'farmer';
   });
 
   const isHost = role === 'expert';

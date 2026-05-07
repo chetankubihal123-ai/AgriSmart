@@ -149,7 +149,7 @@ export const translations = {
             irrigationReminderDesc: 'Soil moisture dropped below 40%. Irrigation scheduled for tomorrow.',
             startIrrigationNow: 'Start Irrigation Now',
             analyticsDashboard: 'Analytics Dashboard',
-            agriculturalModules: 'Agricultural Modules',
+            agriculturalModules: 'dules',
             landAnalysis: 'Land Analysis',
             landAnalysisDesc: 'Analyze farm health and soil metrics comprehensively using satellite imagery and IoT soil sensors.',
             cropHealthDesc: 'Check the current health and vitality of your crops. Compare historical growth rates.',

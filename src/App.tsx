@@ -18,7 +18,6 @@ import { useState, useEffect, useContext, createContext } from 'react';
 import { supabase } from './lib/supabase';
 import { Farm } from './lib/types';
 import { LandingPage } from './pages/LandingPage';
-import { RoleSelection } from './pages/RoleSelection';
 import { MarketRates } from './pages/MarketRates';
 import { AdminDashboard } from './components/AdminDashboard';
 
@@ -100,16 +99,6 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RoleProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { role } = useRole();
-  const location = useLocation();
-
-  if (!role) {
-    return <Navigate to="/role-selection" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-}
 
 // Wrapper components to consume context and pass farm prop
 function CropHealthWrapper() {
@@ -134,9 +123,6 @@ function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   if (user) {
-    if (!role) {
-      return <Navigate to="/role-selection" replace />;
-    }
     const from = location.state?.from || '/dashboard';
     return <Navigate to={from} replace />;
   }
@@ -158,28 +144,23 @@ function AppContent() {
         </RedirectIfAuthenticated>
       } />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/role-selection" element={
-        <PrivateRoute>
-          <RoleSelection />
-        </PrivateRoute>
-      } />
       <Route
         path="/*"
         element={
           <FarmProvider>
              <Layout>
                 <Routes>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/admin/users" element={<PrivateRoute><RoleProtectedRoute><AdminDashboard initialView="users" /></RoleProtectedRoute></PrivateRoute>} />
-                  <Route path="/admin/orders" element={<PrivateRoute><RoleProtectedRoute><AdminDashboard initialView="orders" /></RoleProtectedRoute></PrivateRoute>} />
-                  <Route path="/admin/analytics" element={<PrivateRoute><RoleProtectedRoute><AdminDashboard initialView="dashboard" /></RoleProtectedRoute></PrivateRoute>} />
-                  <Route path="/land-analysis" element={<LandAnalysis />} />
-                  <Route path="/crop-health" element={<CropHealthWrapper />} />
-                  <Route path="/disease-detection" element={<DiseaseDetectionWrapper />} />
-                  <Route path="/weather" element={<WeatherImpactWrapper />} />
-                  <Route path="/shop" element={<PrivateRoute><RoleProtectedRoute><Shop /></RoleProtectedRoute></PrivateRoute>} />
-                  <Route path="/market-rates" element={<MarketRates />} />
-                  <Route path="/schemes" element={<SchemesFinder />} />
+                   <Route path="/dashboard" element={<Dashboard />} />
+                   <Route path="/admin/users" element={<PrivateRoute><AdminDashboard initialView="users" /></PrivateRoute>} />
+                   <Route path="/admin/orders" element={<PrivateRoute><AdminDashboard initialView="orders" /></PrivateRoute>} />
+                   <Route path="/admin/analytics" element={<PrivateRoute><AdminDashboard initialView="dashboard" /></PrivateRoute>} />
+                   <Route path="/land-analysis" element={<LandAnalysis />} />
+                   <Route path="/crop-health" element={<CropHealthWrapper />} />
+                   <Route path="/disease-detection" element={<DiseaseDetectionWrapper />} />
+                   <Route path="/weather" element={<WeatherImpactWrapper />} />
+                   <Route path="/shop" element={<PrivateRoute><Shop /></PrivateRoute>} />
+                   <Route path="/market-rates" element={<MarketRates />} />
+                   <Route path="/schemes" element={<SchemesFinder />} />
                 </Routes>
              </Layout>
           </FarmProvider>
