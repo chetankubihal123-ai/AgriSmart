@@ -407,6 +407,7 @@ export function DiseaseDetection() {
                                     </div>
 
                                     {/* Alternative Diagnoses */}
+                                    {result.alternatives && result.alternatives.length > 0 && (
                                         <div className="flex flex-wrap gap-2">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-full">
                                               {language === 'kn' ? 'ಪರ್ಯಾಯ ರೋಗನಿರ್ಣಯಗಳು' : 'Alternative Diagnoses'}
