@@ -328,7 +328,9 @@ export function MarketRates() {
   useEffect(() => {
     if (searchQuery.trim().length < 3) return;
     
-    const query = searchQuery.trim().toLowerCase();
+    const queryRaw = searchQuery.trim();
+    // Parse "Hubli, Karnataka" -> "Hubli"
+    const query = queryRaw.split(',')[0].trim().toLowerCase();
     
     const fetchFilteredData = async () => {
         const apiKey = import.meta.env.VITE_AGMARKNET_API_KEY;
@@ -336,22 +338,21 @@ export function MarketRates() {
         
         setIsLoading(true);
         try {
-            // Try searching by District first
-            const districtUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[district]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
-            const proxyDistrict = `https://api.allorigins.win/raw?url=${encodeURIComponent(districtUrl)}`;
+            // Try searching by Market (Mandi) name first as it's more specific
+            const marketUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[market]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
+            const proxyMarket = `https://api.allorigins.win/raw?url=${encodeURIComponent(marketUrl)}`;
             
-            const response = await fetch(proxyDistrict);
-            const data = await response.json();
-            
-            let records = data.records || [];
+            const marketResponse = await fetch(proxyMarket);
+            const marketData = await marketResponse.json();
+            let records = marketData.records || [];
 
-            // If district search is empty, try searching by Market (Mandi) name
+            // If market search is empty, try searching by District
             if (records.length === 0) {
-                const marketUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[market]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
-                const proxyMarket = `https://api.allorigins.win/raw?url=${encodeURIComponent(marketUrl)}`;
-                const marketResponse = await fetch(proxyMarket);
-                const marketData = await marketResponse.json();
-                records = marketData.records || [];
+                const districtUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[district]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
+                const proxyDistrict = `https://api.allorigins.win/raw?url=${encodeURIComponent(districtUrl)}`;
+                const response = await fetch(proxyDistrict);
+                const data = await response.json();
+                records = data.records || [];
             }
 
             if (records.length > 0) {
@@ -372,8 +373,14 @@ export function MarketRates() {
                 });
                 setCommodities(mapped);
             } else {
-                // If still nothing, don't clear everything, maybe keep fallbacks or show empty with suggestion
-                console.log('No specific market records found for:', query);
+                // If no API results, at least update the FALLBACK data to show the searched location name
+                // as requested by the user ("atleast I should get here name as that searched location")
+                const locationName = query.charAt(0).toUpperCase() + query.slice(1);
+                const localizedFallbacks = FALLBACK_COMMODITIES.map(c => ({
+                    ...c,
+                    market: `${locationName} Mandi, ${queryRaw.includes(',') ? queryRaw.split(',')[1].trim() : 'Local Region'}`
+                }));
+                setCommodities(localizedFallbacks);
             }
         } catch (e) {
             console.error('Search error:', e);
