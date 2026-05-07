@@ -26,8 +26,8 @@ export function Shop() {
 
     const STATIC_CATALOG = [
         // Tomato Crop
-        { id: 's1', brand: 'Syngenta', name: 'Saaho (TO-3251) Tomato Seeds (ಸ್ಯಾಹೋ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 999, originalPrice: 1525, discount: 34, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1592841608277-33d2f837a962?auto=format&fit=crop&q=80&w=600' },
-        { id: 's2', brand: 'Seminis', name: 'Abhilash Tomato Seeds (ಅಭಿಲಾಶ್ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 707, originalPrice: 813, discount: 13, unit: '10 gms', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=600' },
+        { id: 's1', brand: 'Syngenta', name: 'Saaho (TO-3251) Tomato Seeds (ಸ್ಯಾಹೋ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 999, originalPrice: 1525, discount: 34, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600' },
+        { id: 's2', brand: 'Seminis', name: 'Abhilash Tomato Seeds (ಅಭಿಲಾಶ್ ಟೊಮೆಟೊ ಬೀಜ)', category: 'Seeds', crop: 'Tomato', price: 707, originalPrice: 813, discount: 13, unit: '10 gms', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=600' },
         { id: 's3', brand: 'Syngenta', name: 'Heemsohna Tomato Seeds (ಹೀಮಸೋನಾ ಟೊಮೆಟೊ)', category: 'Seeds', crop: 'Tomato', price: 1065, originalPrice: 1231, discount: 13, unit: '3500 seeds', image: 'https://images.unsplash.com/photo-1590139704851-f0439bb752ee?auto=format&fit=crop&q=80&w=600' },
         { id: 'n1', brand: 'Bayer', name: 'Antracol Fungicide (ಪರಾಗಸ್ಪರ್ಶ ಕೀಟನಾಶಕ)', category: 'Nutrients', crop: 'Tomato', price: 273, originalPrice: 350, discount: 22, unit: '250 gms', image: 'https://images.unsplash.com/photo-1628352081506-83c43123ed6d?auto=format&fit=crop&q=80&w=600' },
         { id: 'n2', brand: 'Geolife', name: 'No-Virus Immunity Booster (ನೋ-ವೈರಸ್ ರೋಗನಿರೋಧಕ)', category: 'Nutrients', crop: 'Tomato', price: 369, originalPrice: 850, discount: 57, unit: '250 ml', image: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&q=80&w=600' },
