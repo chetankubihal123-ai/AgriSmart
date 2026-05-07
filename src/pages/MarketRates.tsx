@@ -326,44 +326,65 @@ export function MarketRates() {
 
   // 2. Search filtering on existing real data
   useEffect(() => {
-    if (searchQuery.trim().length === 0) return;
+    if (searchQuery.trim().length < 3) return;
     
-    // In a real app, we might re-fetch from API with filter params
-    // But for now, we filter the current set or we could do a new fetch with state/district filter
     const query = searchQuery.trim().toLowerCase();
     
-    // Only fetch new data if user searches for a location
-    if (query.length > 3) {
-        const fetchFilteredData = async () => {
-            const apiKey = import.meta.env.VITE_AGMARKNET_API_KEY;
-            const resourceId = '9ef273d1-c1aa-42da-ad35-3c544bd3503c';
-            const baseUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[district]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
+    const fetchFilteredData = async () => {
+        const apiKey = import.meta.env.VITE_AGMARKNET_API_KEY;
+        const resourceId = '9ef273d1-c1aa-42da-ad35-3c544bd3503c';
+        
+        setIsLoading(true);
+        try {
+            // Try searching by District first
+            const districtUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[district]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
+            const proxyDistrict = `https://api.allorigins.win/raw?url=${encodeURIComponent(districtUrl)}`;
             
-            try {
-                const response = await fetch(proxyUrl);
-                const data = await response.json();
-                if (data && data.records && data.records.length > 0) {
-                    const mapped = data.records.map((record: any, idx: number) => ({
+            const response = await fetch(proxyDistrict);
+            const data = await response.json();
+            
+            let records = data.records || [];
+
+            // If district search is empty, try searching by Market (Mandi) name
+            if (records.length === 0) {
+                const marketUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=50&filters[market]=${query.charAt(0).toUpperCase() + query.slice(1)}`;
+                const proxyMarket = `https://api.allorigins.win/raw?url=${encodeURIComponent(marketUrl)}`;
+                const marketResponse = await fetch(proxyMarket);
+                const marketData = await marketResponse.json();
+                records = marketData.records || [];
+            }
+
+            if (records.length > 0) {
+                const mapped = records.map((record: any, idx: number) => {
+                    const modalPrice = parseInt(record.modal_price) || 0;
+                    return {
                         id: `${record.commodity}-${record.market}-${idx}`,
                         name: `${record.commodity} (${record.variety || 'Local'})`,
-                        currentPrice: parseInt(record.modal_price) || 0,
+                        currentPrice: modalPrice,
                         unit: record.unit || 'Quintal',
                         trend: 1.5,
                         trendUp: true,
-                        history: [1800, 1850, 1900, 1880, 1920, 1950, parseInt(record.modal_price) || 1950],
-                        market: `${record.market}, ${record.district}`,
-                        quality: 'Standard' as const,
+                        history: [modalPrice * 0.94, modalPrice * 0.96, modalPrice * 0.98, modalPrice * 0.97, modalPrice * 0.99, modalPrice * 0.99, modalPrice],
+                        market: `${record.market}, ${record.district} (${record.state})`,
+                        quality: modalPrice > 5000 ? 'Premium' : 'Standard',
                         lastUpdated: new Date()
-                    }));
-                    setCommodities(mapped);
-                }
-            } catch (e) {
-                console.error(e);
+                    };
+                });
+                setCommodities(mapped);
+            } else {
+                // If still nothing, don't clear everything, maybe keep fallbacks or show empty with suggestion
+                console.log('No specific market records found for:', query);
             }
-        };
-        fetchFilteredData();
-    }
+        } catch (e) {
+            console.error('Search error:', e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Debounce the search to avoid hitting API limits
+    const timeout = setTimeout(fetchFilteredData, 500);
+    return () => clearTimeout(timeout);
   }, [searchQuery]);
 
 
