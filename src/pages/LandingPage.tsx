@@ -133,7 +133,7 @@ export function LandingPage() {
             </nav>
 
             {/* Hero Section */}
-            <section id="home" className="pt-40 pb-20 px-6 max-w-7xl mx-auto text-center flex flex-col items-center overflow-hidden">
+            <section id="home" className="pt-28 md:pt-40 pb-20 px-4 md:px-6 max-w-7xl mx-auto text-center flex flex-col items-center overflow-hidden">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -146,7 +146,7 @@ export function LandingPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.3 }}
-                    className="text-5xl md:text-7xl font-bold text-prodmast-dark tracking-tight leading-[1.1] max-w-4xl drop-shadow-sm"
+                    className="text-3xl sm:text-4xl md:text-7xl font-bold text-prodmast-dark tracking-tight leading-[1.1] max-w-4xl drop-shadow-sm"
                 >
                     {t('landing.heroTitleMain')}
                 </motion.h1>
@@ -154,7 +154,7 @@ export function LandingPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.4 }}
-                    className="mt-6 text-lg text-prodmast-dark/70 max-w-2xl font-medium"
+                    className="mt-6 text-base md:text-lg text-prodmast-dark/70 max-w-2xl font-medium"
                 >
                     {t('landing.heroSubtitleMain')}
                 </motion.p>
