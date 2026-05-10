@@ -141,11 +141,34 @@ export function useImageClassifier() {
         }
     };
 
+    const classifyAll = async (imageElement: HTMLImageElement): Promise<{ className: string; probability: number }[]> => {
+        const results: { className: string; probability: number }[] = [];
+        
+        const modelsToRun = Object.entries(customModels).filter(([_, m]) => m !== null);
+        
+        await Promise.all(modelsToRun.map(async ([crop, tmModel]) => {
+            try {
+                const predictions = await tmModel!.predict(imageElement);
+                predictions.forEach(p => {
+                    results.push({
+                        className: p.className,
+                        probability: p.probability
+                    });
+                });
+            } catch (e) {
+                console.warn(`${crop} model failed during multi-scan`, e);
+            }
+        }));
+
+        return results.sort((a, b) => b.probability - a.probability);
+    };
+
     return {
         model,
         modelLoading,
         modelError,
         classifyImage,
+        classifyAll,
         initializeModels,
         isCustomModelLoaded: Object.values(customModels).some(m => m !== null)
     };

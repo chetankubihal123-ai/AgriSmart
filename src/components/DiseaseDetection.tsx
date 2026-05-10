@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Upload, X, Loader2, Camera, Bug, Sparkles } from 'lucide-react';
 import { useImageClassifier, CropType } from '../hooks/useImageClassifier';
 import { useLanguage } from '../contexts/LanguageContext';
-import { analyzeImageWithGemini, detectPlantBoundingBox, cropImage, detectPlantPolygon } from '../lib/gemini';
+import { analyzeImageWithGemini, detectPlantBoundingBox, cropImage, detectPlantPolygon, analyzeDetailedPlantHealth, identifyCropType } from '../lib/gemini';
 
 interface AnalysisResult {
     disease: string;
@@ -86,6 +86,62 @@ const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warnin
         recs: ['Apply fungicides early', 'Remove old plant debris'],
         bio: ['Apply Streptomyces lydicus', 'Use humic acid'],
         prev: ['Improve field drainage', 'Wider row spacing']
+    },
+    'Corn__healthy': {
+        title: 'Corn (Healthy)',
+        status: 'Healthy',
+        recs: ['Maintain nitrogen levels', 'Monitor for borers'],
+        bio: ['Use beneficial nematodes', 'Apply compost tea'],
+        prev: ['Rotate with legumes', 'Ensure good drainage']
+    },
+    'Corn__Common_rust_': {
+        title: 'Corn Common Rust',
+        status: 'Warning',
+        recs: ['Apply foliar fungicides', 'Plant resistant hybrids'],
+        bio: ['Apply Bacillus subtilis', 'Use seaweed extract'],
+        prev: ['Sow early in season', 'Remove crop residue']
+    },
+    'Corn__Gray_leaf_spot': {
+        title: 'Corn Gray Leaf Spot',
+        status: 'Critical',
+        recs: ['Rotate with non-host crops', 'Apply fungicides at tasseling'],
+        bio: ['Use Trichoderma species', 'Apply organic matter'],
+        prev: ['Till under residue', 'Choose resistant varieties']
+    },
+    'Corn__Northern_Leaf_Blight': {
+        title: 'Corn Northern Leaf Blight',
+        status: 'Warning',
+        recs: ['Apply labeled fungicides', 'Manage crop residue'],
+        bio: ['Use microbial stimulants', 'Apply neem based products'],
+        prev: ['Use 2-year crop rotation', 'Improve air flow']
+    },
+    'Chilli_healthy': {
+        title: 'Chilli (Healthy)',
+        status: 'Healthy',
+        recs: ['Regular watering', 'Balanced fertilization'],
+        bio: ['Use organic mulch', 'Encourage ladybugs'],
+        prev: ['Regular soil testing', 'Monitor for thrips']
+    },
+    'Chilli_Anthracnose': {
+        title: 'Chilli Anthracnose',
+        status: 'Critical',
+        recs: ['Apply copper fungicides', 'Remove infected fruits'],
+        bio: ['Use Garlic extract', 'Apply Trichoderma'],
+        prev: ['Use pathogen-free seeds', 'Avoid overhead irrigation']
+    },
+    'Chilli_Bacterial_Wilt': {
+        title: 'Chilli Bacterial Wilt',
+        status: 'Critical',
+        recs: ['Remove and burn plants', 'Improve soil drainage'],
+        bio: ['Apply Pseudomonas fluorescens', 'Use bio-fumigation'],
+        prev: ['Long crop rotation', 'Maintain soil pH 6.5-7']
+    },
+    'Chilli_Leaf_Curl': {
+        title: 'Chilli Leaf Curl Virus',
+        status: 'Warning',
+        recs: ['Control whitefly population', 'Remove viral hosts'],
+        bio: ['Apply Neem oil', 'Use yellow sticky traps'],
+        prev: ['Plant barrier crops', 'Use virus-resistant seeds']
     }
 };
 
@@ -102,7 +158,7 @@ export function DiseaseDetection() {
     const [polygon, setPolygon] = useState<[number, number][] | null>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
-    const { model, modelLoading, modelError, classifyImage, isCustomModelLoaded, initializeModels } = useImageClassifier();
+    const { model, modelLoading, modelError, classifyImage, classifyAll, isCustomModelLoaded, initializeModels } = useImageClassifier();
 
     useEffect(() => {
         initializeModels();
@@ -145,12 +201,19 @@ export function DiseaseDetection() {
             setResult(null);
             setClassificationError(null);
 
-            // Trigger Instant Magic Crop & Cutout
+            // Trigger Instant Magic Crop & Cutout + Auto Crop Identification
             setIsCropping(true);
             try {
+                // 1. Identify Crop Type first
+                const identifiedCrop = await identifyCropType(dataUrl);
+                if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
+                    setSelectedCrop(identifiedCrop as any);
+                }
+
+                // 2. Run cutout analysis
                 const [boxResult, polyResult] = await Promise.all([
                     detectPlantBoundingBox(dataUrl),
-                    detectPlantPolygon(dataUrl, selectedCrop)
+                    detectPlantPolygon(dataUrl, (identifiedCrop && identifiedCrop !== 'other') ? (identifiedCrop as any) : selectedCrop)
                 ]);
 
                 if (polyResult && polyResult.polygon) {
@@ -178,37 +241,75 @@ export function DiseaseDetection() {
         try {
             let imageToAnalyze = selectedImage;
 
-            // 1. FOCUS: Teachable Machine Local Analysis First
-            const { customPredictions, error: localError } = await classifyImage(imageRef.current!, selectedCrop);
-            
-            if (!localError && customPredictions && customPredictions.length > 0) {
-                const top = customPredictions[0];
-                const dbKey = top.className;
-                const dbEntry = (DISEASE_GUIDE as any)[dbKey];
+            // 1. Identify Crop Type FIRST (Invisible to user)
+            // This is essential to pick the correct specialized model.
+            const identifiedCrop = await identifyCropType(selectedImage);
+            let currentCrop: CropType = 'tomato';
+            let useMultiScan = true;
 
-                if (dbEntry && top.probability > 0.4) {
-                    // Use Local Data primarily
+            if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
+                currentCrop = identifiedCrop as CropType;
+                setSelectedCrop(currentCrop);
+                useMultiScan = false;
+            }
+
+            // 2. FOCUS: Teachable Machine (Priority #1)
+            let predictions: { className: string; probability: number }[] = [];
+            
+            if (useMultiScan) {
+                predictions = await classifyAll(imageRef.current!);
+            } else {
+                const result = await classifyImage(imageRef.current!, currentCrop);
+                predictions = result.customPredictions || [];
+            }
+            
+            if (predictions && predictions.length > 0) {
+                const top = predictions[0];
+                const dbKey = top.className;
+                
+                // Fuzzy matching for guide lookup
+                let dbEntry = (DISEASE_GUIDE as any)[dbKey];
+                if (!dbEntry) {
+                    const similarKey = Object.keys(DISEASE_GUIDE).find(k => 
+                        k.toLowerCase().replace(/_/g, '') === dbKey.toLowerCase().replace(/_/g, '') ||
+                        dbKey.toLowerCase().includes(k.toLowerCase()) ||
+                        k.toLowerCase().includes(dbKey.toLowerCase())
+                    );
+                    if (similarKey) dbEntry = (DISEASE_GUIDE as any)[similarKey];
+                }
+
+                // If TM is confident, we USE it
+                if (top.probability > 0.3) {
+                    const isHealthy = dbKey.toLowerCase().includes('healthy');
+                    
                     setResult({
-                        disease: dbEntry.title.toUpperCase(),
+                        disease: dbEntry ? dbEntry.title.toUpperCase() : dbKey.replace(/_/g, ' ').toUpperCase(),
                         confidence: Math.round(top.probability * 100),
-                        description: `[Local Model] ${dbEntry.title} detected with high confidence.`,
-                        treatment: dbEntry.recs,
-                        severity: dbEntry.status === 'Healthy' ? 'Low' : (dbEntry.status === 'Warning' ? 'Moderate' : 'High'),
-                        detailedTreatment: {
+                        description: dbEntry 
+                            ? `[Local Model] ${dbEntry.title} detected with high confidence.` 
+                            : `[AI] ${dbKey.replace(/_/g, ' ')} detected. Analyzing specific details...`,
+                        treatment: dbEntry ? dbEntry.recs : ['Monitor plant daily', 'Remove affected leaves'],
+                        severity: dbEntry ? (dbEntry.status === 'Healthy' ? 'Low' : (dbEntry.status === 'Warning' ? 'Moderate' : 'High')) : (isHealthy ? 'Low' : 'Moderate'),
+                        detailedTreatment: dbEntry ? {
                             conventional: dbEntry.recs,
                             biological: dbEntry.bio,
                             prevention: dbEntry.prev
+                        } : {
+                            conventional: ['Apply appropriate organic fungicide', 'Ensure proper spacing'],
+                            biological: ['Apply neem oil spray'],
+                            prevention: ['Rotate crops annually']
                         }
                     });
 
-                    // Optional: Try to enrich with Gemini in background if possible
-                    analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language).then(enriched => {
+                    // Enrichment: Use Gemini ONLY to fill in the gaps in background
+                    analyzeDetailedPlantHealth(imageToAnalyze, currentCrop, language).then(enriched => {
                         if (enriched) {
                             setResult(prev => prev ? {
                                 ...prev,
                                 description: enriched.causes || prev.description,
                                 spread: enriched.spread || prev.spread,
-                                detailedTreatment: enriched.treatment || prev.detailedTreatment
+                                detailedTreatment: enriched.treatment || prev.detailedTreatment,
+                                disease: (dbEntry) ? prev.disease : (enriched.topDiagnosis?.name || prev.disease)
                             } : null);
                         }
                     });
@@ -218,15 +319,14 @@ export function DiseaseDetection() {
                 }
             }
 
-            // 2. Fallback to Gemini Detailed Analysis
+            // 2. Fallback to Gemini ONLY if Teachable Machine is not confident or fails
             const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);
-            
             if (detailedResult) {
                 setResult({
                     disease: detailedResult.topDiagnosis?.name || "Unknown Disease",
                     confidence: detailedResult.topDiagnosis?.confidence || 0,
-                    description: detailedResult.causes || "No description available",
-                    treatment: detailedResult.treatment?.conventional || ["No treatment data found"],
+                    description: detailedResult.causes || "Analysis complete. See treatment protocol below.",
+                    treatment: detailedResult.treatment?.conventional || ["No specific treatment found"],
                     severity: detailedResult.topDiagnosis?.severity || "Moderate",
                     alternatives: detailedResult.alternatives || [],
                     lesions: detailedResult.lesions || [],
@@ -237,20 +337,24 @@ export function DiseaseDetection() {
                 return;
             }
 
-            // 3. Last Resort: Generic Gemini
-            const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
-            if (geminiResult) {
+            // 3. Last Resort: Generic identification if everything else fails
+            const genericResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
+            if (genericResult) {
                 setResult({
-                    ...geminiResult,
-                    description: `[AI] ${geminiResult.description}`
+                    ...genericResult,
+                    disease: genericResult.disease || "Plant Health Issue",
+                    description: `[AI Analysis] ${genericResult.description}`
                 });
                 setAnalyzing(false);
                 return;
             }
 
+            // If we reach here, we truly failed
+            throw new Error("All analysis paths failed");
+
         } catch (error: any) {
             console.error("General analysis error", error);
-            setClassificationError(t('cropHealth.failedToIdentify'));
+            setClassificationError("The analysis took too long or failed. Please ensure the image is clear and try again.");
         } finally {
             setAnalyzing(false);
         }
@@ -274,20 +378,7 @@ export function DiseaseDetection() {
                         <p className="text-slate-600 font-medium">{t('disease.subtitle')}</p>
                     </div>
 
-                    <div className="flex gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                        {(['tomato', 'corn', 'chilli'] as CropType[]).map((crop) => (
-                            <button
-                                key={crop}
-                                onClick={() => setSelectedCrop(crop)}
-                                className={`px-4 py-2 rounded-md text-xs font-black uppercase tracking-widest transition-all ${selectedCrop === crop
-                                    ? 'bg-red-600 text-white shadow-md'
-                                    : 'text-slate-500 hover:bg-slate-200'
-                                    }`}
-                            >
-                                {crop}
-                            </button>
-                        ))}
-                    </div>
+
                 </div>
 
 
