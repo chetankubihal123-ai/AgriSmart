@@ -251,18 +251,16 @@ export function DiseaseDetection() {
         try {
             let imageToAnalyze = selectedImage;
 
-            // 1. Identify Crop Type FIRST (Invisible to user)
-            // This is essential to pick the correct specialized model.
-            // 1. Teachable Machine & MobileNet Check (Priority #1)
-            const classification = await classifyImage(imageRef.current!, selectedCrop);
+            // 1. Identify Crop Type (Gatekeeper)
+            const identifiedCrop = await identifyCropType(selectedImage);
             
-            if (!classification.isPlant && (!classification.customPredictions || classification.customPredictions[0].probability < 0.25)) {
+            if (identifiedCrop === 'invalid') {
                 setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
                 setAnalyzing(false);
                 return;
             }
 
-            const identifiedCrop = await identifyCropType(selectedImage);
+            const classification = await classifyImage(imageRef.current!, selectedCrop);
             let currentCrop: CropType = selectedCrop;
             let useMultiScan = true;
 

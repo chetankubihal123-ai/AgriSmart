@@ -146,12 +146,10 @@ export async function detectPlantBoundingBox(base64Image: string) {
 
 export async function identifyCropType(base64Image: string): Promise<string> {
   const base64Data = base64Image.split(',')[1];
-  const prompt = `Identify the subject in this image.
-  - Is it a plant, leaf, crop, fruit, or vegetable? (Yes/No)
-  - If YES: Is it a "tomato", "corn", or "chilli"? 
-  - If it is a plant but NOT one of those three, return "other".
-  - If it is CLEARLY NOT a plant (e.g., a person, notebook, text, tool, building, car), return "invalid".
-  - NOTE: A leaf held in a hand or on a plain surface IS STILL A PLANT.
+  const prompt = `Strictly identify the subject in this image.
+  - If the image contains a person, human, face, car, truck, building, furniture, text-heavy notebook, or any NON-PLANT object, return "invalid".
+  - If it is a plant, leaf, crop, fruit, or vegetable, identify it as "tomato", "corn", "chilli", or "other".
+  - NOTE: A leaf held by a person is a plant, but a person standing by a car is NOT a plant.
   Return ONLY one word: "tomato", "corn", "chilli", "other", or "invalid".`;
 
   for (const modelName of MODELS) {

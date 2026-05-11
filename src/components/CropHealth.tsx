@@ -180,11 +180,11 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       // Trigger AI Identity & Magic Cutout
       setIsCropping(true);
       try {
-        // 1. MobileNet/TM check
-        const classification = await classifyImage(imageRef.current || new Image(), selectedCrop);
+        // 1. Identify Crop Type (Gatekeeper)
         const identifiedCrop = await identifyCropType(dataUrl);
+        const classification = await classifyImage(imageRef.current || new Image(), selectedCrop);
 
-        if (!classification.isPlant && identifiedCrop === 'invalid') {
+        if (identifiedCrop === 'invalid') {
           setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
           setIsCropping(false);
           return;
@@ -227,10 +227,10 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
       // 0. Double check identity if needed, but we already do it in handleFile.
       // However, analyzeImage might be called directly if we didn't block in handleFile.
-      // 1. MobileNet/TM Check
-      const classification = await classifyImage(imageRef.current!, selectedCrop);
+      // 1. Final strict check
+      const identifiedCrop = await identifyCropType(selectedImage);
       
-      if (!classification.isPlant && (!classification.customPredictions || classification.customPredictions[0].probability < 0.25)) {
+      if (identifiedCrop === 'invalid') {
         setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
         setAnalyzing(false);
         return;
