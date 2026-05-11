@@ -161,9 +161,10 @@ export async function identifyCropType(base64Image: string, language: string = '
 
   CRITICAL RULES:
   - If the image contains a leaf pattern, organic veins, or plant structure, it IS VALID.
-  - Do NOT reject images just because they have a plain background or are zoomed in.
+  - Even if blurry, zoomed in, or on a plain background, it IS VALID.
+  - IF YOU ARE UNSURE, RETURN "other" INSTEAD OF "invalid".
+  - ONLY use "invalid" for clearly non-farming objects (people, cars, electronics, etc.).
   - Diseased leaves (brown/spotted) are 100% VALID agricultural samples.
-  - Only use "invalid" for clearly non-farming objects like people or machines.
 
   Validation Rules:
   - Macro/Close-up shots of leaves are VALID and should be categorized.
