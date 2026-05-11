@@ -236,7 +236,6 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
         return;
       }
 
-      const identifiedCrop = await identifyCropType(selectedImage);
       const currentCrop = (identifiedCrop && identifiedCrop !== 'invalid' && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop;
 
       // Use Detailed Analysis
