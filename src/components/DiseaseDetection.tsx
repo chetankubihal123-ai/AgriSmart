@@ -256,6 +256,10 @@ export function DiseaseDetection() {
 
             // 1. Check for cached validation or run once
             let currentValidation = validationResult;
+            
+            // Artificial 3-second delay for professional "scanning" feel as requested
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
             if (!currentValidation || currentValidation.status === 'error') {
                 const check = await identifyCropType(selectedImage, language);
                 currentValidation = {
