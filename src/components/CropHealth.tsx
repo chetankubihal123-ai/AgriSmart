@@ -639,13 +639,15 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                     <button
                       onClick={analyzeImage}
                       className={`w-full md:w-auto px-10 py-5 rounded-xl font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 transform flex items-center justify-center gap-3 ${
-                        analyzing || !validationResult || validationResult?.status === 'error'
+                        analyzing
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                           : validationResult?.status === 'warning'
-                          ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-200/50'
+                          ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-200/50 hover:-translate-y-1'
+                          : validationResult?.status === 'error'
+                          ? 'bg-slate-800 text-white hover:bg-slate-900 shadow-slate-200/50 hover:-translate-y-1'
                           : 'bg-green-600 text-white hover:bg-green-700 shadow-green-200/50 hover:-translate-y-1'
                       }`}
-                      disabled={analyzing || !validationResult || validationResult.status === 'error'}
+                      disabled={analyzing}
                     >
                       {analyzing ? (
                         <>
