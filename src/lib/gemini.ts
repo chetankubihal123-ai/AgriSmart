@@ -160,9 +160,12 @@ export async function identifyCropType(base64Image: string, language: string = '
   3. "invalid" - if it is a HUMAN, FACE, SELFIE, CLOTHING, CAR, BUILDING, TEXT, or unrelated object.
 
   Validation Rules:
-  - High confidence (>90%) if it's a clear leaf/plant.
-  - Medium confidence (50-80%) if blurry or distant but clearly a plant.
-  - Low confidence (<50%) if uncertain.
+  - Macro/Close-up shots of leaves are VALID and should be categorized.
+  - Diseased, brown, or spotted leaves are STILL VALID plants.
+  - Plain, gray, or blue backgrounds are common in labs/offices; ignore the background and focus on the subject.
+  - High confidence (>90%) if it's a clear leaf/plant part.
+  - Medium confidence (50-80%) if blurry, highly diseased, or macro-zoomed.
+  - Low confidence (<50%) ONLY if it's truly ambiguous.
 
   Return ONLY a JSON object in this format:
   {
