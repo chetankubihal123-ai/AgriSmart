@@ -189,7 +189,9 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
           return;
         }
 
-        if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
+        if (identifiedCrop === 'other') {
+          console.log("Identified as other plant");
+        } else if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
           setSelectedCrop(identifiedCrop as any);
         }
 
@@ -233,8 +235,11 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
         return;
       }
 
+      // If it's a known crop, use it, otherwise use the selected one
+      const currentCrop = (identifiedCrop && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop;
+
       // Use Detailed Analysis
-      const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);
+      const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, currentCrop as CropType, language);
 
       if (detailedResult) {
         setResult({

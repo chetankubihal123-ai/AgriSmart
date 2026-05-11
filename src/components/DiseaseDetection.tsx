@@ -213,7 +213,10 @@ export function DiseaseDetection() {
                     return;
                 }
 
-                if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
+                if (identifiedCrop === 'other') {
+                    console.log("Identified as other plant");
+                    // We allow 'other' plants to proceed but don't change the selected crop
+                } else if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
                     setSelectedCrop(identifiedCrop as any);
                 }
 
@@ -258,7 +261,7 @@ export function DiseaseDetection() {
                 return;
             }
 
-            let currentCrop: CropType = 'tomato';
+            let currentCrop: CropType = selectedCrop;
             let useMultiScan = true;
 
             if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {

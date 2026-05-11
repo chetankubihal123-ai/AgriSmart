@@ -146,30 +146,36 @@ export async function detectPlantBoundingBox(base64Image: string) {
 
 export async function identifyCropType(base64Image: string): Promise<string> {
   const base64Data = base64Image.split(',')[1];
-  const prompt = `Task: Identify the crop or object in the image.
-  1. If the image is NOT a plant, leaf, crop, or farming-related subject (e.g., a person, a notebook, furniture, a screen, etc.), return "invalid".
-  2. If it is a plant, identify if it is "tomato", "corn", or "chilli".
-  3. If it is a plant but not one of those three, return "other".
-  Return ONLY the single word answer: "tomato", "corn", "chilli", "other", or "invalid".`;
+  const prompt = `Identify the subject in this image.
+  - Is it a plant, leaf, crop, fruit, or vegetable? (Yes/No)
+  - If YES: Is it a "tomato", "corn", or "chilli"? 
+  - If it is a plant but NOT one of those three, return "other".
+  - If it is CLEARLY NOT a plant (e.g., a person, notebook, text, tool, building, car), return "invalid".
+  - NOTE: A leaf held in a hand or on a plain surface IS STILL A PLANT.
+  Return ONLY one word: "tomato", "corn", "chilli", "other", or "invalid".`;
 
   for (const modelName of MODELS) {
     try {
       const model = genAI.getGenerativeModel({ 
         model: modelName,
-        generationConfig: { temperature: 0.1 }
+        generationConfig: { 
+          temperature: 0.1,
+          topP: 0.95,
+          topK: 40
+        }
       });
       const result = await model.generateContent([
         { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
         prompt
       ]);
       const response = result.response.text().trim().toLowerCase();
-      if (['tomato', 'corn', 'chilli', 'other', 'invalid'].some(word => response.includes(word))) {
-        if (response.includes('tomato')) return 'tomato';
-        if (response.includes('corn')) return 'corn';
-        if (response.includes('chilli')) return 'chilli';
-        if (response.includes('invalid')) return 'invalid';
-        return 'other';
-      }
+      
+      // Use regex to find exact word matches
+      if (/\btomato\b/.test(response)) return 'tomato';
+      if (/\bcorn\b/.test(response)) return 'corn';
+      if (/\bchilli\b/.test(response)) return 'chilli';
+      if (/\binvalid\b/.test(response)) return 'invalid';
+      if (/\bother\b/.test(response)) return 'other';
     } catch (error) {
       console.warn(`Crop identification failed with ${modelName}:`, error);
       continue;

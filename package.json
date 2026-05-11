@@ -8,9 +8,17 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "cap:init": "npx cap init",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:open": "npx cap open android",
+    "mobile:build": "npm run build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.3",
+    "@capacitor/cli": "^7.6.4",
+    "@capacitor/core": "^8.3.3",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.57.4",
     "@teachablemachine/image": "^0.8.5",
