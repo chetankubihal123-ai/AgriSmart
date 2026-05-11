@@ -144,13 +144,32 @@ export async function detectPlantBoundingBox(base64Image: string) {
   return null;
 }
 
-export async function identifyCropType(base64Image: string): Promise<string> {
+export interface CropValidationResult {
+  category: 'tomato' | 'corn' | 'chilli' | 'other' | 'invalid';
+  confidence: number;
+  reason: string;
+}
+
+export async function identifyCropType(base64Image: string, language: string = 'en'): Promise<CropValidationResult> {
   const base64Data = base64Image.split(',')[1];
-  const prompt = `Strictly identify the subject in this image.
-  - If the image contains a person, human, face, car, truck, building, furniture, text-heavy notebook, or any NON-PLANT object, return "invalid".
-  - If it is a plant, leaf, crop, fruit, or vegetable, identify it as "tomato", "corn", "chilli", or "other".
-  - NOTE: A leaf held by a person is a plant, but a person standing by a car is NOT a plant.
-  Return ONLY one word: "tomato", "corn", "chilli", "other", or "invalid".`;
+  const prompt = `CRITICAL TASK: Validate if this image is a CROP/PLANT for agricultural analysis.
+  
+  Categories:
+  1. "tomato", "corn", "chilli" - if specifically identified.
+  2. "other" - if it is a plant/crop/leaf but NOT one of the above.
+  3. "invalid" - if it is a HUMAN, FACE, SELFIE, CLOTHING, CAR, BUILDING, TEXT, or unrelated object.
+
+  Validation Rules:
+  - High confidence (>90%) if it's a clear leaf/plant.
+  - Medium confidence (50-80%) if blurry or distant but clearly a plant.
+  - Low confidence (<50%) if uncertain.
+
+  Return ONLY a JSON object in this format:
+  {
+    "category": "tomato" | "corn" | "chilli" | "other" | "invalid",
+    "confidence": number (0-100),
+    "reason": "Short explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
+  }`;
 
   for (const modelName of MODELS) {
     try {
@@ -158,28 +177,32 @@ export async function identifyCropType(base64Image: string): Promise<string> {
         model: modelName,
         generationConfig: { 
           temperature: 0.1,
-          topP: 0.95,
-          topK: 40
+          responseMimeType: "application/json"
         }
       });
       const result = await model.generateContent([
         { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
         prompt
       ]);
-      const response = result.response.text().trim().toLowerCase();
+      const responseText = result.response.text();
+      const parsed = JSON.parse(responseText);
       
-      // Use regex to find exact word matches
-      if (/\btomato\b/.test(response)) return 'tomato';
-      if (/\bcorn\b/.test(response)) return 'corn';
-      if (/\bchilli\b/.test(response)) return 'chilli';
-      if (/\binvalid\b/.test(response)) return 'invalid';
-      if (/\bother\b/.test(response)) return 'other';
+      return {
+        category: parsed.category || 'invalid',
+        confidence: parsed.confidence || 0,
+        reason: parsed.reason || ''
+      };
     } catch (error) {
       console.warn(`Crop identification failed with ${modelName}:`, error);
       continue;
     }
   }
-  return 'invalid';
+
+  return {
+    category: 'invalid',
+    confidence: 0,
+    reason: language === 'kn' ? 'ಚಿತ್ರವನ್ನು ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.' : 'Could not identify image.'
+  };
 }
 
 export async function cropImage(base64Image: string, box: { ymin: number, xmin: number, ymax: number, xmax: number }): Promise<string> {

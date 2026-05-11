@@ -129,7 +129,12 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [classificationError, setClassificationError] = useState<string | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    status: 'success' | 'warning' | 'error' | null;
+    category: string;
+    confidence: number;
+    reason: string;
+  } | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<CropType>('tomato');
   const [isCropping, setIsCropping] = useState(false);
   const [boundingBox, setBoundingBox] = useState<{ ymin: number, xmin: number, ymax: number, xmax: number } | null>(null);
@@ -180,28 +185,34 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       // Trigger AI Identity & Magic Cutout
       setIsCropping(true);
       try {
-        // 1. Teachable Machine Check (Primary trust)
-        const classification = await classifyImage(imageRef.current || new Image(), selectedCrop);
-        const topConfidence = classification.customPredictions?.[0]?.probability || 0;
+        // 1. Identify & Validate Crop
+        const result = await identifyCropType(dataUrl, language);
         
-        // 2. Identify Crop Type (Secondary check)
-        const identifiedCrop = await identifyCropType(dataUrl);
+        let status: 'success' | 'warning' | 'error' = 'error';
+        if (result.category !== 'invalid') {
+          status = result.confidence >= 80 ? 'success' : 'warning';
+        }
 
-        // Block ONLY if TM is not confident AND Gemini says invalid
-        if (topConfidence < 0.35 && identifiedCrop === 'invalid') {
-          setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
+        setValidationResult({
+          status,
+          category: result.category,
+          confidence: result.confidence,
+          reason: result.reason
+        });
+
+        if (status === 'error') {
           setIsCropping(false);
           return;
         }
 
-        if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
-          setSelectedCrop(identifiedCrop as any);
+        if (result.category && ['tomato', 'corn', 'chilli'].includes(result.category)) {
+          setSelectedCrop(result.category as any);
         }
 
         // 2. Run analysis with the identified (or existing) crop
         const [boxResult, polyResult] = await Promise.all([
           detectPlantBoundingBox(dataUrl),
-          detectPlantPolygon(dataUrl, (identifiedCrop && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop)
+          detectPlantPolygon(dataUrl, (result.category && result.category !== 'other') ? result.category : selectedCrop)
         ]);
 
         if (polyResult && polyResult.polygon) {
@@ -229,20 +240,21 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
     try {
       let imageToAnalyze = selectedImage;
 
-      // 0. Double check identity if needed, but we already do it in handleFile.
-      // However, analyzeImage might be called directly if we didn't block in handleFile.
-      // 1. Hybrid check: Trust TM if confident, otherwise trust Gemini
-      const classification = await classifyImage(imageRef.current!, selectedCrop);
-      const topConfidence = classification.customPredictions?.[0]?.probability || 0;
-      const identifiedCrop = await identifyCropType(selectedImage);
+      // 1. Final strict check
+      const result = await identifyCropType(selectedImage, language);
       
-      if (topConfidence < 0.35 && identifiedCrop === 'invalid') {
-        setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
+      if (result.category === 'invalid' || result.confidence < 40) {
+        setValidationResult({
+          status: 'error',
+          category: result.category,
+          confidence: result.confidence,
+          reason: result.reason
+        });
         setAnalyzing(false);
         return;
       }
 
-      const currentCrop = (identifiedCrop && identifiedCrop !== 'invalid' && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop;
+      const currentCrop = (result.category && result.category !== 'invalid' && result.category !== 'other') ? result.category : selectedCrop;
 
       // Use Detailed Analysis
       const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, currentCrop as CropType, language);
@@ -360,7 +372,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
   const resetAnalysis = () => {
     setSelectedImage(null);
     setResult(null);
-    setClassificationError(null);
+    setValidationResult(null);
   };
 
   return (
@@ -393,10 +405,39 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
         </p>
 
 
-        {classificationError && (
-          <div className="bg-red-500/10 text-red-400 p-4 rounded-xl mb-6 flex items-center gap-3 border border-red-500/20">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <p className="font-medium">{classificationError}</p>
+        {validationResult && (
+          <div className={`mb-6 p-4 rounded-xl border flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500 ${
+            validationResult.status === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+            validationResult.status === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+            'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className={`mt-1 p-2 rounded-full ${
+              validationResult.status === 'success' ? 'bg-green-100 text-green-600' :
+              validationResult.status === 'warning' ? 'bg-amber-100 text-amber-600' :
+              'bg-red-100 text-red-600'
+            }`}>
+              {validationResult.status === 'success' ? <CheckCircle className="w-5 h-5" /> :
+               validationResult.status === 'warning' ? <AlertCircle className="w-5 h-5" /> :
+               <X className="w-5 h-5" />}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-bold text-lg">
+                  {validationResult.status === 'success' ? (language === 'kn' ? 'ಬೆಳೆ ಯಶಸ್ವಿಯಾಗಿ ಪತ್ತೆಯಾಗಿದೆ' : 'Crop Detected Successfully') :
+                   validationResult.status === 'warning' ? (language === 'kn' ? 'ಬೆಳೆಯನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ' : 'Unable to Confirm Crop') :
+                   (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ' : 'No Crop Detected')}
+                </h4>
+                <span className="text-sm font-medium px-2 py-1 bg-white/50 rounded-lg border border-current/10">
+                  {validationResult.confidence}% {language === 'kn' ? 'ಖಚಿತತೆ' : 'Match'}
+                </span>
+              </div>
+              <p className="text-sm opacity-90">{validationResult.reason}</p>
+              {validationResult.status === 'warning' && (
+                <p className="mt-2 text-xs font-medium underline">
+                  {language === 'kn' ? 'ದಯವಿಟ್ಟು ಉತ್ತಮ ಬೆಳಕಿನಲ್ಲಿ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ತೆಗೆದುಕೊಳ್ಳಿ.' : 'Please take a clearer photo in better lighting for better results.'}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -577,25 +618,57 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
             <div className="flex flex-col justify-center">
               {!result ? (
-                <div className="text-center md:text-left p-6 glass rounded-2xl">
-                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-4">{t('cropHealth.readyToAnalyze')}</h3>
+                <div className="text-center md:text-left p-6 glass rounded-2xl relative overflow-hidden group">
+                  {validationResult?.status === 'success' && (
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-bl-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-500" />
+                  )}
+                  
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-4">
+                    {validationResult?.status === 'success' ? (language === 'kn' ? 'ವಿಶ್ಲೇಷಣೆಗೆ ಸಿದ್ಧವಾಗಿದೆ' : 'READY TO ANALYZE') :
+                     validationResult?.status === 'warning' ? (language === 'kn' ? 'ಹೆಚ್ಚಿನ ಸ್ಪಷ್ಟತೆ ಅಗತ್ಯವಿದೆ' : 'NEEDS CLARITY') :
+                     (language === 'kn' ? 'ಅನೂರ್ಜಿತ ಚಿತ್ರ' : 'INVALID IMAGE')}
+                  </h3>
+                  
                   <p className="text-slate-600 font-medium mb-8 leading-relaxed">
-                    {t('cropHealth.scanningText')}
+                    {validationResult?.status === 'success' 
+                      ? (language === 'kn' ? 'ಈ ಚಿತ್ರವು ವಿಶ್ಲೇಷಣೆಗೆ ಸೂಕ್ತವಾಗಿದೆ. ಮುಂದುವರಿಯಲು ಕೆಳಗಿನ ಬಟನ್ ಕ್ಲಿಕ್ ಮಾಡಿ.' : 'This image looks great for analysis. Click the button below to start.')
+                      : (language === 'kn' ? 'ನಾವು ಕೃಷಿ ಸಂಬಂಧಿತ ವಸ್ತುಗಳನ್ನು ಮಾತ್ರ ವಿಶ್ಲೇಷಿಸುತ್ತೇವೆ. ದಯವಿಟ್ಟು ಬೆಳೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'We only analyze farming-related content. Please upload a clear image of your crop.')}
                   </p>
-                  <button
-                    onClick={analyzeImage}
-                    className="w-full md:w-auto bg-red-600 text-white px-10 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-red-700 transition shadow-xl shadow-red-600/20 active:scale-95 transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    disabled={analyzing || modelLoading || isCropping}
-                  >
-                    {analyzing ? t('cropHealth.analyzing') : t('cropHealth.startAnalysis')}
-                  </button>
-                  <button
-                    onClick={resetAnalysis}
-                    className="mt-6 text-gray-500 hover:text-white font-medium block md:inline-block md:ml-6 disabled:opacity-50 transition-colors"
-                    disabled={analyzing}
-                  >
-                    {t('disease.retake')}
-                  </button>
+
+                  <div className="flex flex-col gap-4">
+                    <button
+                      onClick={analyzeImage}
+                      className={`w-full md:w-auto px-10 py-5 rounded-xl font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 transform flex items-center justify-center gap-3 ${
+                        analyzing || validationResult?.status === 'error'
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                          : validationResult?.status === 'warning'
+                          ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-200/50'
+                          : 'bg-green-600 text-white hover:bg-green-700 shadow-green-200/50 hover:-translate-y-1'
+                      }`}
+                      disabled={analyzing || !validationResult || validationResult.status === 'error'}
+                    >
+                      {analyzing ? (
+                        <>
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                          {t('cropHealth.analyzing')}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-6 h-6" />
+                          {t('cropHealth.startAnalysis')}
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={resetAnalysis}
+                      className="text-slate-500 hover:text-slate-900 font-bold uppercase text-[10px] tracking-widest pt-2 transition-colors flex items-center justify-center md:justify-start gap-2"
+                      disabled={analyzing}
+                    >
+                      <Upload className="w-3 h-3" />
+                      {t('disease.retake')}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white/5 rounded-2xl border border-white/10 p-8 shadow-2xl backdrop-blur-sm">
