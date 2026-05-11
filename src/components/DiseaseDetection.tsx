@@ -251,16 +251,17 @@ export function DiseaseDetection() {
         try {
             let imageToAnalyze = selectedImage;
 
-            // 1. Identify Crop Type (Gatekeeper)
+            // 1. Hybrid Check: Trust TM if confident, otherwise use Gemini
+            const classification = await classifyImage(imageRef.current!, selectedCrop);
+            const topConfidence = classification.customPredictions?.[0]?.probability || 0;
             const identifiedCrop = await identifyCropType(selectedImage);
             
-            if (identifiedCrop === 'invalid') {
+            if (topConfidence < 0.35 && identifiedCrop === 'invalid') {
                 setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
                 setAnalyzing(false);
                 return;
             }
 
-            const classification = await classifyImage(imageRef.current!, selectedCrop);
             let currentCrop: CropType = selectedCrop;
             let useMultiScan = true;
 

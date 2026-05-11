@@ -180,11 +180,15 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       // Trigger AI Identity & Magic Cutout
       setIsCropping(true);
       try {
-        // 1. Identify Crop Type (Gatekeeper)
-        const identifiedCrop = await identifyCropType(dataUrl);
+        // 1. Teachable Machine Check (Primary trust)
         const classification = await classifyImage(imageRef.current || new Image(), selectedCrop);
+        const topConfidence = classification.customPredictions?.[0]?.probability || 0;
+        
+        // 2. Identify Crop Type (Secondary check)
+        const identifiedCrop = await identifyCropType(dataUrl);
 
-        if (identifiedCrop === 'invalid') {
+        // Block ONLY if TM is not confident AND Gemini says invalid
+        if (topConfidence < 0.35 && identifiedCrop === 'invalid') {
           setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
           setIsCropping(false);
           return;
@@ -227,10 +231,12 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
       // 0. Double check identity if needed, but we already do it in handleFile.
       // However, analyzeImage might be called directly if we didn't block in handleFile.
-      // 1. Final strict check
+      // 1. Hybrid check: Trust TM if confident, otherwise trust Gemini
+      const classification = await classifyImage(imageRef.current!, selectedCrop);
+      const topConfidence = classification.customPredictions?.[0]?.probability || 0;
       const identifiedCrop = await identifyCropType(selectedImage);
       
-      if (identifiedCrop === 'invalid') {
+      if (topConfidence < 0.35 && identifiedCrop === 'invalid') {
         setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
         setAnalyzing(false);
         return;
