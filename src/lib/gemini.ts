@@ -146,10 +146,11 @@ export async function detectPlantBoundingBox(base64Image: string) {
 
 export async function identifyCropType(base64Image: string): Promise<string> {
   const base64Data = base64Image.split(',')[1];
-  const prompt = `Identify the crop in this image. 
-  Choose ONLY from these exact words: "tomato", "corn", "chilli".
-  If it's none of these, return "other".
-  Return ONLY the single word answer.`;
+  const prompt = `Task: Identify the crop or object in the image.
+  1. If the image is NOT a plant, leaf, crop, or farming-related subject (e.g., a person, a notebook, furniture, a screen, etc.), return "invalid".
+  2. If it is a plant, identify if it is "tomato", "corn", or "chilli".
+  3. If it is a plant but not one of those three, return "other".
+  Return ONLY the single word answer: "tomato", "corn", "chilli", "other", or "invalid".`;
 
   for (const modelName of MODELS) {
     try {
@@ -162,15 +163,19 @@ export async function identifyCropType(base64Image: string): Promise<string> {
         prompt
       ]);
       const response = result.response.text().trim().toLowerCase();
-      if (['tomato', 'corn', 'chilli'].includes(response)) {
-        return response;
+      if (['tomato', 'corn', 'chilli', 'other', 'invalid'].some(word => response.includes(word))) {
+        if (response.includes('tomato')) return 'tomato';
+        if (response.includes('corn')) return 'corn';
+        if (response.includes('chilli')) return 'chilli';
+        if (response.includes('invalid')) return 'invalid';
+        return 'other';
       }
     } catch (error) {
       console.warn(`Crop identification failed with ${modelName}:`, error);
       continue;
     }
   }
-  return 'other';
+  return 'invalid';
 }
 
 export async function cropImage(base64Image: string, box: { ymin: number, xmin: number, ymax: number, xmax: number }): Promise<string> {

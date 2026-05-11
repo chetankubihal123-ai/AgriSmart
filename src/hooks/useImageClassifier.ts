@@ -106,14 +106,17 @@ export function useImageClassifier() {
                 'jigsaw', 'puzzle', 'art', 'sketch', 'drawing', 'painting', 'graffiti'
             ];
 
-            const topPredictions = predictions.slice(0, 3);
+            const topPredictions = predictions.slice(0, 5);
             const isArtificial = topPredictions.some(p =>
                 artificialKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
 
-            const isPlant = !isArtificial && predictions.some(p =>
+            // Stricter plant check: must have a plant keyword in top 5 and NOT be artificial
+            const hasPlantKeyword = predictions.slice(0, 5).some(p =>
                 plantKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
+
+            const isPlant = !isArtificial && hasPlantKeyword;
 
             // 2. Custom Model Check - Use the selected crop model for maximum accuracy
             let customPredictions: { className: string; probability: number }[] | undefined;

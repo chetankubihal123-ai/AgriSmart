@@ -206,6 +206,13 @@ export function DiseaseDetection() {
             try {
                 // 1. Identify Crop Type first
                 const identifiedCrop = await identifyCropType(dataUrl);
+                
+                if (identifiedCrop === 'invalid') {
+                    setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
+                    setIsCropping(false);
+                    return;
+                }
+
                 if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
                     setSelectedCrop(identifiedCrop as any);
                 }
@@ -244,6 +251,13 @@ export function DiseaseDetection() {
             // 1. Identify Crop Type FIRST (Invisible to user)
             // This is essential to pick the correct specialized model.
             const identifiedCrop = await identifyCropType(selectedImage);
+            
+            if (identifiedCrop === 'invalid') {
+                setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
+                setAnalyzing(false);
+                return;
+            }
+
             let currentCrop: CropType = 'tomato';
             let useMultiScan = true;
 

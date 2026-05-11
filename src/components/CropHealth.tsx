@@ -182,6 +182,13 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       try {
         // 1. Identify Crop Type first
         const identifiedCrop = await identifyCropType(dataUrl);
+
+        if (identifiedCrop === 'invalid') {
+          setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
+          setIsCropping(false);
+          return;
+        }
+
         if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
           setSelectedCrop(identifiedCrop as any);
         }
@@ -216,6 +223,15 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
     try {
       let imageToAnalyze = selectedImage;
+
+      // 0. Double check identity if needed, but we already do it in handleFile.
+      // However, analyzeImage might be called directly if we didn't block in handleFile.
+      const identifiedCrop = await identifyCropType(selectedImage);
+      if (identifiedCrop === 'invalid') {
+        setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
+        setAnalyzing(false);
+        return;
+      }
 
       // Use Detailed Analysis
       const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop, language);
