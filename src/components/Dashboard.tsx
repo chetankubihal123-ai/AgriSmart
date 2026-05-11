@@ -20,7 +20,8 @@ import {
   Calculator,
   Leaf,
   Bug,
-  CloudRain
+  CloudRain,
+  Loader2
 } from 'lucide-react';
 import { useFarm } from '../App';
 import { useNavigate } from 'react-router-dom';
@@ -104,7 +105,17 @@ export function Dashboard() {
         try {
           const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
           const geoData = await geoRes.json();
-          setLocationName(geoData.city || geoData.locality || "Local");
+          
+          // Construct full location name: City, State, Country
+          const city = geoData.city || geoData.locality || "";
+          const state = geoData.principalSubdivision || "Karnataka";
+          const country = geoData.countryName || "India";
+          
+          if (city) {
+            setLocationName(`${city}, ${state}, ${country}`);
+          } else {
+            setLocationName(`${state}, ${country}`);
+          }
 
           const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
           const weatherData = await weatherRes.json();
@@ -281,8 +292,12 @@ export function Dashboard() {
         <div className="relative z-10 w-full lg:w-auto">
           <div className="flex flex-col gap-2 mb-3">
             <h1 className="text-4xl md:text-5xl font-sans font-extrabold text-white tracking-tight leading-tight">
-              {locationName ? locationName + " " : 'Main '}
-              <span className="text-prodmast-accent">(karnataka)</span>
+              {locationName ? locationName : (
+                <span className="flex items-center gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-prodmast-accent" />
+                  <span className="animate-pulse">Detecting Location...</span>
+                </span>
+              )}
             </h1>
             {weather && (
               <div className="flex items-center gap-4">

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, CheckCircle, AlertTriangle, Loader2, Play, Scan } from 'lucide-react';
+import { UploadCloud, CheckCircle, AlertTriangle, Play, Scan, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useImageClassifier } from '../hooks/useImageClassifier';
 import { useLanguage } from '../contexts/LanguageContext';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export function DiseaseScanner() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -10,8 +11,14 @@ export function DiseaseScanner() {
   const [result, setResult] = useState<{ disease: string; confidence: number; raw_class: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [displayConfidence, setDisplayConfidence] = useState(0);
+  const [validating, setValidating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { t } = useLanguage();
+  const { classifyImage, classifyAll, isCustomModelLoaded, initializeModels } = useImageClassifier();
+  const { t, language } = useLanguage();
+
+  useEffect(() => {
+    initializeModels();
+  }, [initializeModels]);
 
   useEffect(() => {
     if (result) {
@@ -58,31 +65,47 @@ export function DiseaseScanner() {
   };
 
   const scanImage = async () => {
-    if (!selectedFile) return;
+    if (!previewUrl) return;
 
     setLoading(true);
     setError(null);
     
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-
     try {
-      // Assuming FastAPI server is running on localhost:8000
-      const response = await fetch('http://localhost:8000/predict', {
-        method: 'POST',
-        body: formData,
+      const img = new Image();
+      img.src = previewUrl;
+      await new Promise((resolve) => {
+        img.onload = resolve;
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to reach AI server. Make sure the backend is running!');
+      // 2. Perform validation (Is it a plant?)
+      const validation = await classifyImage(img);
+      
+      if (!validation.isPlant) {
+        throw new Error(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ.' : 'No crop detected in this image.');
       }
 
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
+      // 3. Perform local classification using ALL Teachable Machine models
+      const predictions = await classifyAll(img);
+
+      if (predictions.length === 0 || predictions[0].probability < 0.1) {
+        throw new Error(language === 'kn' ? 'ರೋಗವನ್ನು ಪತ್ತೆಹಚ್ಚಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.' : 'Could not identify a specific disease. Please try a clearer photo.');
       }
+
+      // 4. Take the top prediction
+      const top = predictions[0];
       
-      setResult(data);
+      // Clean up the name (remove crop prefix)
+      const cleanName = top.className
+        .replace(/^(tomato|corn|chilli)_/i, '')
+        .replace(/_/g, ' ')
+        .trim();
+
+      setResult({
+        disease: cleanName,
+        confidence: top.probability * 100,
+        raw_class: top.className
+      });
+
     } catch (err: any) {
       setError(err.message || 'An error occurred during scanning.');
     } finally {
@@ -104,7 +127,11 @@ export function DiseaseScanner() {
             </span>
             AI Disease Scanner
           </h3>
-          <p className="text-slate-400 text-sm mt-2 ml-14">Upload a leaf image for instant expert diagnosis.</p>
+          <p className="text-slate-400 text-sm mt-2 ml-14">
+            {language === 'kn' 
+              ? 'ತಜ್ಞರ ರೋಗನಿರ್ಣಯಕ್ಕಾಗಿ ಎಲೆ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
+              : 'Upload a leaf image for instant expert diagnosis.'}
+          </p>
         </div>
       </div>
 
@@ -197,7 +224,9 @@ export function DiseaseScanner() {
                 <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 border border-red-500/30 animate-pulse">
                   <AlertTriangle className="w-8 h-8 text-red-500" />
                 </div>
-                <h4 className="text-white font-bold text-xl mb-2">Connection Error</h4>
+                <h4 className="text-white font-bold text-xl mb-2">
+                  {error.includes('No crop') ? (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ' : 'No Crop Detected') : 'Analysis Error'}
+                </h4>
                 <p className="text-red-400 text-sm font-medium">{error}</p>
                 <button onClick={clearSelection} className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs uppercase tracking-widest font-bold transition-colors">Try Again</button>
               </div>
@@ -210,9 +239,13 @@ export function DiseaseScanner() {
                   <div>
                     <span className={`text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 mb-1 ${isHealthy ? 'text-green-400' : 'text-red-400'}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${isHealthy ? 'bg-green-400 shadow-[0_0_8px_#4ade80]' : 'bg-red-400 shadow-[0_0_8px_#f87171]'} animate-pulse`}></span>
-                      {isHealthy ? 'Healthy Plant Detected' : 'Threat Detected'}
+                      {isHealthy 
+                        ? (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಸಸ್ಯ ಪತ್ತೆಯಾಗಿದೆ' : 'Healthy Plant Detected') 
+                        : (language === 'kn' ? 'ಬೆದರಿಕೆ ಪತ್ತೆಯಾಗಿದೆ' : 'Threat Detected')}
                     </span>
-                    <h4 className="text-white font-bold text-2xl tracking-tight leading-none">{result.disease}</h4>
+                    <h4 className="text-white font-bold text-2xl tracking-tight leading-none">
+                      {language === 'kn' ? result.disease : result.disease}
+                    </h4>
                   </div>
                 </div>
 

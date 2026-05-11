@@ -139,7 +139,7 @@ export async function detectPlantBoundingBox(base64Image: string) {
       if (match) {
         return JSON.parse(match[0]);
       }
-    } catch (error) { continue; }
+    } catch (_error) { continue; }
   }
   return null;
 }
@@ -151,7 +151,9 @@ export interface CropValidationResult {
 }
 
 export async function identifyCropType(base64Image: string, language: string = 'en'): Promise<CropValidationResult> {
+  const mimeType = base64Image.split(',')[0].split(':')[1].split(';')[0];
   const base64Data = base64Image.split(',')[1];
+  
   const prompt = `CRITICAL TASK: Validate if this image is a CROP/PLANT for agricultural analysis.
   
   Categories:
@@ -160,11 +162,11 @@ export async function identifyCropType(base64Image: string, language: string = '
   3. "invalid" - if it is a HUMAN, FACE, SELFIE, CLOTHING, CAR, BUILDING, TEXT, or unrelated object.
 
   CRITICAL RULES:
-  - If the image contains a leaf pattern, organic veins, or plant structure, it IS VALID.
-  - Even if blurry, zoomed in, or on a plain background, it IS VALID.
+  - NEVER use "invalid" if there is even a hint of a green leaf, plant part, or organic structure.
+  - If the background is white, transparent, checkered, or plain gray, IGNORE it and focus on the subject.
+  - Macro/Close-up shots of leaves are 100% VALID agricultural samples.
+  - Diseased, brown, or spotted leaves are STILL VALID plants.
   - IF YOU ARE UNSURE, RETURN "other" INSTEAD OF "invalid".
-  - ONLY use "invalid" for clearly non-farming objects (people, cars, electronics, etc.).
-  - Diseased leaves (brown/spotted) are 100% VALID agricultural samples.
 
   Validation Rules:
   - Macro/Close-up shots of leaves are VALID and should be categorized.
@@ -181,28 +183,36 @@ export async function identifyCropType(base64Image: string, language: string = '
     "reason": "Short explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
   }`;
 
-  try {
-    const model = genAI.getGenerativeModel({ 
-      model: MODELS[0], // Force Flash for speed
-      generationConfig: { 
-        temperature: 0.1,
-        responseMimeType: "application/json"
-      }
-    });
-    const result = await model.generateContent([
-      { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
-      prompt
-    ]);
-    const responseText = result.response.text();
-    const parsed = JSON.parse(responseText);
-    
-    return {
-      category: parsed.category || 'invalid',
-      confidence: parsed.confidence || 0,
-      reason: parsed.reason || ''
-    };
-  } catch (error) {
-    console.warn(`Crop identification failed:`, error);
+  for (const modelName of MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: { 
+          temperature: 0.4
+        }
+      });
+      const result = await model.generateContent([
+        { inlineData: { data: base64Data, mimeType: mimeType } },
+        prompt
+      ]);
+      const responseText = result.response.text();
+      const match = responseText.match(/\{[\s\S]*\}/);
+      if (!match) continue;
+      
+      const parsed = JSON.parse(match[0]);
+      const validCategories = ['tomato', 'corn', 'chilli', 'other', 'invalid'];
+      let category = (parsed.category || 'invalid').toLowerCase();
+      if (!validCategories.includes(category)) category = 'other';
+      
+      return {
+        category: category as any,
+        confidence: parsed.confidence || 0,
+        reason: parsed.reason || ''
+      };
+    } catch (error) {
+      console.warn(`Crop identification failed with ${modelName}:`, error);
+      continue;
+    }
   }
 
   return {

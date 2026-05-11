@@ -290,12 +290,12 @@ export function Auth() {
           <div className="my-10 flex justify-center relative z-10">
             <div className="relative group">
               <div className="absolute -inset-8 bg-green-400/20 rounded-full blur-[60px] group-hover:bg-green-400/30 transition-all duration-700 scale-125"></div>
-              <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[4rem] border border-white/10 shadow-2xl relative transition-transform duration-500 group-hover:scale-105">
-                <div className="w-64 h-64 lg:w-72 lg:h-72 flex items-center justify-center overflow-hidden">
+              <div className="bg-white/5 backdrop-blur-2xl p-4 rounded-[4rem] border border-white/10 shadow-2xl relative transition-transform duration-500 group-hover:scale-105 overflow-hidden">
+                <div className="w-72 h-72 lg:w-96 lg:h-96 flex items-center justify-center">
                   <img
                     src={authFarmerImg}
                     alt="AgriSmart AI Assistant"
-                    className="w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
+                    className="w-full h-full object-contain scale-110 drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)]"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'https://illustrations.popsy.co/green/farmer.svg';
                     }}
@@ -356,7 +356,7 @@ export function Auth() {
                         value={phone}
                         onChange={handlePhoneChange}
                         required
-                        className="w-full pl-12 pr-4 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
+                        className="w-full pl-14 pr-4 py-5.5 bg-slate-50 border border-slate-100 rounded-[24px] focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-lg placeholder-slate-400 shadow-sm"
                         placeholder="9876543210"
                       />
                     </div>
@@ -379,7 +379,7 @@ export function Auth() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         maxLength={12}
-                        className="w-full pl-12 pr-12 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
+                        className="w-full pl-14 pr-14 py-5.5 bg-slate-50 border border-slate-100 rounded-[24px] focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-lg placeholder-slate-400 shadow-sm"
                         placeholder="••••••••"
                       />
                       <button
@@ -451,7 +451,7 @@ export function Auth() {
                         value={phone}
                         onChange={handlePhoneChange}
                         required
-                        className="w-full pl-12 pr-4 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
+                        className="w-full pl-14 pr-4 py-5.5 bg-slate-50 border border-slate-100 rounded-[24px] focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-lg placeholder-slate-400 shadow-sm"
                         placeholder="9876543210"
                       />
                     </div>
@@ -474,7 +474,7 @@ export function Auth() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         maxLength={12}
-                        className="w-full pl-12 pr-12 py-4.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-semibold placeholder-slate-400"
+                        className="w-full pl-14 pr-14 py-5.5 bg-slate-50 border border-slate-100 rounded-[24px] focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-lg placeholder-slate-400 shadow-sm"
                         placeholder="••••••••"
                       />
                       <button

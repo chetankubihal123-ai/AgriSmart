@@ -141,15 +141,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 }
             }
 
-            // 4. Send Confirmation Email (Bulletproof Iframe Method)
+            // 4. Send Confirmation Email (Modern Fetch Method)
             try {
                 if (orderData) {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = 'https://formsubmit.co/chetankubihal123@gmail.com';
-                    form.target = 'hidden-email-frame';
-                    
-                    const data: any = {
+                    const emailData = {
                         _subject: `New Order from AgriMarket: #${orderData.id.slice(0, 8)}`,
                         Customer: name,
                         Phone: phone,
@@ -162,31 +157,19 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                         _captcha: 'false'
                     };
 
-                    for (const key in data) {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = key;
-                        input.value = data[key];
-                        form.appendChild(input);
-                    }
-
-                    const iframe = document.createElement('iframe');
-                    iframe.name = 'hidden-email-frame';
-                    iframe.style.display = 'none';
-                    document.body.appendChild(iframe);
-                    document.body.appendChild(form);
-                    form.submit();
+                    await fetch('https://formsubmit.co/ajax/chetankubihal123@gmail.com', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(emailData)
+                    });
                     
-                    console.log('✅ Email dispatch initiated via hidden form.');
-                    
-                    // Cleanup
-                    setTimeout(() => {
-                        document.body.removeChild(form);
-                        document.body.removeChild(iframe);
-                    }, 2000);
+                    console.log('✅ Order notification sent to FormSubmit.');
                 }
             } catch (e) {
-                console.warn('❌ Email dispatch setup error:', e);
+                console.warn('❌ Email dispatch error:', e);
             }
 
             setSuccess(true);
@@ -254,16 +237,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                             </motion.div>
                         </div>
 
-                        <p className="text-prodmast-muted font-bold text-sm leading-relaxed mb-6 px-4">
+                        <p className="text-prodmast-muted font-bold text-sm leading-relaxed mb-10 px-4">
                             Your high-quality farming supplies are on the way! Thank you for choosing AgriSmart.
                         </p>
-                        
-                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-10 mx-4">
-                            <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1">Action Required</p>
-                            <p className="text-[10px] font-bold text-blue-500 leading-tight">
-                                Check your <span className="text-blue-700 underline">Spam Folder</span> for an activation email. You must click 'Activate' once to receive orders.
-                            </p>
-                        </div>
 
                         <button
                             onClick={() => {

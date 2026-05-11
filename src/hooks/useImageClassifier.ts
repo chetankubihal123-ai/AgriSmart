@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as tmImage from '@teachablemachine/image';
@@ -30,7 +30,7 @@ export function useImageClassifier() {
 
     const [isInitialized, setIsInitialized] = useState(false);
 
-    const initializeModels = async () => {
+    const initializeModels = useCallback(async () => {
         if (isInitialized || modelLoading) return;
         
         try {
@@ -78,13 +78,13 @@ export function useImageClassifier() {
             setModelError("Failed to load AI model. Please check your internet connection.");
             setModelLoading(false);
         }
-    };
+    }, [isInitialized, modelLoading, customModels]);
 
     // We still keep a small state for auto-loading if we really want to, 
     // but better to leave it to the components to call initializeModels() when they mount or through a button.
     // For now, let's keep it manual.
 
-    const classifyImage = async (imageElement: HTMLImageElement, selectedCrop: CropType = 'tomato'): Promise<ClassificationResult> => {
+    const classifyImage = useCallback(async (imageElement: HTMLImageElement, selectedCrop: CropType = 'tomato'): Promise<ClassificationResult> => {
         if (!model) {
             return { isPlant: false, predictions: [], error: "Model not loaded" };
         }
@@ -98,7 +98,7 @@ export function useImageClassifier() {
                 'wheat', 'corn', 'rice', 'potato', 'tomato', 'broccoli', 'cabbage', 'carrot', 'pepper', 'chilli', 'capsicum',
                 'garden', 'field', 'greenhouse', 'pot', 'vase', 'produce', 'food', 'grain', 'seed', 'bush', 'shrub', 'herb',
                 'ear', 'spike', 'head', 'maize', 'fodder', 'hay', 'rapeseed', 'daisy', 'buckeye', 'coral fungus', 'agaric', 'mushroom',
-                'cardoon', 'thistle', 'vine', 'weed'
+                'cardoon', 'thistle', 'vine', 'weed', 'texture', 'pattern', 'velvet', 'organic', 'structure', 'vein'
             ];
 
             const artificialKeywords = [
@@ -111,12 +111,7 @@ export function useImageClassifier() {
                 artificialKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
 
-            // Stricter plant check: must have a plant keyword in top 5 and NOT be artificial
-            const hasPlantKeyword = predictions.slice(0, 5).some(p =>
-                plantKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
-            );
 
-            const isPlant = !isArtificial && hasPlantKeyword;
 
             // 2. Custom Model Check - Use the selected crop model for maximum accuracy
             let customPredictions: { className: string; probability: number }[] | undefined;
@@ -132,6 +127,16 @@ export function useImageClassifier() {
                 }
             }
 
+            // Stricter plant check: must have a plant keyword in top 5 and NOT be artificial
+            // OR the custom model must be somewhat confident (meaning it recognizes it as a known disease/crop)
+            const hasPlantKeyword = predictions.slice(0, 5).some(p =>
+                plantKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
+            );
+
+            const isTMConfident = customPredictions && customPredictions.length > 0 && customPredictions[0].probability > 0.1;
+
+            const isPlant = (!isArtificial && hasPlantKeyword) || isTMConfident;
+
             return {
                 isPlant,
                 predictions,
@@ -142,9 +147,9 @@ export function useImageClassifier() {
             console.error("Classification error", error);
             return { isPlant: false, predictions: [], error: "Failed to classify image." };
         }
-    };
+    }, [model, customModels]);
 
-    const classifyAll = async (imageElement: HTMLImageElement): Promise<{ className: string; probability: number }[]> => {
+    const classifyAll = useCallback(async (imageElement: HTMLImageElement): Promise<{ className: string; probability: number }[]> => {
         const results: { className: string; probability: number }[] = [];
         
         const modelsToRun = Object.entries(customModels).filter(([_, m]) => m !== null);
@@ -164,7 +169,7 @@ export function useImageClassifier() {
         }));
 
         return results.sort((a, b) => b.probability - a.probability);
-    };
+    }, [customModels]);
 
     return {
         model,

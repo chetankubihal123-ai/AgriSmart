@@ -204,7 +204,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
   };
 
   const selectSuggestion = (location: LocationResult) => {
-    const fullName = location.admin1 ? `${location.name}, ${location.admin1}, ${location.country}` : `${location.name}, ${location.country}`;
+    const fullName = [location.name, location.admin1, location.country].filter(Boolean).join(', ');
     setSearchQuery(fullName);
     fetchWeather(location.latitude, location.longitude, fullName);
   };
@@ -217,8 +217,10 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
       const data = await response.json();
 
       if (data.results && data.results.length > 0) {
-        const { latitude, longitude, name, country } = data.results[0];
-        await fetchWeather(latitude, longitude, `${name}, ${country}`);
+        const loc = data.results[0];
+        const fullName = [loc.name, loc.admin1, loc.country].filter(Boolean).join(', ');
+        setSearchQuery(fullName);
+        await fetchWeather(loc.latitude, loc.longitude, fullName);
       } else {
         alert(t('weather.locationNotFound'));
       }
@@ -227,6 +229,7 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
       alert(t('weather.failedToFind'));
     } finally {
       setIsSearching(false);
+      setShowSuggestions(false);
     }
   };
 
@@ -311,6 +314,11 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
             placeholder={t('weather.searchPlaceholder')}
             value={searchQuery}
             onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSearchLocation(searchQuery);
+              }
+            }}
             className="w-full pl-20 pr-10 py-6 rounded-[35px] border-none ring-1 ring-slate-100 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg text-slate-700 font-bold placeholder:text-slate-400 transition-all bg-slate-50/50"
           />
           <AnimatePresence>
