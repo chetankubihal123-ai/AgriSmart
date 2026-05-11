@@ -180,18 +180,17 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       // Trigger AI Identity & Magic Cutout
       setIsCropping(true);
       try {
-        // 1. Identify Crop Type first
+        // 1. MobileNet/TM check
+        const classification = await classifyImage(imageRef.current || new Image(), selectedCrop);
         const identifiedCrop = await identifyCropType(dataUrl);
 
-        if (identifiedCrop === 'invalid') {
+        if (!classification.isPlant && identifiedCrop === 'invalid') {
           setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
           setIsCropping(false);
           return;
         }
 
-        if (identifiedCrop === 'other') {
-          console.log("Identified as other plant");
-        } else if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
+        if (identifiedCrop && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
           setSelectedCrop(identifiedCrop as any);
         }
 
@@ -228,15 +227,17 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
 
       // 0. Double check identity if needed, but we already do it in handleFile.
       // However, analyzeImage might be called directly if we didn't block in handleFile.
-      const identifiedCrop = await identifyCropType(selectedImage);
-      if (identifiedCrop === 'invalid') {
+      // 1. MobileNet/TM Check
+      const classification = await classifyImage(imageRef.current!, selectedCrop);
+      
+      if (!classification.isPlant && (!classification.customPredictions || classification.customPredictions[0].probability < 0.25)) {
         setClassificationError(language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೆಳೆ ಅಥವಾ ಎಲೆಯ ಸ್ಪಷ್ಟ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' : 'No crop detected. Please upload a clear image of a crop or leaf.');
         setAnalyzing(false);
         return;
       }
 
-      // If it's a known crop, use it, otherwise use the selected one
-      const currentCrop = (identifiedCrop && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop;
+      const identifiedCrop = await identifyCropType(selectedImage);
+      const currentCrop = (identifiedCrop && identifiedCrop !== 'invalid' && identifiedCrop !== 'other') ? identifiedCrop : selectedCrop;
 
       // Use Detailed Analysis
       const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, currentCrop as CropType, language);
