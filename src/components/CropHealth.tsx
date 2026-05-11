@@ -182,16 +182,11 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
       setResult(null);
       setClassificationError(null);
 
-      // Trigger AI Identity & Magic Cutout
-      setIsCropping(true);
+      // 1. Identify & Validate Crop (Fastest Path)
       try {
-        // 1. Identify & Validate Crop
         const result = await identifyCropType(dataUrl, language);
         
-        let status: 'success' | 'warning' | 'error' = 'error';
-        if (result.category !== 'invalid') {
-          status = result.confidence >= 80 ? 'success' : 'warning';
-        }
+        const status: 'success' | 'warning' | 'error' = result.category === 'invalid' ? 'error' : (result.confidence >= 80 ? 'success' : 'warning');
 
         setValidationResult({
           status,
@@ -209,21 +204,16 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
           setSelectedCrop(result.category as any);
         }
 
-        // 2. Run analysis with the identified (or existing) crop
+        // 2. Run cutout analysis in parallel only if valid
         const [boxResult, polyResult] = await Promise.all([
           detectPlantBoundingBox(dataUrl),
           detectPlantPolygon(dataUrl, (result.category && result.category !== 'other') ? result.category : selectedCrop)
         ]);
 
-        if (polyResult && polyResult.polygon) {
-          setPolygon(polyResult.polygon);
-        }
-
-        if (boxResult) {
-          setBoundingBox(boxResult);
-        }
+        if (polyResult && polyResult.polygon) setPolygon(polyResult.polygon);
+        if (boxResult) setBoundingBox(boxResult);
       } catch (err) {
-        console.warn("Magic cutout failed:", err);
+        console.warn("Processing failed:", err);
       } finally {
         setIsCropping(false);
       }

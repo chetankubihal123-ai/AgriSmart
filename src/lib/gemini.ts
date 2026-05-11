@@ -156,8 +156,14 @@ export async function identifyCropType(base64Image: string, language: string = '
   
   Categories:
   1. "tomato", "corn", "chilli" - if specifically identified.
-  2. "other" - if it is a plant/crop/leaf but NOT one of the above.
+  2. "other" - if it is a plant/crop/leaf/flower but NOT one of the above.
   3. "invalid" - if it is a HUMAN, FACE, SELFIE, CLOTHING, CAR, BUILDING, TEXT, or unrelated object.
+
+  CRITICAL RULES:
+  - If the image contains a leaf pattern, organic veins, or plant structure, it IS VALID.
+  - Do NOT reject images just because they have a plain background or are zoomed in.
+  - Diseased leaves (brown/spotted) are 100% VALID agricultural samples.
+  - Only use "invalid" for clearly non-farming objects like people or machines.
 
   Validation Rules:
   - Macro/Close-up shots of leaves are VALID and should be categorized.
@@ -174,10 +180,8 @@ export async function identifyCropType(base64Image: string, language: string = '
     "reason": "Short explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
   }`;
 
-  for (const modelName of MODELS) {
-    try {
       const model = genAI.getGenerativeModel({ 
-        model: modelName,
+        model: MODELS[0], // Force Flash for speed
         generationConfig: { 
           temperature: 0.1,
           responseMimeType: "application/json"
@@ -196,10 +200,8 @@ export async function identifyCropType(base64Image: string, language: string = '
         reason: parsed.reason || ''
       };
     } catch (error) {
-      console.warn(`Crop identification failed with ${modelName}:`, error);
-      continue;
+      console.warn(`Crop identification failed:`, error);
     }
-  }
 
   return {
     category: 'invalid',

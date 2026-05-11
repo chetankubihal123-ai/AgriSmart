@@ -206,16 +206,12 @@ export function DiseaseDetection() {
             setResult(null);
             setClassificationError(null);
 
-            // Trigger Instant Magic Crop & Cutout + Auto Crop Identification
+            // 1. Identify & Validate Crop (Fastest Path)
             setIsCropping(true);
             try {
-                // 1. Identify & Validate Crop
                 const result = await identifyCropType(dataUrl, language);
                 
-                let status: 'success' | 'warning' | 'error' = 'error';
-                if (result.category !== 'invalid') {
-                    status = result.confidence >= 80 ? 'success' : 'warning';
-                }
+                const status: 'success' | 'warning' | 'error' = result.category === 'invalid' ? 'error' : (result.confidence >= 80 ? 'success' : 'warning');
 
                 setValidationResult({
                     status,
@@ -233,22 +229,16 @@ export function DiseaseDetection() {
                     setSelectedCrop(result.category as any);
                 }
 
-                // 2. Run cutout analysis
+                // 2. Run cutout analysis in parallel only if valid
                 const [boxResult, polyResult] = await Promise.all([
                     detectPlantBoundingBox(dataUrl),
-                    detectPlantPolygon(dataUrl, (identifiedCrop && identifiedCrop !== 'other') ? (identifiedCrop as any) : selectedCrop)
+                    detectPlantPolygon(dataUrl, (result.category && result.category !== 'other') ? (result.category as any) : selectedCrop)
                 ]);
 
-                if (polyResult && polyResult.polygon) {
-                    setPolygon(polyResult.polygon);
-                }
-
-                if (boxResult) {
-                    setBoundingBox(boxResult);
-                    // No physical crop, we use CSS zoom now
-                }
+                if (polyResult && polyResult.polygon) setPolygon(polyResult.polygon);
+                if (boxResult) setBoundingBox(boxResult);
             } catch (err) {
-                console.warn("Magic cutout failed:", err);
+                console.warn("Processing failed:", err);
             } finally {
                 setIsCropping(false);
             }
