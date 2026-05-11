@@ -639,7 +639,7 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
                     <button
                       onClick={analyzeImage}
                       className={`w-full md:w-auto px-10 py-5 rounded-xl font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 transform flex items-center justify-center gap-3 ${
-                        analyzing || validationResult?.status === 'error'
+                        analyzing || !validationResult || validationResult?.status === 'error'
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                           : validationResult?.status === 'warning'
                           ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-200/50'
