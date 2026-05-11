@@ -180,28 +180,29 @@ export async function identifyCropType(base64Image: string, language: string = '
     "reason": "Short explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
   }`;
 
-      const model = genAI.getGenerativeModel({ 
-        model: MODELS[0], // Force Flash for speed
-        generationConfig: { 
-          temperature: 0.1,
-          responseMimeType: "application/json"
-        }
-      });
-      const result = await model.generateContent([
-        { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
-        prompt
-      ]);
-      const responseText = result.response.text();
-      const parsed = JSON.parse(responseText);
-      
-      return {
-        category: parsed.category || 'invalid',
-        confidence: parsed.confidence || 0,
-        reason: parsed.reason || ''
-      };
-    } catch (error) {
-      console.warn(`Crop identification failed:`, error);
-    }
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: MODELS[0], // Force Flash for speed
+      generationConfig: { 
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    });
+    const result = await model.generateContent([
+      { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
+      prompt
+    ]);
+    const responseText = result.response.text();
+    const parsed = JSON.parse(responseText);
+    
+    return {
+      category: parsed.category || 'invalid',
+      confidence: parsed.confidence || 0,
+      reason: parsed.reason || ''
+    };
+  } catch (error) {
+    console.warn(`Crop identification failed:`, error);
+  }
 
   return {
     category: 'invalid',
