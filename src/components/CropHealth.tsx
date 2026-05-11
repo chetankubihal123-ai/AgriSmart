@@ -240,21 +240,25 @@ export function CropHealth({ farm: _farm }: CropHealthProps) {
     try {
       let imageToAnalyze = selectedImage;
 
-      // 1. Final strict check
-      const result = await identifyCropType(selectedImage, language);
+      // 1. Check for cached validation or run once
+      let currentValidation = validationResult;
+      if (!currentValidation || currentValidation.status === 'error') {
+        const check = await identifyCropType(selectedImage, language);
+        currentValidation = {
+          status: check.category === 'invalid' ? 'error' : (check.confidence >= 80 ? 'success' : 'warning'),
+          category: check.category,
+          confidence: check.confidence,
+          reason: check.reason
+        };
+        setValidationResult(currentValidation);
+      }
       
-      if (result.category === 'invalid' || result.confidence < 40) {
-        setValidationResult({
-          status: 'error',
-          category: result.category,
-          confidence: result.confidence,
-          reason: result.reason
-        });
+      if (currentValidation.status === 'error' || currentValidation.confidence < 40) {
         setAnalyzing(false);
         return;
       }
 
-      const currentCrop = (result.category && result.category !== 'invalid' && result.category !== 'other') ? result.category : selectedCrop;
+      const currentCrop = (currentValidation.category && currentValidation.category !== 'invalid' && currentValidation.category !== 'other') ? currentValidation.category : selectedCrop;
 
       // Use Detailed Analysis
       const detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, currentCrop as CropType, language);

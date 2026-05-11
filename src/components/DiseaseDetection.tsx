@@ -264,16 +264,20 @@ export function DiseaseDetection() {
         try {
             let imageToAnalyze = selectedImage;
 
-            // 1. Final strict check
-            const result = await identifyCropType(selectedImage, language);
+            // 1. Check for cached validation or run once
+            let currentValidation = validationResult;
+            if (!currentValidation || currentValidation.status === 'error') {
+                const check = await identifyCropType(selectedImage, language);
+                currentValidation = {
+                    status: check.category === 'invalid' ? 'error' : (check.confidence >= 80 ? 'success' : 'warning'),
+                    category: check.category,
+                    confidence: check.confidence,
+                    reason: check.reason
+                };
+                setValidationResult(currentValidation);
+            }
             
-            if (result.category === 'invalid' || result.confidence < 40) {
-                setValidationResult({
-                    status: 'error',
-                    category: result.category,
-                    confidence: result.confidence,
-                    reason: result.reason
-                });
+            if (currentValidation.status === 'error' || currentValidation.confidence < 40) {
                 setAnalyzing(false);
                 return;
             }
@@ -282,8 +286,8 @@ export function DiseaseDetection() {
             let currentCrop: CropType = selectedCrop;
             let useMultiScan = true;
 
-            if (identifiedCrop && identifiedCrop !== 'invalid' && ['tomato', 'corn', 'chilli'].includes(identifiedCrop)) {
-                currentCrop = identifiedCrop as CropType;
+            if (currentValidation.category && currentValidation.category !== 'invalid' && ['tomato', 'corn', 'chilli'].includes(currentValidation.category)) {
+                currentCrop = currentValidation.category as CropType;
                 setSelectedCrop(currentCrop);
                 useMultiScan = false;
             }
