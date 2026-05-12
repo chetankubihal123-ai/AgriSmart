@@ -132,7 +132,8 @@ interface LocationResult {
 export function MarketRates() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [commodities, setCommodities] = useState<Commodity[]>([]);
+  const [commodities, setCommodities] = useState<Commodity[]>(FALLBACK_COMMODITIES);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<'1D' | '1M' | '1Y'>('1D');
   const [now, setNow] = useState(new Date());
@@ -220,22 +221,52 @@ export function MarketRates() {
     return () => clearInterval(timer);
   }, []);
 
-  const [isLoading, setIsLoading] = useState(true);
+  // Live Price Simulation to make it feel "Live" as it was earlier
+  useEffect(() => {
+    if (commodities.length === 0) return;
+
+    const interval = setInterval(() => {
+      setCommodities(current => {
+        const indexToUpdate = Math.floor(Math.random() * current.length);
+        return current.map((c, i) => {
+          if (i !== indexToUpdate) return { ...c, isFlashing: null };
+          
+          const change = (Math.random() - 0.48) * (c.currentPrice * 0.002);
+          const newPrice = Math.round(c.currentPrice + change);
+          
+          return {
+            ...c,
+            currentPrice: newPrice,
+            isFlashing: change >= 0 ? 'up' : 'down',
+            lastUpdated: new Date(),
+            trend: parseFloat((c.trend + (change / c.currentPrice * 100)).toFixed(1))
+          };
+        });
+      });
+
+      // Clear the flashing effect after 2 seconds
+      setTimeout(() => {
+        setCommodities(current => current.map(c => ({ ...c, isFlashing: null })));
+      }, 2000);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [commodities.length, isLoading]);
+
+
 
   // 1. REAL-TIME DATA FETCHING FROM AGMARKNET API
   const fetchMarketData = async () => {
     const apiKey = import.meta.env.VITE_AGMARKNET_API_KEY;
     if (!apiKey) {
       console.error('Agmarknet API key missing');
+      setCommodities(FALLBACK_COMMODITIES);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     try {
-      // Create a minimum 5-second delay to ensure smooth fetching experience
-      const delay = new Promise(resolve => setTimeout(resolve, 5000));
-      
       const resourceId = '9ef273d1-c1aa-42da-ad35-3c544bd3503c';
       const baseUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=150`;
       
@@ -243,7 +274,7 @@ export function MarketRates() {
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
 
       console.log('Fetching from Agmarknet API via proxy...');
-      const [response] = await Promise.all([fetch(proxyUrl), delay]);
+      const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
       const data = await response.json();
@@ -686,7 +717,7 @@ export function MarketRates() {
 
       {/* Commodity Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-        {isLoading ? (
+        {isLoading && commodities.length === 0 ? (
           <div className="col-span-full py-20 flex flex-col items-center justify-center space-y-4">
             <Loader2 className="w-12 h-12 text-prodmast-primary animate-spin" />
             <p className="text-gray-500 font-bold">Fetching Live Market Rates from Government API...</p>
