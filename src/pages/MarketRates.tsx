@@ -166,27 +166,37 @@ export function MarketRates() {
         return seed / 233280;
     };
 
-    // Historical data starts before the current price
-    // If trend is up, start LOWER. If trend is down, start HIGHER.
-    const startOffset = timeRange === '1D' ? 0.02 : timeRange === '1M' ? 0.08 : 0.15;
-    let current = base * (selectedCommodity.trendUp ? (1 - startOffset) : (1 + startOffset));
-    
-
-    // Standard historical logic
-    for (let i = 0; i < count; i++) {
-        const volatility = timeRange === '1D' ? 0.005 : timeRange === '1M' ? 0.02 : 0.05;
-        const trend = selectedCommodity.trendUp ? 1.002 : 0.998;
+    if (timeRange === '1D') {
+      // 1 Day: Smooth hourly fluctuations
+      let current = base * 0.98;
+      for (let i = 0; i < 24; i++) {
+        const volatility = 0.006;
+        current = current * (1 + (rnd() * volatility * 2 - volatility));
+        points.push({ time: `${i}:00`, price: Math.round(current) });
+      }
+    } else if (timeRange === '1M') {
+      // 1 Month: Daily fluctuations with mild trend
+      let current = base * (selectedCommodity.trendUp ? 0.92 : 1.08);
+      for (let i = 0; i < 30; i++) {
+        const volatility = 0.02;
+        const trend = selectedCommodity.trendUp ? 1.003 : 0.997;
         current = current * trend * (1 + (rnd() * volatility * 2 - volatility));
-        
-        let label = '';
-        if (timeRange === '1D') label = `${i}:00`;
-        else if (timeRange === '1M') label = `Day ${i + 1}`;
-        else label = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i];
-
-        points.push({ time: label, price: Math.round(current), isForecast: false });
+        points.push({ time: `Day ${i + 1}`, price: Math.round(current) });
+      }
+    } else {
+      // 1 Year ('1Y') or Forecast: Majestic seasonal supply-chain peaks!
+      // Summer/lean months (June, July, August) experience massive supply shortages,
+      // causing crop prices to spike extremely high (e.g. up to 1.5x - 1.8x base price).
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      for (let i = 0; i < 12; i++) {
+        const seasonalFactor = 1 + Math.sin((i / 11) * Math.PI) * 0.45; // up to +45% seasonal peak
+        const noise = 1 + (rnd() * 0.08 - 0.04); // ±4% random noise
+        const price = base * seasonalFactor * noise;
+        points.push({ time: months[i], price: Math.round(price) });
+      }
     }
     
-    // Ensure the last point matches current price
+    // Ensure the last point matches current price perfectly for real-time consistency
     points[points.length - 1].price = base;
     return points;
   }, [selectedCommodity, timeRange]);

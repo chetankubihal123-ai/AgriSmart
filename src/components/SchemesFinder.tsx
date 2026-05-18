@@ -12,7 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useFarm } from '../App';
+import { useFarm } from '../contexts/FarmContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Scheme {

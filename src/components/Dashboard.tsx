@@ -23,22 +23,24 @@ import {
   CloudRain,
   Loader2
 } from 'lucide-react';
-import { useFarm } from '../App';
+import { useFarm } from '../contexts/FarmContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { DiseaseScanner } from './DiseaseScanner';
 import { useAuth } from '../contexts/AuthContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { AdminDashboard } from './AdminDashboard';
 import { ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export function Dashboard() {
   const { farms, selectedFarm, setSelectedFarm, loading: farmsLoading } = useFarm();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const [recentData, setRecentData] = useState<(CropData & { prediction?: Prediction })[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState('All');
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
 
   const [locationName, setLocationName] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number, code: number } | null>(null);
@@ -99,6 +101,11 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!isOnline) {
+      setLocationName(language === 'kn' ? 'ಆಫ್‌ಲೈನ್ - ಕರ್ನಾಟಕ, ಭಾರತ' : 'Offline - Karnataka, India');
+      return;
+    }
+
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
@@ -127,7 +134,7 @@ export function Dashboard() {
         console.warn("Geolocation denied or error", error);
       });
     }
-  }, []);
+  }, [isOnline, language]);
 
   const getWeatherIcon = (code: number) => {
     if (code === 0) return <Sun className="w-5 h-5 text-amber-300" />;

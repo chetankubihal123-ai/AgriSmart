@@ -3,6 +3,7 @@ import { Farm } from '../lib/types';
 import { AlertCircle, CheckCircle, Upload, X, Loader2, Camera, Sparkles } from 'lucide-react';
 import { useImageClassifier, CropType } from '../hooks/useImageClassifier';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { analyzeImageWithGemini, detectPlantBoundingBox, detectPlantPolygon, analyzeDetailedPlantHealth, identifyCropType } from '../lib/gemini';
 
 interface CropHealthProps {
@@ -125,6 +126,7 @@ const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warnin
 
 export function CropHealth(_props: CropHealthProps) {
   const { t, language } = useLanguage();
+  const isOnline = useOnlineStatus();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -188,7 +190,7 @@ export function CropHealth(_props: CropHealthProps) {
       setPolygon(null);
 
       setValidating(true);
-      // 1. Identify & Validate Crop (Local Focus on Teachable Machine/MobileNet)
+      // 1. Identify & Validate Crop
       try {
         const tempImg = new Image();
         tempImg.src = dataUrl;
@@ -196,32 +198,118 @@ export function CropHealth(_props: CropHealthProps) {
           tempImg.onload = resolve;
         });
 
+        // Always run the local classifier first to get domain-expert confidence
         const localCheck = await classifyImage(tempImg, selectedCrop);
         
-        let status: 'success' | 'warning' | 'error' = localCheck.isPlant ? 'success' : 'error';
-        
-        setValidationResult({
-          status,
-          category: localCheck.isPlant ? selectedCrop : 'invalid',
-          confidence: localCheck.isPlant ? 95 : 0,
-          reason: localCheck.isPlant 
-            ? (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ. ವಿಶ್ಲೇಷಣೆ ಮುಂದುವರಿಸಬಹುದು.' : 'Crop detected. Ready for detailed analysis.')
-            : (language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ.' : 'No crop detected in this image.')
-        });
+        let isValid = localCheck.isPlant;
+        let isAmbiguous = false;
+        let categoryDetected = selectedCrop;
+        let confidenceScore = localCheck.isPlant ? 95 : 0;
+        let validationReason = localCheck.isPlant
+          ? (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ. ವಿಶ್ಲೇಷಣೆ ಮುಂದುವರಿಸಬಹುದು.' : 'Crop detected. Ready for detailed analysis.')
+          : (language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ.' : 'No crop detected in this image.');
 
-        if (!localCheck.isPlant) {
-          setIsCropping(false);
-          return;
+        if (isOnline) {
+          try {
+            const geminiCheck = await identifyCropType(dataUrl, language);
+            if (geminiCheck) {
+              if (geminiCheck.category !== 'invalid') {
+                // Gemini confirmed it's valid!
+                isValid = true;
+                isAmbiguous = false;
+                confidenceScore = geminiCheck.confidence;
+                validationReason = geminiCheck.reason;
+                if (['tomato', 'corn', 'chilli'].includes(geminiCheck.category)) {
+                  categoryDetected = geminiCheck.category as CropType;
+                  setSelectedCrop(categoryDetected);
+                }
+              } else {
+                // Gemini says invalid. Is it a real explicit rejection, or just a service fallback?
+                if (geminiCheck.confidence > 0) {
+                  // Explicit rejection by Gemini
+                  if (localCheck.isPlant) {
+                    // Local check says yes! Override Gemini as warning/ambiguous
+                    isValid = true;
+                    isAmbiguous = true;
+                    confidenceScore = 80;
+                    validationReason = language === 'kn' 
+                      ? 'ಸ್ಥಳೀಯ ಪರಿಶೀಲನೆಯು ಬೆಳೆಯನ್ನು ಪತ್ತೆಹಚ್ಚಿದೆ.' 
+                      : 'Crop detected via local model (Gemini was uncertain).';
+                  } else {
+                    // Both agree or local check is uncertain
+                    isValid = false;
+                    isAmbiguous = false;
+                    confidenceScore = geminiCheck.confidence;
+                    validationReason = geminiCheck.reason;
+                  }
+                } else {
+                  // Gemini service failed (confidence === 0). Fall back to local check.
+                  if (localCheck.isPlant) {
+                    isValid = true;
+                    isAmbiguous = false;
+                    confidenceScore = 90;
+                    validationReason = language === 'kn'
+                      ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ (ಸ್ಥಳೀಯ ವಿಶ್ಲೇಷಣೆ).'
+                      : 'Crop detected successfully via local classifier.';
+                  } else {
+                    // Both are uncertain/failed. Treat as Ambiguous/Warning instead of Blocked!
+                    isValid = true;
+                    isAmbiguous = true;
+                    confidenceScore = 50;
+                    validationReason = language === 'kn'
+                      ? 'ಬೆಳೆಯನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ನೀವು ವಿಶ್ಲೇಷಣೆಯನ್ನು ಪ್ರಾರಂಭಿಸಬಹುದು.'
+                      : 'Unable to fully verify crop. You can still proceed with analysis.';
+                  }
+                }
+              }
+            }
+          } catch (geminiErr) {
+            console.warn("Gemini validation failed, falling back to local model:", geminiErr);
+            if (localCheck.isPlant) {
+              isValid = true;
+              isAmbiguous = false;
+            } else {
+              // Treat as warning instead of hard block
+              isValid = true;
+              isAmbiguous = true;
+              confidenceScore = 50;
+              validationReason = language === 'kn'
+                ? 'ಚಿತ್ರವನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆದರೆ ವಿಶ್ಲೇಷಣೆ ಪ್ರಾರಂಭಿಸಬಹುದು.'
+                : 'Validation offline and inconclusive. You can still try starting the analysis.';
+            }
+          }
+        } else {
+          // Offline mode
+          if (localCheck.isPlant) {
+            isValid = true;
+            isAmbiguous = false;
+          } else {
+            // Treat as warning instead of hard block
+            isValid = true;
+            isAmbiguous = true;
+            confidenceScore = 50;
+            validationReason = language === 'kn'
+              ? 'ಚಿತ್ರವನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆದರೆ ವಿಶ್ಲೇಷಣೆ ಪ್ರಾರಂಭಿಸಬಹುದು.'
+              : 'Validation offline and inconclusive. You can still try starting the analysis.';
+          }
         }
 
-        if (result.category && ['tomato', 'corn', 'chilli'].includes(result.category)) {
-          setSelectedCrop(result.category as any);
+        setValidationResult({
+          status: !isValid ? 'error' : (isAmbiguous ? 'warning' : 'success'),
+          category: isValid ? categoryDetected : 'invalid',
+          confidence: confidenceScore,
+          reason: validationReason
+        });
+
+        if (!isValid) {
+          setIsCropping(false);
+          return;
         }
 
         // 2. Run cutout analysis in parallel only if valid
         const [boxResult, polyResult] = await Promise.all([
           detectPlantBoundingBox(dataUrl),
-          detectPlantPolygon(dataUrl, (result.category && result.category !== 'other') ? result.category : selectedCrop)
+          detectPlantPolygon(dataUrl, categoryDetected)
         ]);
 
         if (polyResult && polyResult.polygon) setPolygon(polyResult.polygon);

@@ -20,63 +20,8 @@ import { Farm } from './lib/types';
 import { LandingPage } from './pages/LandingPage';
 import { MarketRates } from './pages/MarketRates';
 import { AdminDashboard } from './components/AdminDashboard';
-
-// Create a context to manage farm state globally for the dashboard routes
-const FarmContext = createContext<{
-  farms: Farm[];
-  selectedFarm: Farm | null;
-  setSelectedFarm: (farm: Farm | null) => void;
-  loadFarms: () => Promise<void>;
-  loading: boolean;
-}>({
-  farms: [],
-  selectedFarm: null,
-  setSelectedFarm: () => { },
-  loadFarms: async () => { },
-  loading: true,
-});
-
-export const useFarm = () => useContext(FarmContext);
-
-function FarmProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const [farms, setFarms] = useState<Farm[]>([]);
-  const [selectedFarm, setSelectedFarm] = useState<Farm | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const loadFarms = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const { data, error } = await supabase
-        .from('farms')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setFarms(data || []);
-      if (data && data.length > 0 && !selectedFarm) {
-        setSelectedFarm(data[0]);
-      }
-    } catch (error) {
-      console.error('Error loading farms:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFarms();
-  }, [user]);
-
-  return (
-    <FarmContext.Provider value={{ farms, selectedFarm, setSelectedFarm, loadFarms, loading }}>
-      {children}
-    </FarmContext.Provider>
-  );
-}
+import { FarmProvider, useFarm } from './contexts/FarmContext';
+import { ClassifierProvider } from './contexts/ClassifierContext';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -171,6 +116,7 @@ function AppContent() {
 }
 
 import { CartProvider } from './contexts/CartContext';
+import { OfflineBanner } from './components/OfflineBanner';
 
 function App() {
   return (
@@ -178,9 +124,12 @@ function App() {
       <AuthProvider>
         <RoleProvider>
           <LanguageProvider>
-            <CartProvider>
-              <AppContent />
-            </CartProvider>
+            <ClassifierProvider>
+              <CartProvider>
+                <OfflineBanner />
+                <AppContent />
+              </CartProvider>
+            </ClassifierProvider>
           </LanguageProvider>
         </RoleProvider>
       </AuthProvider>
