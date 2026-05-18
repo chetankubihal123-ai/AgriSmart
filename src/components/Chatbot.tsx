@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, X, MessageSquare, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { findBestMatch } from '../lib/knowledgeBase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { askGeminiText } from '../lib/gemini';
 
 interface Message {
     id: string;
@@ -16,9 +17,92 @@ interface ChatbotProps {
     setIsOpen: (isOpen: boolean) => void;
 }
 
+// Offline Kannada translation map for local database query fallback
+const KANNADA_OFFLINE_RESPONSES: Record<string, string> = {
+    "Wheat is a Rabi crop sown in winter (Oct-Dec) and harvested in spring (March-May). It requires cool weather for growth and warm weather for ripening. Ideal temperature: 10°C-15°C (sowing), 21°C-26°C (harvesting).": 
+    "ಗೋಧಿ ಒಂದು ರಬಿ ಬೆಳೆಯಾಗಿದ್ದು, ಚಳಿಗಾಲದಲ್ಲಿ (ಅಕ್ಟೋಬರ್-ಡಿಸೆಂಬರ್) ಬಿತ್ತನೆ ಮಾಡಿ ವಸಂತಕಾಲದಲ್ಲಿ (ಮಾರ್ಚ್-ಮೇ) ಕೊಯ್ಲು ಮಾಡಲಾಗುತ್ತದೆ. ಇದರ ಬೆಳವಣಿಗೆಗೆ ತಂಪಾದ ಹವಾಮಾನ ಮತ್ತು ಹಣ್ಣಾಗಲು ಬೆಚ್ಚಗಿನ ಹವಾಮಾನದ ಅಗತ್ಯವಿದೆ. ಬಿತ್ತನೆಗೆ 10°C-15°C ಮತ್ತು ಕೊಯ್ಲಿಗೆ 21°C-26°C ತಾಪಮಾನ ಸೂಕ್ತವಾಗಿದೆ.",
+
+    "Rice (Paddy) is a Kharif crop that requires high temperature (25°C+) and heavy rainfall (100cm+). It grows best in clayey loam soil that can retain water.": 
+    "ಭತ್ತ (ನೆಲ್ಲು) ಒಂದು ಖಾರಿಫ್ ಬೆಳೆಯಾಗಿದ್ದು, ಇದಕ್ಕೆ ಹೆಚ್ಚಿನ ತಾಪಮಾನ (25°C+) ಮತ್ತು ಭಾರಿ ಮಳೆಯ (100cm+) ಅಗತ್ಯವಿರುತ್ತದೆ. ನೀರನ್ನು ಹಿಡಿದಿಟ್ಟುಕೊಳ್ಳುವ ಜೇಡಿಮಣ್ಣಿನಿಂದ ಕೂಡಿದ ಲೋಮ್ ಮಣ್ಣಿನಲ್ಲಿ ಇದು ಚೆನ್ನಾಗಿ ಬೆಳೆಯುತ್ತದೆ.",
+
+    "Corn (Maize) needs well-drained, fertile soil. It is a heavy feeder, so apply Nitrogen-rich fertilizer (Urea) at knee-high stage. Water deeply but avoid waterlogging.": 
+    "ಮೆಕ್ಕೆಜೋಳಕ್ಕೆ ಉತ್ತಮ ನೀರು ಬಸಿಯುವ ಮತ್ತು ಫಲವತ್ತಾದ ಮಣ್ಣಿನ ಅಗತ್ಯವಿದೆ. ಇದು ಹೆಚ್ಚು ಪೋಷಕಾಂಶಗಳನ್ನು ಹೀರಿಕೊಳ್ಳುವುದರಿಂದ, ಮೊಣಕಾಲು ಎತ್ತರದ ಹಂತದಲ್ಲಿ ಸಾರಜನಕ ಭರಿತ ರಸಗೊಬ್ಬರವನ್ನು (ಯೂರಿಯಾ) ಅನ್ವಯಿಸಿ. ಆಳವಾಗಿ ನೀರುಣಿಸಿ ಆದರೆ ನೀರು ನಿಲ್ಲದಂತೆ ನೋಡಿಕೊಳ್ಳಿ.",
+
+    "Tomatoes love sun! They need at least 6-8 hours of sunlight. Support plants with stakes to keep fruit off the ground. Watch out for Early Blight (brown spots on leaves).": 
+    "ಟೊಮೆಟೊಗಳಿಗೆ ಸೂರ್ಯನ ಬೆಳಕು ತುಂಬಾ ಇಷ್ಟ! ಇವುಗಳಿಗೆ ಕನಿಷ್ಠ 6-8 ಗಂಟೆಗಳ ನೇರ ಸೂರ್ಯನ ಬೆಳಕು ಬೇಕು. ಕಾಯಿಗಳು ನೆಲಕ್ಕೆ ತಾಗದಂತೆ ತಡೆಯಲು ಗಿಡಗಳಿಗೆ ಆಸರೆ ಕೋಲುಗಳನ್ನು ನೀಡಿ. ಆರಂಭಿಕ ಕೊಳೆ ರೋಗದ (ಎಲೆಗಳ ಮೇಲೆ ಕಂದು ಕಲೆಗಳು) ಬಗ್ಗೆ ಜಾಗರೂಕರಾಗಿರಿ.",
+
+    "Potatoes grow best in loose, well-drained sandy loam soil. Hill soil around the base of the plant as it grows to protect tubers from sunlight (green potatoes are toxic!).": 
+    "ಆಲೂಗಡ್ಡೆ ಸಡಿಲವಾದ, ಉತ್ತಮ ನೀರು ಬಸಿಯುವ ಮರಳು ಮಿಶ್ರಿತ ಜೇಡಿಮಣ್ಣಿನಲ್ಲಿ ಚೆನ್ನಾಗಿ ಬೆಳೆಯುತ್ತದೆ. ಗೆಡ್ಡೆಗಳನ್ನು ಸೂರ್ಯನ ಬೆಳಕಿನಿಂದ ರಕ್ಷಿಸಲು ಗಿಡ ಬೆಳೆದಂತೆ ಬುಡಕ್ಕೆ ಮಣ್ಣು ಏರಿಸಿ (ಹಸಿರು ಬಣ್ಣಕ್ಕೆ ತಿರುಗಿದ ಆಲೂಗಡ್ಡೆಗಳು ವಿಷಕಾರಿಯಾಗಿರುತ್ತವೆ!).",
+
+    "A crop is a plant or animal product that can be grown and harvested extensively for profit or subsistence. In agriculture, crops are typically divided into food crops (wheat, rice), feed crops, fiber crops (cotton), and oil crops.": 
+    "ಬೆಳೆಯು ಲಾಭ ಅಥವಾ ಜೀವನಾಧಾರಕ್ಕಾಗಿ ವ್ಯಾಪಕವಾಗಿ ಬೆಳೆದು ಕೊಯ್ಲು ಮಾಡಬಹುದಾದ ಸಸ್ಯ ಅಥವಾ ಪ್ರಾಣಿ ಉತ್ಪನ್ನವಾಗಿದೆ. ಕೃಷಿಯಲ್ಲಿ, ಬೆಳೆಗಳನ್ನು ಸಾಮಾನ್ಯವಾಗಿ ಆಹಾರ ಬೆಳೆಗಳು (ಗೋಧಿ, ಭತ್ತ), ಮೇವಿನ ಬೆಳೆಗಳು, ನಾರಿನ ಬೆಳೆಗಳು (ಹತ್ತಿ) ಮತ್ತು ಎಣ್ಣೆಕಾಳು ಬೆಳೆಗಳಾಗಿ ವಿಂಗಡಿಸಲಾಗುತ್ತದೆ.",
+
+    "Early Blight appears as concentric 'target board' brown spots on leaves. Control it by rotating crops, keeping leaves dry while watering, and using copper-based fungicides if severe.": 
+    "ಆರಂಭಿಕ ಕೊಳೆ ರೋಗವು ಎಲೆಗಳ ಮೇಲೆ ವೃತ್ತಾಕಾರದ ಕಂದು ಬಣ್ಣದ ಕಲೆಗಳಾಗಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತದೆ. ಬೆಳೆ ಸರದಿಯನ್ನು ಅನುಸರಿಸುವ ಮೂಲಕ, ನೀರುಣಿಸುವಾಗ ಎಲೆಗಳನ್ನು ಒಣದಾಗಿಡುವ ಮೂಲಕ ಮತ್ತು ತೀವ್ರವಾಗಿದ್ದರೆ ತಾಮ್ರ ಆಧಾರಿತ ಶಿಲೀಂಧ್ರನಾಶಕಗಳನ್ನು ಬಳಸುವ ಮೂಲಕ ಇದನ್ನು ನಿಯಂತ್ರಿಸಿ.",
+
+    "Leaf Rust appears as orange/reddish powdery pustules on leaves (common in Wheat). planted resistant varieties. If infected, apply sulfur or propiconazole fungicides immediately.": 
+    "ಎಲೆ ತುಕ್ಕು ರೋಗವು ಎಲೆಗಳ ಮೇಲೆ ಕಿತ್ತಳೆ ಅಥವಾ ಕೆಂಪು ಬಣ್ಣದ ಪುಡಿಯಂತಹ ಗುಳ್ಳೆಗಳಾಗಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತದೆ (ಗೋಧಿಯಲ್ಲಿ ಸಾಮಾನ್ಯ). ರೋಗ ನಿರೋಧಕ ತಳಿಗಳನ್ನು ಬಿತ್ತನೆ ಮಾಡಿ. ಸೋಂಕು ತಗುಲಿದರೆ ತಕ್ಷಣ ಸಲ್ಫರ್ ಅಥವಾ ಪ್ರೊಪಿಕೊನಜೋಲ್ ಶಿಲೀಂಧ್ರನಾಶಕಗಳನ್ನು ಸಿಂಪಡಿಸಿ.",
+
+    "Yellowing leaves (Chlorosis) often indicate Nitrogen deficiency or over-watering. Check if the soil is too soggy. If dry, apply a nitrogen-rich fertilizer like Urea or Compost.": 
+    "ಎಲೆಗಳು ಹಳದಿಯಾಗುವುದು (ಕ್ಲೋರೋಸಿಸ್) ಸಾಮಾನ್ಯವಾಗಿ ಸಾರಜನಕದ ಕೊರತೆ ಅಥವಾ ಅತಿಯಾದ ನೀರುಣಿಸುವಿಕೆಯನ್ನು ಸೂಚಿಸುತ್ತದೆ. ಮಣ್ಣು ಹೆಚ್ಚು ಜವಳಾಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ಒಣಗಿದ್ದರೆ, ಯೂರಿಯಾ ಅಥವಾ ಕಾಂಪೋಸ್ಟ್ ನಂತಹ ಸಾರಜನಕ ಭರಿತ ರಸಗೊಬ್ಬರವನ್ನು ಅನ್ವಯಿಸಿ.",
+
+    "For common pests like Aphids, try spraying a Neem Oil solution (organic) first. For caterpillars or borers, you may need specific pesticides like Emamectin benzoate, but always check safety periods.": 
+    "ಅಫಿಡ್ಸ್‌ನಂತಹ ಸಾಮಾನ್ಯ ಕೀಟಗಳಿಗಾಗಿ, ಮೊದಲು ಬೇವಿನ ಎಣ್ಣೆ ದ್ರಾವಣವನ್ನು (ಸಾವಯವ) ಸಿಂಪಡಿಸಲು ಪ್ರಯತ್ನಿಸಿ. ಕೀಟಗಳು ಅಥವಾ ಕೊರಕಗಳಿಗಾಗಿ, ನಿಮಗೆ ಇಮಾಮೆಕ್ಟಿನ್ ಬೆಂಜೊಯೇಟ್ ನಂತಹ ನಿರ್ದಿಷ್ಟ ಕೀಟನಾಶಕಗಳು ಬೇಕಾಗಬಹುದು, ಆದರೆ ಯಾವಾಗಲೂ ಸುರಕ್ಷಿತ ಅವಧಿಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+
+    "The standard fertilizer ratio is N-P-K (Nitrogen, Phosphorus, Potassium). Leafy crops need more N, fruiting crops need more P and K. Always do a soil test before applying heavy chemicals.": 
+    "ಪ್ರಮಾಣಿತ ರಸಗೊಬ್ಬರ ಅನುಪಾತವು N-P-K (ಸಾರಜನಕ, ರಂಜಕ, ಪೊಟ್ಯಾಸಿಯಮ್) ಆಗಿದೆ. ಎಲೆಗಳ ಬೆಳೆಗಳಿಗೆ ಹೆಚ್ಚಿನ N ಅಗತ್ಯವಿರುತ್ತದೆ, ಕಾಯಿ ಬಿಡುವ ಬೆಳೆಗಳಿಗೆ ಹೆಚ್ಚಿನ P ಮತ್ತು K ಅಗತ್ಯವಿರುತ್ತದೆ. ರಾಸಾಯನಿಕಗಳನ್ನು ಬಳಸುವ ಮುನ್ನ ಯಾವಾಗಲೂ ಮಣ್ಣಿನ ಪರೀಕ್ಷೆ ಮಾಡಿ.",
+
+    "Most crops prefer deep, infrequent watering rather than daily shallow sprinkling. Drip irrigation is the most water-efficient method, saving up to 50% water compared to flood irrigation.": 
+    "ಹೆಚ್ಚಿನ ಬೆಳೆಗಳು ಪ್ರತಿದಿನ ಮೇಲ್ಮೈಗೆ ನೀರು ಚಿಮುಕಿಸುವುದಕ್ಕಿಂತ ಆಳವಾಗಿ ನೀರುಣಿಸುವುದನ್ನು ಇಷ್ಟಪಡುತ್ತವೆ. ಹನಿ ನೀರಾವರಿಯು ಅತ್ಯಂತ ದಕ್ಷ ವಿಧಾನವಾಗಿದ್ದು, ಪ್ರವಾಹ ನೀರಾವರಿಗೆ ಹೋಲಿಸಿದರೆ ಶೇಕಡಾ 50 ರಷ್ಟು ನೀರನ್ನು ಉಳಿಸುತ್ತದೆ.",
+
+    "Organic farming improves soil health long-term. Vermicompost and cow manure are excellent natural fertilizers. Crop rotation is also key to preventing soil depletion.": 
+    "ಸಾವಯವ ಕೃಷಿಯು ದೀರ್ಘಕಾಲದವರೆಗೆ ಮಣ್ಣಿನ ಆರೋಗ್ಯವನ್ನು ಸುಧಾರಿಸುತ್ತದೆ. ಎರೆಹುಳು ಗೊಬ್ಬರ ಮತ್ತು ಕೊಟ್ಟಿಗೆ ಗೊಬ್ಬರಗಳು ಅತ್ಯುತ್ತಮ ನೈಸರ್ಗಿಕ ರಸಗೊಬ್ಬರಗಳಾಗಿವೆ. ಮಣ್ಣಿನ ಸತ್ವ ಕಡಿಮೆಯಾಗುವುದನ್ನು ತಡೆಯಲು ಬೆಳೆ ಸರದಿ ಕೂಡ ಪ್ರಮುಖವಾಗಿದೆ.",
+
+    "You can check the specific 'Weather' tab in this dashboard for a 5-day forecast tailored to your farm's location.": 
+    "ನಿಮ್ಮ ತೋಟದ ಸ್ಥಳಕ್ಕೆ ಅನುಗುಣವಾಗಿ 5 ದಿನಗಳ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆಯನ್ನು ವೀಕ್ಷಿಸಲು ಈ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ನಲ್ಲಿರುವ ನಿರ್ದಿಷ್ಟ 'ಹವಾಮಾನ' (Weather) ಟ್ಯಾಬ್ ಅನ್ನು ಪರಿಶೀಲಿಸಬಹುದು.",
+
+    "Government schemes vary by region. Common ones include PM-KISAN (income support) and Soil Health Card scheme. Contact your local Krishi Vigyan Kendra (KVK) for current details.": 
+    "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು ಪ್ರದೇಶಕ್ಕೆ ಅನುಗುಣವಾಗಿ ಬದಲಾಗುತ್ತವೆ. ಸಾಮಾನ್ಯ ಯೋಜನೆಗಳಲ್ಲಿ ಪಿಎಂ-ಕಿಸಾನ್ (ಆದಾಯ ಬೆಂಬಲ) ಮತ್ತು ಮಣ್ಣಿನ ಆರೋಗ್ಯ ಕಾರ್ಡ್ ಯೋಜನೆ ಸೇರಿವೆ. ಹೆಚ್ಚಿನ ವಿವರಗಳಿಗಾಗಿ ನಿಮ್ಮ ಸ್ಥಳೀಯ ಕೃಷಿ ವಿಜ್ಞಾನ ಕೇಂದ್ರವನ್ನು (KVK) ಸಂಪರ್ಕಿಸಿ.",
+
+    "Hello! I am AgriBot. Ask me about growing crops (wheat, rice), treating diseases (blight, rust), or general farming tips!": 
+    "ನಮಸ್ಕಾರ! ನಾನು ಅಗ್ರಿ-ಬಡ್ಡಿ. ಬೆಳೆಗಳನ್ನು ಬೆಳೆಯುವುದು (ಗೋಧಿ, ಭತ್ತ), ರೋಗಗಳಿಗೆ ಚಿಕಿತ್ಸೆ ನೀಡುವುದು (ತುಕ್ಕು ರೋಗ) ಅಥವಾ ಸಾಮಾನ್ಯ ಕೃಷಿ ಸಲಹೆಗಳ ಬಗ್ಗೆ ನನ್ನನ್ನು ಕೇಳಿ!"
+};
+
+// Offline Kannada input-to-English keywords map
+const KANNADA_KEYWORD_MAP: Record<string, string> = {
+    'ಗೋಧಿ': 'wheat',
+    'ರಬಿ': 'wheat',
+    'ಭತ್ತ': 'rice',
+    'ಅಕ್ಕಿ': 'rice',
+    'ನೆಲ್ಲು': 'rice',
+    'ಖಾರಿಫ್': 'rice',
+    'ಮೆಕ್ಕೆಜೋಳ': 'corn',
+    'ಜೋಳ': 'corn',
+    'ಟೊಮೆಟೊ': 'tomato',
+    'ಟೊಮ್ಯಾಟೊ': 'tomato',
+    'ಆಲೂಗಡ್ಡೆ': 'potato',
+    'ಆಲೂ': 'potato',
+    'ಕೊಳೆ': 'blight',
+    'ಕಲೆ': 'blight',
+    'ತುಕ್ಕು': 'rust',
+    'ಹಳದಿ': 'yellowing',
+    'ಕೀಟ': 'pest',
+    'ಹುಳು': 'pest',
+    'ಗೊಬ್ಬರ': 'fertilizer',
+    'ರಸಗೊಬ್ಬರ': 'fertilizer',
+    'ನೀರು': 'water',
+    'ನೀರಾವರಿ': 'water',
+    'ಸಾವಯವ': 'organic',
+    'ಹವಾಮಾನ': 'weather',
+    'ಮಳೆ': 'weather',
+    'ಯೋಜನೆ': 'scheme',
+    'ಸಾಲ': 'scheme',
+    'ನಮಸ್ಕಾರ': 'hello',
+    'ಹಲೋ': 'hello'
+};
+
 export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
-    const { t, translations } = useLanguage();
-    // Internal state for messages stays here
+    const { t, translations, language } = useLanguage();
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
@@ -35,6 +119,7 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
     const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
     const recognitionRef = useRef<any>(null);
 
+    // Sync language selection live with Speech Recognition locale
     useEffect(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -42,8 +127,8 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
             recognitionRef.current.continuous = false;
             recognitionRef.current.interimResults = false;
             
-            // Set language dynamically
-            recognitionRef.current.lang = t('chatbot.greeting').includes('ಹಲೋ') ? 'kn-IN' : 'en-US';
+            // Set dynamic audio-capture language!
+            recognitionRef.current.lang = language === 'kn' ? 'kn-IN' : 'en-US';
 
             recognitionRef.current.onresult = (event: any) => {
                 const transcript = event.results[0][0].transcript;
@@ -54,7 +139,22 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
             recognitionRef.current.onerror = () => setIsListening(false);
             recognitionRef.current.onend = () => setIsListening(false);
         }
-    }, [t]);
+    }, [language]);
+
+    // Live update the greeting if user changes dashboard language
+    useEffect(() => {
+        setMessages(prev => {
+            if (prev.length === 1 && prev[0].id === '1') {
+                return [{
+                    id: '1',
+                    text: t('chatbot.greeting'),
+                    sender: 'ai',
+                    timestamp: prev[0].timestamp
+                }];
+            }
+            return prev;
+        });
+    }, [language, t]);
 
     const toggleListening = () => {
         if (isListening) {
@@ -69,7 +169,7 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
         if (!isVoiceEnabled) return;
         window.speechSynthesis.cancel(); // Stop current speech
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = t('chatbot.greeting').includes('ಹಲೋ') ? 'kn-IN' : 'en-US';
+        utterance.lang = language === 'kn' ? 'kn-IN' : 'en-US';
         window.speechSynthesis.speak(utterance);
     };
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -94,19 +194,48 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
         };
 
         setMessages((prev) => [...prev, userMessage]);
+        const queryText = inputText;
         setInputText('');
         setIsTyping(true);
 
-        // Simulate AI response
-        setTimeout(() => {
-            const bestMatch = findBestMatch(inputText);
+        // Dynamic multi-lingual response generator (Live Gemini API -> offline local translated fallback)
+        (async () => {
             let responseText = "";
 
-            if (bestMatch) {
-                responseText = bestMatch;
-            } else {
-                const fallbacks = translations.chatbot.fallbacks;
-                responseText = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+            try {
+                // 1. Try Live Gemini model first!
+                const geminiResp = await askGeminiText(queryText, language);
+                if (geminiResp) {
+                    responseText = geminiResp;
+                }
+            } catch (err) {
+                console.warn("Gemini chatbot service unavailable, shifting to offline database:", err);
+            }
+
+            // 2. Offline fallback if Gemini fails
+            if (!responseText) {
+                let mappedQuery = queryText;
+                if (language === 'kn') {
+                    // Extract Kannada keywords and map to English targets for ripgrep keywords matching
+                    const lowerQuery = queryText.toLowerCase();
+                    Object.entries(KANNADA_KEYWORD_MAP).forEach(([knKey, enKey]) => {
+                        if (lowerQuery.includes(knKey)) {
+                            mappedQuery += " " + enKey;
+                        }
+                    });
+                }
+
+                const bestMatch = findBestMatch(mappedQuery);
+                if (bestMatch) {
+                    if (language === 'kn') {
+                        responseText = KANNADA_OFFLINE_RESPONSES[bestMatch] || bestMatch;
+                    } else {
+                        responseText = bestMatch;
+                    }
+                } else {
+                    const fallbacks = translations.chatbot.fallbacks;
+                    responseText = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+                }
             }
 
             const aiMessage: Message = {
@@ -118,19 +247,37 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
             setMessages((prev) => [...prev, aiMessage]);
             setIsTyping(false);
             speak(responseText);
-        }, 1000 + Math.random() * 1000);
+        })();
     };
 
-    // Copilot Action
+    // Dynamic dashboard summary card action in user's active language
     const triggerSummarize = () => {
-        setMessages(prev => [...prev, { id: Date.now().toString(), text: "Please summarize the farm dashboard.", sender: 'user', timestamp: new Date() }]);
+        const userQuery = language === 'kn' ? "ದಯವಿಟ್ಟು ಫಾರ್ಮ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಅನ್ನು ಸಾರಾಂಶಗೊಳಿಸಿ." : "Please summarize the farm dashboard.";
+        setMessages(prev => [...prev, { id: Date.now().toString(), text: userQuery, sender: 'user', timestamp: new Date() }]);
         setIsTyping(true);
-        setTimeout(() => {
-            const summary = "Here is your Farm Summary: \n1. Primary Location: Karnataka \n2. Live Market: Chilli is up (+4.2%), while Tomato is down. \n3. Alerts: High risk of Leaf Blight detected in Sector 4. \n4. Overall ROI is tracking at 28.4%. \nWould you like me to deploy treatments?";
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: summary, sender: 'ai', timestamp: new Date() }]);
+
+        (async () => {
+            let responseText = "";
+            try {
+                const prompt = `Summarize the current farm state. Context: 1. Location: Karnataka. 2. Live Market: Chilli is up (+4.2%), while Tomato is down. 3. Alerts: High risk of Leaf Blight detected in Sector 4. 4. ROI is tracking at 28.4%. Provide a high-quality summary in ${language === 'kn' ? 'Kannada language' : 'English language'}.`;
+                const geminiResp = await askGeminiText(prompt, language);
+                if (geminiResp) {
+                    responseText = geminiResp;
+                }
+            } catch (err) {
+                console.warn("Gemini dashboard summary failed:", err);
+            }
+
+            if (!responseText) {
+                responseText = language === 'kn' 
+                    ? "ನಿಮ್ಮ ತೋಟದ ಸಾರಾಂಶ ಇಲ್ಲಿದೆ:\n1. ಪ್ರಾಥಮಿಕ ಸ್ಥಳ: ಕರ್ನಾಟಕ\n2. ಮಾರುಕಟ್ಟೆ ದರಗಳು: ಮೆಣಸಿನಕಾಯಿ ದರ ಹೆಚ್ಚಾಗಿದೆ (+4.2%), ಟೊಮೆಟೊ ಕಡಿಮೆಯಾಗಿದೆ.\n3. ಎಚ್ಚರಿಕೆಗಳು: ಸೆಕ್ಟರ್ 4 ರಲ್ಲಿ ಲೀಫ್ ಬ್ಲೈಟ್‌ನ ಹೆಚ್ಚಿನ ಅಪಾಯವಿದೆ.\n4. ಒಟ್ಟಾರೆ ಲಾಭ (ROI) ಶೇಕಡಾ 28.4 ರಷ್ಟಿದೆ.\nನಾನು ಚಿಕಿತ್ಸೆಯನ್ನು ನಿಯೋಜಿಸಬೇಕೇ?"
+                    : "Here is your Farm Summary:\n1. Primary Location: Karnataka\n2. Live Market: Chilli is up (+4.2%), while Tomato is down.\n3. Alerts: High risk of Leaf Blight detected in Sector 4.\n4. Overall ROI is tracking at 28.4%.\nWould you like me to deploy treatments?";
+            }
+
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: responseText, sender: 'ai', timestamp: new Date() }]);
             setIsTyping(false);
-            speak(summary);
-        }, 1500);
+            speak(responseText);
+        })();
     };
 
     if (!isOpen) {
@@ -143,7 +290,7 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                   <Bot className="w-6 h-6 text-prodmast-accent group-hover:rotate-12 transition-transform" />
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse border-2 border-prodmast-dark"></span>
                 </div>
-                <span className="font-bold text-sm tracking-wide hidden md:inline text-prodmast-accent uppercase">Farm Copilot</span>
+                <span className="font-bold text-sm tracking-wide hidden md:inline text-prodmast-accent uppercase">Agri-Buddy</span>
             </button>
         );
     }
@@ -157,7 +304,7 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                         <Bot className="w-6 h-6 text-prodmast-accent drop-shadow-md" />
                     </div>
                     <div>
-                        <h3 className="font-black text-white tracking-wide text-lg">Farm Copilot</h3>
+                        <h3 className="font-black text-white tracking-wide text-lg">Agri-Buddy</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
                            <span className="w-1.5 h-1.5 rounded-full bg-prodmast-accent shadow-[0_0_5px_#a3e635] animate-pulse"></span>
                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">AI Online</p>
@@ -227,13 +374,13 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                      onClick={triggerSummarize}
                      className="whitespace-nowrap px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-prodmast-accent/50 hover:bg-prodmast-accent/10 text-xs font-bold text-slate-300 transition-all focus:outline-none"
                    >
-                     ⚡ Summarize Dashboard
+                     ⚡ {language === 'kn' ? 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಸಾರಾಂಶ' : 'Summarize Dashboard'}
                    </button>
                    <button 
-                     onClick={() => setInputText("What are the crop yields looking like?")}
+                     onClick={() => setInputText(language === 'kn' ? 'ಬೆಳೆ ಇಳುವರಿ ಹೇಗಿದೆ?' : 'What are the crop yields looking like?')}
                      className="whitespace-nowrap px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-prodmast-accent/50 hover:bg-prodmast-accent/10 text-xs font-bold text-slate-300 transition-all focus:outline-none"
                    >
-                     📈 Predict Yields
+                     📈 {language === 'kn' ? 'ಇಳುವರಿ ಅಂದಾಜು ವರದಿ' : 'Predict Yields'}
                    </button>
                 </div>
 
@@ -250,7 +397,7 @@ export function Chatbot({ isOpen, setIsOpen }: ChatbotProps) {
                             type="text"
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
-                            placeholder={isListening ? "Listening..." : "Ask your farm copilot..."}
+                            placeholder={isListening ? (language === 'kn' ? 'ಆಲಿಸಲಾಗುತ್ತಿದೆ...' : 'Listening...') : (language === 'kn' ? 'ಅಗ್ರಿ-ಬಡ್ಡಿಯನ್ನು ಕೇಳಿ...' : 'Ask Agri-Buddy...')}
                             className="w-full pl-5 pr-12 py-3.5 bg-black/40 border border-white/20 rounded-xl focus:ring-2 focus:ring-prodmast-accent focus:border-transparent transition text-sm text-white placeholder-slate-500 outline-none"
                         />
                         <button

@@ -242,3 +242,26 @@ export async function cropImage(base64Image: string, box: { ymin: number, xmin: 
     img.src = base64Image;
   });
 }
+
+export async function askGeminiText(prompt: string, language: string = 'en'): Promise<string | null> {
+  const langPrompt = language === 'kn' 
+    ? 'IMPORTANT: Return the response strictly in KANNADA language using Kannada script. Keep it warm, extremely concise (2-3 sentences max) and helpful for a farmer.' 
+    : 'IMPORTANT: Return the response strictly in ENGLISH. Keep it warm, extremely concise (2-3 sentences max) and helpful for a farmer.';
+  
+  const finalPrompt = `${langPrompt}\n\nQuestion: ${prompt}`;
+
+  for (const modelName of MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(finalPrompt);
+      const text = result.response.text();
+      if (text && text.trim().length > 0) {
+        return text.trim();
+      }
+    } catch (error) {
+      console.warn(`Text model ${modelName} failed:`, error);
+      continue;
+    }
+  }
+  return null;
+}

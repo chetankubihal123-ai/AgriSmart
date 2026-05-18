@@ -224,7 +224,7 @@ export const translations = {
         chatbot: {
             trigger: 'Ask AI',
             placeholder: 'Ask about crops, diseases, or weather...',
-            greeting: 'Hello! I am your AI farming assistant. Ask me anything in English or Kannada!',
+            greeting: 'Hello! I am Agri-Buddy, your AI farming assistant. Ask me anything in English or Kannada!',
             fallbacks: [
                 "I'm not sure about that specific topic yet. Try asking about crops like Wheat/Rice or diseases like Rust/Blight.",
                 "I'm still learning! I can help best with farming questions about crops, fertilizers, and diseases.",
@@ -682,7 +682,7 @@ export const translations = {
         chatbot: {
             trigger: 'AI ಅನ್ನು ಕೇಳಿ',
             placeholder: 'ಬೆಳೆಗಳು, ರೋಗಗಳು ಅಥವಾ ಹವಾಮಾನದ ಬಗ್ಗೆ ಕೇಳಿ...',
-            greeting: 'ನಮಸ್ಕಾರ! ನಾನು ನಿಮ್ಮ AI ಕೃಷಿ ಸಹಾಯಕ. ಇಂಗ್ಲಿಷ್ ಅಥವಾ ಕನ್ನಡದಲ್ಲಿ ಏನ್ನಾದರೂ ಕೇಳಿ!',
+            greeting: 'ನಮಸ್ಕಾರ! ನಾನು ಅಗ್ರಿ-ಬಡ್ಡಿ (Agri-Buddy), ನಿಮ್ಮ AI ಕೃಷಿ ಸಹಾಯಕ. ಇಂಗ್ಲಿಷ್ ಅಥವಾ ಕನ್ನಡದಲ್ಲಿ ಏನ್ನಾದರೂ ಕೇಳಿ!',
             fallbacks: [
                 "ಕ್ಷಮಿಸಿ, ಆ ವಿಷಯದ ಬಗ್ಗೆ ನನಗೆ ಇನ್ನೂ ತಿಳಿದಿಲ್ಲ. ಗೋಧಿ/ಭತ್ತ ಅಥವಾ ರೋಗಗಳ ಬಗ್ಗೆ ಕೇಳಲು ಪ್ರಯತ್ನಿಸಿ.",
                 "ನಾನು ಇನ್ನೂ ಕಲಿಯುತ್ತಿದ್ದೇನೆ! ಬೆಳೆಗಳು, ರಸಗೊಬ್ಬರಗಳು ಮತ್ತು ರೋಗಗಳ ಬಗ್ಗೆ ನಾನು ಉತ್ತಮವಾಗಿ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ.",
