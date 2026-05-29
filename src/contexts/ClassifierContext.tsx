@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as tmImage from '@teachablemachine/image';
@@ -27,9 +27,9 @@ interface ClassifierContextProps {
 const ClassifierContext = createContext<ClassifierContextProps | undefined>(undefined);
 
 const CROP_MODELS: Record<CropType, string> = {
-    tomato: 'https://teachablemachine.withgoogle.com/models/2vRwO2g0X/',
-    corn: 'https://teachablemachine.withgoogle.com/models/ICOh_TngP/',
-    chilli: 'https://teachablemachine.withgoogle.com/models/9ueDCD3gc/'
+    tomato: 'https://teachablemachine.withgoogle.com/models/FO53wg6gQO/',
+    corn: 'https://teachablemachine.withgoogle.com/models/FO53wg6gQO/',
+    chilli: 'https://teachablemachine.withgoogle.com/models/FO53wg6gQO/'
 };
 
 // Global singletons to persist loaded models across re-renders
@@ -166,10 +166,10 @@ export function ClassifierProvider({ children }: { children: React.ReactNode }) 
                 (p.probability > 0.65 || !hasPlantKeyword)
             );
 
-            const isTMConfident = customPredictions && customPredictions.length > 0 && (
+            const isTMConfident = !!(customPredictions && customPredictions.length > 0 && (
                 customPredictions[0].probability > 0.75 ||
                 (customPredictions[0].probability > 0.35 && hasPlantKeyword)
-            );
+            ));
 
             const isPlant = (!isArtificial && hasPlantKeyword && !hasRejectKeyword) || 
                             (!isArtificial && isTMConfident && !hasRejectKeyword);

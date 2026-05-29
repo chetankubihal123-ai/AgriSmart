@@ -14,9 +14,6 @@ import { DiseaseDetection } from './components/DiseaseDetection';
 import { LandAnalysis } from './components/LandAnalysis';
 import { Shop } from './pages/Shop';
 import { SchemesFinder } from './components/SchemesFinder';
-import { useState, useEffect, useContext, createContext } from 'react';
-import { supabase } from './lib/supabase';
-import { Farm } from './lib/types';
 import { LandingPage } from './pages/LandingPage';
 import { MarketRates } from './pages/MarketRates';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -64,7 +61,7 @@ function DiseaseDetectionWrapper() {
 
 function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const { role } = useRole();
+  useRole();
   const location = useLocation();
 
   if (user) {

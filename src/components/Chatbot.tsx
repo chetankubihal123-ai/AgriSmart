@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, X, MessageSquare, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { Send, Bot, X, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { findBestMatch } from '../lib/knowledgeBase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { askGeminiText } from '../lib/gemini';

@@ -7,13 +7,9 @@ import {
   Wind,
   Sun,
   CloudRain,
-  AlertTriangle,
-  ArrowRight,
   MapPin,
   Search,
   Loader2,
-  Thermometer,
-  Tractor,
   Zap,
   Waves,
   ShieldCheck,
@@ -59,7 +55,6 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
 
   // Search & Autocomplete State
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<LocationResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -182,7 +177,6 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
     if (value.trim().length > 2) {
-      setIsSearching(true);
       searchTimeoutRef.current = setTimeout(async () => {
         try {
           const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(value)}&count=5&language=en&format=json`);
@@ -191,14 +185,11 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
           setShowSuggestions(true);
         } catch (error) {
           console.error('Autocomplete error:', error);
-        } finally {
-          setIsSearching(false);
         }
       }, 300);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
-      setIsSearching(false);
     }
   };
 
@@ -210,7 +201,6 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
 
   const handleSearchLocation = async (query: string) => {
     if (!query.trim()) return;
-    setIsSearching(true);
     try {
       const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
       const data = await response.json();
@@ -227,14 +217,12 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
       console.error('Geocoding error:', error);
       alert(t('weather.failedToFind'));
     } finally {
-      setIsSearching(false);
       setShowSuggestions(false);
     }
   };
 
   const handleCurrentLocation = () => {
     if ('geolocation' in navigator) {
-      setIsSearching(true);
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
@@ -243,7 +231,6 @@ export function WeatherImpact({ farm }: WeatherImpactProps) {
         (error) => {
           console.error('Geolocation error:', error);
           alert(t('weather.unableToRetrieve'));
-          setIsSearching(false);
         }
       );
     } else {

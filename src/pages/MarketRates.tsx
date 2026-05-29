@@ -25,17 +25,6 @@ interface Commodity {
   isFlashing?: 'up' | 'down' | null;
 }
 
-const BASE_CROPS = [
-  { id: 'chilli', name: 'Red Chilli (Teja)', basePrice: 22500, unit: 'Quintal', quality: 'Premium' as const },
-  { id: 'corn', name: 'Maize / Corn', basePrice: 2450, unit: 'Quintal', quality: 'Standard' as const },
-  { id: 'tomato', name: 'Tomato (Local)', basePrice: 1800, unit: 'Quintal', quality: 'Fair' as const },
-  { id: 'soybean', name: 'Soybean (Yellow)', basePrice: 4850, unit: 'Quintal', quality: 'Premium' as const },
-  { id: 'wheat', name: 'Wheat (Lokwan)', basePrice: 2850, unit: 'Quintal', quality: 'Standard' as const },
-  { id: 'cotton', name: 'Cotton (BT)', basePrice: 7200, unit: 'Quintal', quality: 'Premium' as const }
-];
-
-const DEFAULT_MARKETS = ['Guntur APMC', 'Nizamabad APMC', 'Kolar APMC', 'Latur Mandi', 'Sehore APMC', 'Khammam Mandi'];
-
 const FALLBACK_COMMODITIES: Commodity[] = [
   {
     id: 'fallback-1',
@@ -145,6 +134,36 @@ export function MarketRates() {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Helper to dynamically get the immediate market display name based on user typing
+  const displayMarket = (itemMarket: string) => {
+    const queryRaw = searchQuery.trim();
+    if (queryRaw.length >= 1) {
+      const query = queryRaw.split(',')[0].trim();
+      if (!query) return itemMarket;
+      
+      const capitalized = query.charAt(0).toUpperCase() + query.slice(1);
+      
+      // If the item market already includes the query, let it be (e.g., from API records)
+      if (itemMarket.toLowerCase().includes(query.toLowerCase())) {
+        return itemMarket;
+      }
+      
+      // Extract state from search query, defaulting strictly to 'Karnataka'
+      const stateMatch = queryRaw.includes(',') ? queryRaw.split(',')[1].trim() : '';
+      const stateCapitalized = stateMatch 
+        ? stateMatch.charAt(0).toUpperCase() + stateMatch.slice(1)
+        : 'Karnataka';
+      
+      let suffix = 'APMC';
+      if (itemMarket.toLowerCase().includes('mandi')) {
+        suffix = 'Mandi';
+      }
+      
+      return `${capitalized} ${suffix}, ${stateCapitalized}`;
+    }
+    return itemMarket;
+  };
+
   const selectedCommodity = useMemo(() => 
     commodities.find(c => c.id === selectedCropId),
     [selectedCropId, commodities]
@@ -156,11 +175,9 @@ export function MarketRates() {
     
     const base = selectedCommodity.currentPrice;
     const points: any[] = [];
-    const isForecast = timeRange === '3F';
-    const count = isForecast ? 90 : (timeRange === '1D' ? 24 : timeRange === '1M' ? 30 : 12);
     
     // Seeded random for consistency
-    let seed = stringHash(selectedCommodity.id + (isForecast ? '1Y' : timeRange));
+    let seed = stringHash(selectedCommodity.id + timeRange);
     const rnd = () => {
         seed = (seed * 9301 + 49297) % 233280;
         return seed / 233280;
@@ -612,7 +629,7 @@ export function MarketRates() {
                  <h2 className="text-5xl font-black text-white mb-2 leading-tight">{selectedCommodity.name}</h2>
                   <p className="text-white/60 font-bold mb-8 flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-prodmast-accent" />
-                    {selectedCommodity.market} • {selectedCommodity.quality} Quality
+                    {displayMarket(selectedCommodity.market)} • {selectedCommodity.quality} Quality
                   </p>
 
                   <div className="grid grid-cols-2 gap-4 mb-8">
@@ -626,7 +643,7 @@ export function MarketRates() {
                     </div>
                     <div className="col-span-2 bg-gradient-to-br from-white/10 to-transparent rounded-2xl p-5 border border-white/10 flex justify-between items-center relative overflow-hidden group">
                        <div className="relative z-10">
-                          <p className="text-white/40 text-[10px] font-black uppercase tracking-tighter mb-1">{timeRange === '3F' ? 'Predicted Growth' : `${t('market.change')} (${timeRange})`}</p>
+                          <p className="text-white/40 text-[10px] font-black uppercase tracking-tighter mb-1">{`${t('market.change')} (${timeRange})`}</p>
                           <p className={`text-3xl font-black ${stats.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                              {stats.change >= 0 ? '+' : '-'}{'₹'}{Math.abs(stats.change).toLocaleString()}
                           </p>
@@ -764,7 +781,7 @@ export function MarketRates() {
                    <h3 className="text-2xl font-extrabold text-prodmast-dark tracking-tight mb-2 group-hover:text-prodmast-primary transition-colors">{item.name}</h3>
                    <div className="flex items-center gap-2 text-sm font-bold text-gray-500 uppercase tracking-wider">
                      <MapPin className="w-4 h-4 text-prodmast-primary" />
-                     {item.market}
+                     {displayMarket(item.market)}
                    </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${

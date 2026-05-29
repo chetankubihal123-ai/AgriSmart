@@ -19,6 +19,7 @@
     "@capacitor/android": "^8.3.3",
     "@capacitor/cli": "^7.6.4",
     "@capacitor/core": "^8.3.3",
+    "@emailjs/browser": "^4.4.1",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.57.4",
     "@teachablemachine/image": "^0.8.5",

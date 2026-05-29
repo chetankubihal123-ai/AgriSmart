@@ -7,16 +7,14 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export function DiseaseScanner() {
   const [selectedCrop, setSelectedCrop] = useState<CropType>('tomato');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ disease: string; confidence: number; raw_class: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [displayConfidence, setDisplayConfidence] = useState(0);
-  const [validating, setValidating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { classifyImage, classifyAll, isCustomModelLoaded, initializeModels } = useImageClassifier();
-  const { t, language } = useLanguage();
+  const { classifyImage, isCustomModelLoaded, initializeModels } = useImageClassifier();
+  const { language } = useLanguage();
   const isOnline = useOnlineStatus();
 
   useEffect(() => {
@@ -48,7 +46,6 @@ export function DiseaseScanner() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setResult(null);
@@ -58,7 +55,6 @@ export function DiseaseScanner() {
   };
 
   const clearSelection = () => {
-    setSelectedFile(null);
     setPreviewUrl(null);
     setResult(null);
     setError(null);

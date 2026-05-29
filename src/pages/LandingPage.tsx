@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 
 export function LandingPage() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    useAuth();
     const { t } = useLanguage();
 
     // Splash Screen State

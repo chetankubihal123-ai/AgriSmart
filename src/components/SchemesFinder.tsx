@@ -204,18 +204,7 @@ export function SchemesFinder() {
               onClick={() => setSelectedScheme(scheme)}
               className="group cursor-pointer bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-500 flex flex-col relative overflow-hidden"
             >
-               {/* Match Score Indicator */}
-               <div className="absolute top-0 right-0 p-8 text-right">
-                  <div className="inline-block bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3">
-                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{t('schemes.matchScore')}</p>
-                     <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                        <span className="text-xl font-black text-indigo-900">{scheme.matchScore}%</span>
-                     </div>
-                  </div>
-               </div>
-
-               <div className="flex items-start gap-6 mb-8 pr-24">
+               <div className="flex items-start gap-6 mb-8">
                   <div className={`w-16 h-16 rounded-[14px] flex items-center justify-center shrink-0 border transition-all duration-500 ${scheme.category === 'Financial' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : scheme.category === 'Water' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                     <Building2 className="w-8 h-8" />
                   </div>
