@@ -126,62 +126,92 @@ const DISEASE_GUIDE: Record<string, { title: string, status: 'Healthy' | 'Warnin
 
 const ensureLesions = (
   _status: 'Healthy' | 'Warning' | 'Critical',
-  existingLesions: { box: number[], type: string }[] | undefined,
+  existingLesions: any[] | undefined,
   box: { ymin: number, xmin: number, ymax: number, xmax: number } | null,
   healthScore: number
 ) => {
-  if (healthScore === 100 && (!existingLesions || existingLesions.length === 0)) return [];
+  if (healthScore >= 98 && (!existingLesions || existingLesions.length === 0)) return [];
 
-  // If Gemini returned exact spot coordinates, use them directly!
-  if (existingLesions && existingLesions.length > 0) {
-    return existingLesions.map(l => ({
-      box: Array.isArray(l.box) ? l.box : [450, 480, 490, 520],
-      type: l.type || 'Affected Spot'
-    }));
+  if (existingLesions && Array.isArray(existingLesions) && existingLesions.length > 0) {
+    const parsed = existingLesions.map(l => {
+      let b: number[] | null = null;
+      let type = 'Affected Area';
+      if (Array.isArray(l) && l.length === 4) {
+        b = l;
+      } else if (l && Array.isArray(l.box) && l.box.length === 4) {
+        b = l.box;
+        type = l.type || 'Affected Area';
+      }
+      if (b) {
+        const ymin = Math.max(0, Math.min(980, Number(b[0]) || 0));
+        const xmin = Math.max(0, Math.min(980, Number(b[1]) || 0));
+        const ymax = Math.max(ymin + 20, Math.min(1000, Number(b[2]) || ymin + 150));
+        const xmax = Math.max(xmin + 20, Math.min(1000, Number(b[3]) || xmin + 150));
+        return {
+          box: [ymin, xmin, ymax, xmax],
+          type
+        };
+      }
+      return null;
+    }).filter(Boolean) as { box: number[], type: string }[];
+
+    if (parsed.length > 0) return parsed;
   }
 
-  const b = box || { ymin: 250, xmin: 300, ymax: 750, xmax: 700 };
+  // Fallback: If diseased but no coordinates provided, place an affected region in the leaf area
+  const b = box || { ymin: 250, xmin: 250, ymax: 750, xmax: 750 };
   const height = b.ymax - b.ymin;
   const width = b.xmax - b.xmin;
 
-  if (healthScore >= 90) {
-    // Highly precise tiny spot highlight for mild infections (5-10% affected area)
-    return [
-      {
-        box: [
-          b.ymin + height * 0.35,
-          b.xmin + width * 0.45,
-          b.ymin + height * 0.43,
-          b.xmin + width * 0.53
-        ],
-        type: 'Affected Spot'
-      }
-    ];
-  } else {
-    // Multi-spot high-precision highlights for moderate/severe infections
-    return [
-      {
-        box: [
-          b.ymin + height * 0.25,
-          b.xmin + width * 0.35,
-          b.ymin + height * 0.38,
-          b.xmin + width * 0.48
-        ],
-        type: 'Affected Spot'
-      },
-      {
-        box: [
-          b.ymin + height * 0.55,
-          b.xmin + width * 0.48,
-          b.ymin + height * 0.68,
-          b.xmin + width * 0.6
-        ],
-        type: 'Diseased Spot'
-      }
-    ];
-  }
+  return [
+    {
+      box: [
+        Math.round(b.ymin + height * 0.2),
+        Math.round(b.xmin + width * 0.2),
+        Math.round(b.ymin + height * 0.75),
+        Math.round(b.xmin + width * 0.75)
+      ],
+      type: 'Affected Area'
+    }
+  ];
 };
 
+
+// Fast client-side image compression for rapid AI transmission (reduces 15MB to ~80KB)
+function compressImageForAI(dataUrl: string, maxDim: number = 800): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const width = img.width;
+      const height = img.height;
+      if (width <= maxDim && height <= maxDim) {
+        resolve(dataUrl);
+        return;
+      }
+      let newW = width;
+      let newH = height;
+      if (width > height) {
+        newW = maxDim;
+        newH = Math.round((height * maxDim) / width);
+      } else {
+        newH = maxDim;
+        newW = Math.round((width * maxDim) / height);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = newW;
+      canvas.height = newH;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, newW, newH);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
 export function CropHealth(_props: CropHealthProps) {
   const { t, language } = useLanguage();
@@ -443,6 +473,9 @@ export function CropHealth(_props: CropHealthProps) {
   const [polygon, setPolygon] = useState<[number, number][] | null>(null);
   const [validating, setValidating] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+  const pendingAnalysisPromiseRef = useRef<Promise<any> | null>(null);
+  const preloadedAnalysisRef = useRef<any | null>(null);
+  const preloadedImageRef = useRef<string | null>(null);
 
   const { classifyImage, initializeModels } = useImageClassifier();
 
@@ -488,110 +521,82 @@ export function CropHealth(_props: CropHealthProps) {
       setClassificationError(null);
       setBoundingBox(null);
       setPolygon(null);
+      preloadedAnalysisRef.current = null;
+      preloadedImageRef.current = null;
 
       setValidating(true);
-      // 1. Identify & Validate Crop
       try {
-        const tempImg = new Image();
-        tempImg.src = dataUrl;
-        await new Promise((resolve) => {
-          tempImg.onload = resolve;
-        });
+        // Fast client-side downscale (~40KB) for instant AI identification
+        const compressedUrl = await compressImageForAI(dataUrl, 640);
+        preloadedImageRef.current = compressedUrl;
 
-        // Always run the local classifier first to get domain-expert confidence
-        const localCheck = await classifyImage(tempImg, selectedCrop);
-        
-        let isValid = localCheck.isPlant;
+        // Start pathology analysis concurrently so results are ready by the time user clicks Analyze
+        if (isOnline) {
+          pendingAnalysisPromiseRef.current = analyzeDetailedPlantHealth(compressedUrl, selectedCrop as CropType, language)
+            .then(res => {
+              preloadedAnalysisRef.current = res;
+              return res;
+            })
+            .catch(err => {
+              console.warn("Background pathology preload:", err);
+              return null;
+            });
+        }
+
+        let isValid = false;
         let isAmbiguous = false;
         let categoryDetected = selectedCrop;
-        let confidenceScore = localCheck.isPlant ? 95 : 0;
-        let validationReason = localCheck.isPlant
-          ? (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ. ವಿಶ್ಲೇಷಣೆ ಮುಂದುವರಿಸಬಹುದು.' : 'Crop detected. Ready for detailed analysis.')
-          : (language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ.' : 'No crop detected in this image.');
+        let confidenceScore = 0;
+        let validationReason = '';
 
         if (isOnline) {
           try {
-            const geminiCheck = await identifyCropType(dataUrl, language);
+            const geminiCheck = await identifyCropType(compressedUrl, language);
             if (geminiCheck) {
               if (geminiCheck.category !== 'invalid') {
-                // Gemini confirmed it's valid!
                 isValid = true;
-                isAmbiguous = false;
-                confidenceScore = geminiCheck.confidence;
+                confidenceScore = geminiCheck.confidence || 95;
                 validationReason = geminiCheck.reason;
                 if (['tomato', 'corn', 'chilli'].includes(geminiCheck.category)) {
                   categoryDetected = geminiCheck.category as CropType;
                   setSelectedCrop(categoryDetected);
                 }
               } else {
-                // Gemini says invalid. Is it a real explicit rejection, or just a service fallback?
-                if (geminiCheck.confidence > 0) {
-                  // Explicit rejection by Gemini
-                  if (localCheck.isPlant) {
-                    // Local check says yes! Override Gemini as warning/ambiguous
-                    isValid = true;
-                    isAmbiguous = true;
-                    confidenceScore = 80;
-                    validationReason = language === 'kn' 
-                      ? 'ಸ್ಥಳೀಯ ಪರಿಶೀಲನೆಯು ಬೆಳೆಯನ್ನು ಪತ್ತೆಹಚ್ಚಿದೆ.' 
-                      : 'Crop detected via local model (Gemini was uncertain).';
-                  } else {
-                    // Both agree or local check is uncertain
-                    isValid = false;
-                    isAmbiguous = false;
-                    confidenceScore = geminiCheck.confidence;
-                    validationReason = geminiCheck.reason;
-                  }
-                } else {
-                  // Gemini service failed (confidence === 0). Fall back to local check.
-                  if (localCheck.isPlant) {
-                    isValid = true;
-                    isAmbiguous = false;
-                    confidenceScore = 90;
-                    validationReason = language === 'kn'
-                      ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ (ಸ್ಥಳೀಯ ವಿಶ್ಲೇಷಣೆ).'
-                      : 'Crop detected successfully via local classifier.';
-                  } else {
-                    // Both are uncertain/failed. Treat as Ambiguous/Warning instead of Blocked!
-                    isValid = true;
-                    isAmbiguous = true;
-                    confidenceScore = 50;
-                    validationReason = language === 'kn'
-                      ? 'ಬೆಳೆಯನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ನೀವು ವಿಶ್ಲೇಷಣೆಯನ್ನು ಪ್ರಾರಂಭಿಸಬಹುದು.'
-                      : 'Unable to fully verify crop. You can still proceed with analysis.';
-                  }
-                }
+                isValid = false;
+                confidenceScore = geminiCheck.confidence || 99;
+                validationReason = geminiCheck.reason || (
+                  language === 'kn' 
+                    ? 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಅಥವಾ ಸಸ್ಯ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಕೇವಲ ಬೆಳೆಯ ಎಲೆಯ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
+                    : 'No crop or plant detected in this image. Please upload a clear photo of an agricultural crop or leaf.'
+                );
+                // Invalidate preloaded analysis if non-plant
+                preloadedAnalysisRef.current = null;
+                pendingAnalysisPromiseRef.current = null;
               }
             }
           } catch (geminiErr) {
-            console.warn("Gemini validation failed, falling back to local model:", geminiErr);
-            if (localCheck.isPlant) {
-              isValid = true;
-              isAmbiguous = false;
-            } else {
-              // Treat as warning instead of hard block
-              isValid = true;
-              isAmbiguous = true;
-              confidenceScore = 50;
-              validationReason = language === 'kn'
-                ? 'ಚಿತ್ರವನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆದರೆ ವಿಶ್ಲೇಷಣೆ ಪ್ರಾರಂಭಿಸಬಹುದು.'
-                : 'Validation offline and inconclusive. You can still try starting the analysis.';
-            }
+            console.warn("Gemini validation failed, using fallback:", geminiErr);
+            const tempImg = new Image();
+            tempImg.src = compressedUrl;
+            await new Promise((r) => { tempImg.onload = r; });
+            const localCheck = await classifyImage(tempImg, selectedCrop);
+            isValid = localCheck.isPlant;
+            confidenceScore = localCheck.isPlant ? 75 : 0;
+            validationReason = localCheck.isPlant
+              ? (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ.' : 'Crop detected.')
+              : (language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ.' : 'No crop detected.');
           }
         } else {
           // Offline mode
-          if (localCheck.isPlant) {
-            isValid = true;
-            isAmbiguous = false;
-          } else {
-            // Treat as warning instead of hard block
-            isValid = true;
-            isAmbiguous = true;
-            confidenceScore = 50;
-            validationReason = language === 'kn'
-              ? 'ಚಿತ್ರವನ್ನು ಖಚಿತಪಡಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆದರೆ ವಿಶ್ಲೇಷಣೆ ಪ್ರಾರಂಭಿಸಬಹುದು.'
-              : 'Validation offline and inconclusive. You can still try starting the analysis.';
-          }
+          const tempImg = new Image();
+          tempImg.src = compressedUrl;
+          await new Promise((r) => { tempImg.onload = r; });
+          const localCheck = await classifyImage(tempImg, selectedCrop);
+          isValid = localCheck.isPlant;
+          confidenceScore = localCheck.isPlant ? 75 : 0;
+          validationReason = localCheck.isPlant
+            ? (language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ (ಆಫ್‌ಲೈನ್).' : 'Crop detected (Offline).')
+            : (language === 'kn' ? 'ಯಾವುದೇ ಬೆಳೆ ಪತ್ತೆಯಾಗಿಲ್ಲ.' : 'No crop detected.');
         }
 
         setValidationResult({
@@ -600,20 +605,6 @@ export function CropHealth(_props: CropHealthProps) {
           confidence: confidenceScore,
           reason: validationReason
         });
-
-        if (!isValid) {
-          setIsCropping(false);
-          return;
-        }
-
-        // 2. Run cutout analysis in parallel only if valid
-        const [boxResult, polyResult] = await Promise.all([
-          detectPlantBoundingBox(dataUrl),
-          detectPlantPolygon(dataUrl, categoryDetected)
-        ]);
-
-        if (polyResult && polyResult.polygon) setPolygon(polyResult.polygon);
-        if (boxResult) setBoundingBox(boxResult);
       } catch (err) {
         console.warn("Processing failed:", err);
       } finally {
@@ -631,236 +622,100 @@ export function CropHealth(_props: CropHealthProps) {
     setClassificationError(null);
 
     try {
-      const imageToAnalyze = selectedImage;
+      const imageToAnalyze = preloadedImageRef.current || await compressImageForAI(selectedImage, 640);
 
-      // Artificial 3-second delay for professional "scanning" feel as requested
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // 1. Run BOTH Teachable Machine classifier and Gemini Detailed Analysis in parallel for extreme calibration accuracy!
-      const [tmResult, detailedResult] = await Promise.all([
-        classifyImage(imageRef.current!, selectedCrop),
-        analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop as CropType, language).catch(err => {
-          console.warn("Gemini detailed analysis failed in parallel: ", err);
+      // Check if preloaded result is ready, or await the pending promise
+      let detailedResult = preloadedAnalysisRef.current;
+      if (!detailedResult && pendingAnalysisPromiseRef.current) {
+        detailedResult = await pendingAnalysisPromiseRef.current;
+      }
+      if (!detailedResult && isOnline) {
+        detailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop as CropType, language).catch(err => {
+          console.warn("Gemini detailed analysis fallback: ", err);
           return null;
-        })
-      ]);
+        });
+      }
 
-      const { customPredictions, error: localError } = tmResult;
+      if (detailedResult) {
+        const geminiScore = detailedResult.healthScore !== undefined ? detailedResult.healthScore : 100;
+        const geminiDiagName = detailedResult.topDiagnosis?.name || "";
+        const isHealthy = !geminiDiagName || 
+                          geminiDiagName.toLowerCase().includes('healthy') || 
+                          geminiScore >= 90;
 
-      if (!localError && customPredictions && customPredictions.length > 0) {
-        // Find the "Healthy" prediction explicitly
-        const healthyPred = customPredictions.find(p => p.className.toLowerCase() === 'healthy');
-        const healthyProb = healthyPred ? healthyPred.probability : 0;
-
-        // Find all disease predictions (everything other than healthy)
-        const diseasePredictions = customPredictions.filter(p => p.className.toLowerCase() !== 'healthy');
-        diseasePredictions.sort((a, b) => b.probability - a.probability);
-
-        const topDisease = diseasePredictions.length > 0 ? diseasePredictions[0] : null;
-
-        // Determine if healthy has higher probability than any disease locally
-        let isHealthy = healthyProb >= (topDisease ? topDisease.probability : 0);
-        let diseaseName = topDisease ? topDisease.className : "";
-        let tmUnhealthyPercent = topDisease ? Math.round(topDisease.probability * 100) : 0;
-
-        // Calibration & Accuracy Layer
-        let finalHealthScore = 100;
-        let finalStatus: 'Healthy' | 'Warning' | 'Critical' = 'Healthy';
-        let resolvedLesions: any[] = [];
-
-        if (detailedResult) {
-          const geminiScore = detailedResult.healthScore !== undefined ? detailedResult.healthScore : 100;
-          const geminiDiagName = detailedResult.topDiagnosis?.name || "";
-          
-          const geminiIsHealthy = !geminiDiagName || 
-                                  geminiDiagName.toLowerCase().includes('healthy') || 
-                                  geminiScore >= 90;
-
-          if (geminiIsHealthy && isHealthy) {
-            // Both agree perfectly healthy
-            finalStatus = 'Healthy';
-            finalHealthScore = 100;
-          } else if (geminiIsHealthy && !isHealthy) {
-            // Local model is overconfident on a minor/healthy spot. Calibrate to mild warning with accurate visual score!
-            finalStatus = 'Warning';
-            finalHealthScore = Math.max(85, geminiScore);
-          } else {
-            // Truly diseased crop!
-            finalStatus = detailedResult.topDiagnosis?.severity === 'High' ? 'Critical' : 'Warning';
-            // Use Gemini's accurate health score directly instead of hardcoding 10 or 20!
-            finalHealthScore = geminiScore;
-          }
-          
-          resolvedLesions = ensureLesions(finalStatus, detailedResult.lesions, boundingBox, finalHealthScore);
-          if (finalStatus !== 'Healthy' && !diseaseName) {
-            diseaseName = geminiDiagName;
-          }
-        } else {
-          // Offline / Fallback Calibration
-          if (isHealthy) {
-            finalStatus = 'Healthy';
-            finalHealthScore = 100;
-          } else {
-            finalStatus = tmUnhealthyPercent > 50 ? 'Critical' : 'Warning';
-            // Use dynamic score based on the local model's confidence!
-            finalHealthScore = Math.max(5, Math.round(100 - tmUnhealthyPercent));
-          }
-          resolvedLesions = ensureLesions(finalStatus, undefined, boundingBox, finalHealthScore);
-        }
-
-        // Customize recommendations based on predicted disease
-        let recs = ['Isolate affected plants', 'Monitor spreading', 'Apply organic treatment'];
-        if (diseaseName) {
-          if (diseaseName.toLowerCase().includes('rust')) {
-            recs = ['Apply copper-based fungicide', 'Remove infected leaves immediately', 'Improve air circulation'];
-          } else if (diseaseName.toLowerCase().includes('mold')) {
-            recs = ['Reduce humidity around plants', 'Increase plant spacing', 'Apply neem oil spray'];
-          } else if (diseaseName.toLowerCase().includes('spot')) {
-            recs = ['Avoid overhead watering', 'Prune lower diseased foliage', 'Rotate crops next season'];
-          }
-        }
+        const finalStatus = isHealthy ? 'Healthy' : (detailedResult.topDiagnosis?.severity === 'High' ? 'Critical' : 'Warning');
+        const finalHealthScore = isHealthy ? 100 : geminiScore;
+        const diseaseName = isHealthy 
+          ? (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಬೆಳೆ' : 'Healthy Plant') 
+          : (geminiDiagName || 'Crop Infection');
+        const resolvedLesions = ensureLesions(finalStatus, detailedResult.lesions, boundingBox, finalHealthScore);
 
         setResult({
           status: finalStatus,
-          disease: finalStatus === 'Healthy' ? 'HEALTHY CROP' : diseaseName.toUpperCase().replace('SPECTORIAL', 'SEPTORIA'),
-          confidence: finalStatus === 'Healthy' ? 100 : (100 - finalHealthScore), // % of unhealthy/affected area
-          recommendations: detailedResult?.treatment?.conventional || recs,
-          healthScore: finalHealthScore, // % of healthy
-          growthStage: detailedResult?.growthStage || "Unknown",
-          stressIndicators: detailedResult?.stressIndicators || [],
-          alternatives: detailedResult?.alternatives || [],
+          disease: diseaseName,
+          confidence: isHealthy ? 100 : Math.max(70, Math.round(detailedResult.topDiagnosis?.confidence || (100 - finalHealthScore))),
+          recommendations: detailedResult.treatment?.conventional || ['Isolate affected plants', 'Monitor spreading', 'Apply organic treatment'],
+          healthScore: finalHealthScore,
+          growthStage: detailedResult.growthStage || "Vegetative",
+          stressIndicators: detailedResult.stressIndicators || [],
+          alternatives: detailedResult.alternatives || [],
           lesions: resolvedLesions,
-          causes: detailedResult?.causes || "N/A",
-          spread: detailedResult?.spread || "N/A",
-          treatment: detailedResult?.treatment || {
-            conventional: recs,
-            biological: [],
-            prevention: []
+          causes: detailedResult.causes || "Foliage pathogen activity identified on leaf cells.",
+          spread: detailedResult.spread || "Spreads through airborne fungal spores and water droplets.",
+          treatment: detailedResult.treatment || {
+            conventional: ['Apply targeted fungicide as directed'],
+            biological: ['Use organic neem oil spray'],
+            prevention: ['Avoid overhead watering', 'Space plants for airflow']
           }
         });
         setAnalyzing(false);
         return;
       }
 
-      // Use Detailed Analysis directly (Fallback)
-      const fallbackDetailedResult = await analyzeDetailedPlantHealth(imageToAnalyze, selectedCrop as CropType, language);
+      // Local Fallback if offline or Gemini fails
+      const tmResult = await classifyImage(imageRef.current!, selectedCrop);
+      const { customPredictions, error: localError } = tmResult;
 
-      if (fallbackDetailedResult) {
-        const topDiagName = fallbackDetailedResult.topDiagnosis?.name || "";
-        const isHealthy = !topDiagName || 
-                          topDiagName.toLowerCase().includes('healthy') ||
-                          (fallbackDetailedResult.healthScore !== undefined && fallbackDetailedResult.healthScore >= 90);
-        
-        const status = isHealthy ? 'Healthy' : (fallbackDetailedResult.topDiagnosis?.severity === 'High' ? 'Critical' : 'Warning');
-        const score = fallbackDetailedResult.healthScore !== undefined 
-          ? fallbackDetailedResult.healthScore 
-          : (status === 'Healthy' ? 100 : (status === 'Warning' ? 60 : 30));
-        const resolvedLesions = ensureLesions(status, fallbackDetailedResult.lesions, boundingBox, score);
+      if (!localError && customPredictions && customPredictions.length > 0) {
+        const healthyPred = customPredictions.find(p => p.className.toLowerCase() === 'healthy');
+        const healthyProb = healthyPred ? healthyPred.probability : 0;
+        const diseasePredictions = customPredictions.filter(p => p.className.toLowerCase() !== 'healthy');
+        diseasePredictions.sort((a, b) => b.probability - a.probability);
+        const topDisease = diseasePredictions.length > 0 ? diseasePredictions[0] : null;
+
+        const isHealthy = healthyProb >= (topDisease ? topDisease.probability : 0);
+        const diseaseName = topDisease ? topDisease.className.replace(/_/g, ' ') : "Healthy Plant";
+        const tmUnhealthyPercent = topDisease ? Math.round(topDisease.probability * 100) : 0;
+        const finalStatus = isHealthy ? 'Healthy' : (tmUnhealthyPercent > 50 ? 'Critical' : 'Warning');
+        const finalHealthScore = isHealthy ? 100 : Math.max(5, Math.round(100 - tmUnhealthyPercent));
+        const resolvedLesions = ensureLesions(finalStatus, undefined, boundingBox, finalHealthScore);
 
         setResult({
-          status: status,
-          disease: topDiagName || "Unknown Disease",
-          confidence: fallbackDetailedResult.topDiagnosis?.confidence || 0,
-          recommendations: fallbackDetailedResult.treatment?.conventional || ["No recommendations found"],
-          healthScore: score,
-          growthStage: fallbackDetailedResult.growthStage || "Unknown",
-          stressIndicators: fallbackDetailedResult.stressIndicators || [],
-          alternatives: fallbackDetailedResult.alternatives || [],
+          status: finalStatus,
+          disease: isHealthy ? (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಬೆಳೆ' : 'HEALTHY CROP') : diseaseName.toUpperCase(),
+          confidence: isHealthy ? 100 : tmUnhealthyPercent,
+          recommendations: ['Isolate affected plants', 'Monitor spreading', 'Apply treatment'],
+          healthScore: finalHealthScore,
+          growthStage: "Vegetative",
+          stressIndicators: [],
+          alternatives: [],
           lesions: resolvedLesions,
-          causes: fallbackDetailedResult.causes || "N/A",
-          spread: fallbackDetailedResult.spread || "N/A",
-          treatment: fallbackDetailedResult.treatment
+          causes: "Identified via offline agricultural classification model.",
+          spread: "Spread through environmental conditions.",
+          treatment: {
+            conventional: ['Apply standard fungicide if symptoms expand'],
+            biological: ['Apply neem oil spray'],
+            prevention: ['Ensure clean culture and airflow']
+          }
         });
         setAnalyzing(false);
         return;
       }
 
-      // 2. Gemini Analysis with Fallback (Legacy Fallback)
-      try {
-        const geminiResult = await analyzeImageWithGemini(imageToAnalyze, selectedCrop, language);
-        if (geminiResult) {
-          const status = geminiResult.status || 'Warning';
-          const score = geminiResult.healthScore !== undefined 
-            ? geminiResult.healthScore 
-            : (status === 'Healthy' ? 100 : Math.max(5, 100 - (geminiResult.confidence || 80)));
-          const resolvedLesions = ensureLesions(status as any, undefined, boundingBox, score);
-          setResult({
-            status: status as any,
-            disease: geminiResult.disease,
-            confidence: geminiResult.confidence,
-            recommendations: geminiResult.treatment,
-            healthScore: score,
-            lesions: resolvedLesions,
-            treatment: {
-              conventional: geminiResult.treatment || [],
-              biological: [],
-              prevention: []
-            }
-          });
-          setAnalyzing(false);
-          return;
-        }
-      } catch (geminiError) {
-        console.error("Gemini failed, using local custom model:", geminiError);
-      }
-
-      // Use Teachable Machine model for the selected crop
-      const { customPredictions: fallbackPredictions, error: fallbackError } = await classifyImage(imageRef.current!, selectedCrop);
-
-      if (!fallbackError && fallbackPredictions && fallbackPredictions.length > 0) {
-        const top = fallbackPredictions[0];
-        // Find original key like "Tomato_Late_blight"
-        const dbKey = top.className;
-        const dbEntry = (DISEASE_GUIDE as any)[dbKey];
-
-        if (dbEntry) {
-          const status = dbEntry.status;
-          const score = status === 'Healthy' ? 100 : Math.max(5, Math.round(100 - (top.probability * 100)));
-          const resolvedLesions = ensureLesions(status, undefined, boundingBox, score);
-          setResult({
-            status: status,
-            disease: dbEntry.title.toUpperCase(),
-            confidence: Math.round(top.probability * 100),
-            recommendations: dbEntry.recs,
-            healthScore: score,
-            lesions: resolvedLesions,
-            treatment: {
-              conventional: dbEntry.recs,
-              biological: [],
-              prevention: []
-            }
-          });
-        } else {
-          // Fallback for names not in DB
-          const cleanName = top.className
-            .replace(new RegExp(`^${selectedCrop}_`, 'i'), '')
-            .replace(/_/g, ' ')
-            .trim();
-
-          const status = top.probability > 0.8 ? 'Warning' : 'Healthy';
-          const score = status === 'Healthy' ? 100 : Math.max(5, Math.round(100 - (top.probability * 100)));
-          const resolvedLesions = ensureLesions(status, undefined, boundingBox, score);
-          setResult({
-            status: status,
-            disease: cleanName.toUpperCase(),
-            confidence: Math.round(top.probability * 100),
-            recommendations: ['Monitor plant daily', 'Ensure proper watering', 'Check for spreading symptoms'],
-            healthScore: score,
-            lesions: resolvedLesions,
-            treatment: {
-              conventional: ['Monitor plant daily', 'Ensure proper watering'],
-              biological: [],
-              prevention: []
-            }
-          });
-        }
-        return;
-      }
-
-      // Final generic fallback — no model detected any disease, so report fully healthy
+      // Final generic fallback
       setResult({
         status: 'Healthy',
-        disease: 'Healthy / No issues detected',
+        disease: language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಬೆಳೆ' : 'Healthy Crop',
         confidence: 100,
         recommendations: ['Monitor plant daily', 'Ensure proper watering'],
         healthScore: 100,
@@ -883,6 +738,8 @@ export function CropHealth(_props: CropHealthProps) {
     setSelectedImage(null);
     setResult(null);
     setValidationResult(null);
+    preloadedAnalysisRef.current = null;
+    pendingAnalysisPromiseRef.current = null;
   };
 
   return (
@@ -895,20 +752,6 @@ export function CropHealth(_props: CropHealthProps) {
           </span>
         </div>
 
-        <div className="flex gap-3 bg-slate-900/5 p-1.5 rounded-2xl border border-slate-200 mb-8 w-fit">
-          {(['tomato', 'corn', 'chilli'] as CropType[]).map((crop) => (
-            <button
-              key={crop}
-              onClick={() => setSelectedCrop(crop)}
-              className={`px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${selectedCrop === crop
-                ? 'bg-red-600 text-white shadow-xl shadow-red-600/30 scale-105 transform'
-                : 'text-slate-500 hover:bg-slate-200 hover:text-slate-700'
-                }`}
-            >
-              {crop}
-            </button>
-          ))}
-        </div>
         <p className="text-slate-600 font-medium mb-8 max-w-2xl">
           {t('cropHealth.subtitle')}
         </p>
@@ -1016,144 +859,96 @@ export function CropHealth(_props: CropHealthProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/50 group shadow-2xl">
-              <img
-                ref={imageRef}
-                src={selectedImage}
-                alt="Crop analysis"
-                className={`w-full h-[400px] object-contain transition-all duration-700 ${isCropping ? 'scale-110 blur-sm brightness-50' : 'scale-100 blur-0 brightness-100'}`}
-                crossOrigin="anonymous"
-              />
+            <div className="relative rounded-3xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xl flex items-center justify-center p-3 min-h-[440px]">
+              <div className="relative inline-block max-w-full">
+                <img
+                  ref={imageRef}
+                  src={selectedImage}
+                  alt="Crop analysis"
+                  className="max-h-[500px] w-auto h-auto max-w-full object-contain rounded-2xl shadow-md block"
+                  crossOrigin="anonymous"
+                />
 
-              {/* Magic Cutout Experience (PicsArt Style) */}
-              {!isCropping && selectedImage && (
-                <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-2xl bg-white shadow-inner">
-                  {/* 1. Professional Checkered/White Background */}
-                  <div className="absolute inset-0 opacity-10" style={{
-                    backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
-                    backgroundSize: '20px 20px',
-                    backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-                  }} />
+                {/* Highlighted Red Affected Areas (Directly on the leaf) */}
+                {!analyzing && result && result.status !== 'Healthy' && (
+                  <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden">
+                    {result.lesions?.map((lesion: any, i: number) => {
+                      const [ymin, xmin, ymax, xmax] = lesion.box;
+                      const top = Math.max(0, Math.min(95, ymin / 10));
+                      const left = Math.max(0, Math.min(95, xmin / 10));
+                      const width = Math.max(5, Math.min(100 - left, (xmax - xmin) / 10));
+                      const height = Math.max(5, Math.min(100 - top, (ymax - ymin) / 10));
 
-                  {/* 2. Isolated Leaf Cutout (Zoomed & Clean) */}
-                  <div
-                    className="absolute inset-0 transition-all duration-1000 ease-out"
-                    style={{
-                      transform: boundingBox ? `
-                            scale(${1000 / (boundingBox.xmax - boundingBox.xmin) * 0.85}) 
-                            translate(
-                                ${-(boundingBox.xmin + (boundingBox.xmax - boundingBox.xmin) / 2 - 500) / 10}%, 
-                                ${-(boundingBox.ymin + (boundingBox.ymax - boundingBox.ymin) / 2 - 500) / 10}%
-                            )
-                        ` : 'scale(1)',
-                      transformOrigin: 'center center'
-                    }}
+                      return (
+                        <div
+                          key={`lesion-${i}`}
+                          className="absolute border-2 border-red-500 bg-red-500/25 rounded-lg shadow-[0_0_15px_rgba(239,68,68,0.7)] transition-all animate-pulse"
+                          style={{
+                            top: `${top}%`,
+                            left: `${left}%`,
+                            width: `${width}%`,
+                            height: `${height}%`,
+                          }}
+                        >
+                          <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow absolute -top-3.5 left-1 uppercase tracking-wider whitespace-nowrap">
+                            {lesion.type || 'Affected Area'}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Stress boxes if any */}
+                    {result.stressIndicators?.map((stress: any, i: number) => {
+                      if (!stress.box || stress.box.length !== 4) return null;
+                      const [ymin, xmin, ymax, xmax] = stress.box;
+                      const top = Math.max(0, Math.min(95, ymin / 10));
+                      const left = Math.max(0, Math.min(95, xmin / 10));
+                      const width = Math.max(5, Math.min(100 - left, (xmax - xmin) / 10));
+                      const height = Math.max(5, Math.min(100 - top, (ymax - ymin) / 10));
+
+                      return (
+                        <div
+                          key={`stress-${i}`}
+                          className="absolute border-2 border-amber-500 bg-amber-500/20 rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all animate-pulse"
+                          style={{
+                            top: `${top}%`,
+                            left: `${left}%`,
+                            width: `${width}%`,
+                            height: `${height}%`,
+                          }}
+                        >
+                          <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded shadow absolute -top-3.5 left-1 uppercase tracking-wider whitespace-nowrap">
+                            {stress.type || 'Stress Area'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!analyzing && (
+                  <button
+                    onClick={resetAnalysis}
+                    className="absolute top-3 right-3 bg-black/60 backdrop-blur-md p-2 rounded-full hover:bg-black/80 text-white border border-white/20 transition shadow-lg z-30"
+                    title="Remove image"
                   >
-                    {/* The Cutout Leaf */}
-                    <img
-                      src={selectedImage}
-                      className={`absolute inset-0 w-full h-full object-contain transition-all duration-500 ${
-                        result && result.status !== 'Healthy'
-                          ? 'drop-shadow-[0_0_25px_rgba(220,38,38,0.8)]'
-                          : 'drop-shadow-[0_10px_30px_rgba(0,0,0,0.2)]'
-                      }`}
-                      style={{
-                        clipPath: polygon
-                          ? `polygon(${polygon.map(p => `${p[1] / 10}% ${p[0] / 10}%`).join(', ')})`
-                          : (boundingBox
-                            ? `inset(${boundingBox.ymin / 10}% ${100 - boundingBox.xmax / 10}% ${100 - boundingBox.ymax / 10}% ${boundingBox.xmin / 10}% round 20px)`
-                            : 'inset(10% 10% 10% 10% round 20px)'),
-                      }}
-                      alt="leaf isolate"
-                    />
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
 
-                    {/* 3. Red Selection Border (Always Visible Highlight) */}
-                    <div className="absolute inset-0">
-                      {/* Removed red highlights as per user request */}
+                {/* Scanning Animation Overlay */}
+                {analyzing && (
+                  <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center backdrop-blur-sm rounded-2xl z-20">
+                    <div className="absolute inset-0 overflow-hidden rounded-2xl">
+                      <div className="w-full h-1 bg-green-400 shadow-[0_0_20px_rgba(74,222,128,1)] animate-[scan_2s_linear_infinite]" />
+                    </div>
+                    <div className="bg-slate-900/90 px-6 py-4 rounded-2xl flex items-center gap-3 z-10 border border-green-500/30 shadow-2xl">
+                      <Loader2 className="w-6 h-6 text-green-400 animate-spin" />
+                      <span className="font-bold text-white tracking-wide">{t('cropHealth.analyzingImage')}</span>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Lesion and Stress Indicator Boxes (Visible when result exists) */}
-              {!isCropping && selectedImage && result && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-20"
-                  style={{
-                    transform: boundingBox ? `
-                          scale(${1000 / (boundingBox.xmax - boundingBox.xmin) * 0.85}) 
-                          translate(
-                              ${-(boundingBox.xmin + (boundingBox.xmax - boundingBox.xmin) / 2 - 500) / 10}%, 
-                              ${-(boundingBox.ymin + (boundingBox.ymax - boundingBox.ymin) / 2 - 500) / 10}%
-                          )
-                      ` : 'scale(1)',
-                    transformOrigin: 'center center'
-                  }}
-                >
-                    {/* Lesion Boxes (Visual Aids) */}
-                    {result.lesions?.map((lesion: any, i: number) => (
-                      <div
-                        key={`lesion-${i}`}
-                        className="absolute border-2 border-red-600 bg-red-600/15 shadow-[0_0_15px_rgba(220,38,38,0.6)] flex items-center justify-center rounded-lg animate-pulse transition-all duration-300"
-                        style={{
-                          top: `${lesion.box[0] / 10}%`,
-                          left: `${lesion.box[1] / 10}%`,
-                          width: `${(lesion.box[3] - lesion.box[1]) / 10}%`,
-                          height: `${(lesion.box[2] - lesion.box[0]) / 10}%`
-                        }}
-                      >
-                        <span className="bg-red-600 text-white text-[8px] font-black px-2 py-0.5 rounded shadow absolute -top-3.5 left-1 uppercase tracking-widest">{lesion.type}</span>
-                      </div>
-                    ))}
-
-                    {/* Stress Boxes */}
-                    {result.stressIndicators?.map((stress: any, i: number) => (
-                      <div
-                        key={`stress-${i}`}
-                        className="absolute border-2 border-amber-500 bg-amber-500/15 shadow-[0_0_15px_rgba(245,158,11,0.5)] rounded-lg flex items-center justify-center animate-pulse transition-all duration-300"
-                        style={{
-                          top: `${stress.box[0] / 10}%`,
-                          left: `${stress.box[1] / 10}%`,
-                          width: `${(stress.box[3] - stress.box[1]) / 10}%`,
-                          height: `${(stress.box[2] - stress.box[0]) / 10}%`
-                        }}
-                      >
-                        <span className="bg-amber-500 text-white text-[8px] font-black px-2 py-0.5 rounded shadow absolute -top-3.5 left-1 uppercase tracking-widest">{stress.type}</span>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {!analyzing && !result && (
-                <button
-                  onClick={resetAnalysis}
-                  className="absolute top-4 right-4 bg-black/50 backdrop-blur-md p-2 rounded-full hover:bg-black/70 text-white border border-white/20 transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-
-              {/* Magic Crop Animation Overlay */}
-              {isCropping && (
-                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center backdrop-blur-sm z-30">
-                  <div className="absolute inset-0 overflow-hidden">
-                    <div className="w-full h-1 bg-blue-500/80 shadow-[0_0_20px_rgba(59,130,246,0.8)] animate-[scan_1.5s_linear_infinite]" />
-                  </div>
-                </div>
-              )}
-
-              {/* Scanning Animation Overlay */}
-              {analyzing && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                  <div className="absolute inset-0 overflow-hidden">
-                    <div className="w-full h-1 bg-prodmast-accent/80 shadow-[0_0_20px_rgba(132,204,22,0.8)] animate-[scan_2s_linear_infinite]" />
-                  </div>
-                  <div className="bg-black/80 px-6 py-4 rounded-xl flex items-center gap-3 z-10 border border-prodmast-accent/30 shadow-2xl">
-                    <Loader2 className="w-6 h-6 text-prodmast-accent animate-spin" />
-                    <span className="font-bold text-white tracking-wide">{t('cropHealth.analyzingImage')}</span>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col justify-center">
@@ -1233,57 +1028,72 @@ export function CropHealth(_props: CropHealthProps) {
                 <div className="bg-white/5 rounded-2xl border border-white/10 p-8 shadow-2xl backdrop-blur-sm">
 
                 <div className="mb-10 p-8 rounded-[32px] bg-white border border-slate-100 shadow-xl relative overflow-hidden">
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-8">
+                  <div className="relative z-10 text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
                       <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">{t('cropHealth.vitality')}</span>
-                        <h3 className={`text-4xl font-black tracking-tighter ${result.status === 'Critical' ? 'text-red-600' : (result.status === 'Warning' ? 'text-orange-500' : 'text-green-600')}`}>
-                          {result.status === 'Healthy' ? t('cropHealth.primeHealth') : (result.status === 'Warning' ? t('cropHealth.vulnerable') : t('cropHealth.criticalCondition'))}
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">
+                          Diagnostic Result
+                        </span>
+                        <h3 className={`text-3xl sm:text-4xl font-black tracking-tight ${result.status === 'Critical' ? 'text-red-600' : (result.status === 'Warning' ? 'text-orange-500' : 'text-green-600')}`}>
+                          {result.disease || (result.status === 'Healthy' ? t('cropHealth.primeHealth') : 'Crop Infection')}
                         </h3>
+                        <p className="text-xs text-slate-500 font-bold mt-1">
+                          {result.status === 'Healthy' 
+                            ? 'Optimal Plant Health • Normal Chlorophyll' 
+                            : `${result.status === 'Critical' ? 'Severe Infection Detected' : 'Moderate Stress / Pathogen Activity'} • Treatment Recommended`}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`px-5 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border-2 ${
-                          result.status === 'Critical' ? 'bg-red-50 text-red-600 border-red-200' : 
-                          (result.status === 'Warning' ? 'bg-orange-50 text-orange-500 border-orange-200' : 'bg-green-50 text-green-600 border-green-200')
-                        }`}>
-                          {result.status === 'Healthy' ? t('cropHealth.status.healthy') : (result.status === 'Warning' ? t('cropHealth.status.warning') : t('cropHealth.status.critical'))}
-                        </div>
+                      <div className={`px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border-2 shrink-0 self-start ${
+                        result.status === 'Critical' ? 'bg-red-50 text-red-600 border-red-200' : 
+                        (result.status === 'Warning' ? 'bg-orange-50 text-orange-500 border-orange-200' : 'bg-green-50 text-green-600 border-green-200')
+                      }`}>
+                        {result.status === 'Healthy' ? t('cropHealth.status.healthy') : (result.status === 'Warning' ? t('cropHealth.status.warning') : t('cropHealth.status.critical'))}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 mb-8">
-                      <div className="bg-green-50/50 p-6 rounded-[24px] border border-green-100/50">
-                        <div className="flex items-center gap-2 mb-2">
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                      <div className="bg-green-50/70 p-5 rounded-2xl border border-green-200/60">
+                        <div className="flex items-center gap-2 mb-1">
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{t('cropHealth.goodHealthy')}</span>
+                          <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">{t('cropHealth.goodHealthy')}</span>
                         </div>
-                        <div className="text-5xl font-black text-green-600 tracking-tighter">
+                        <div className="text-4xl font-black text-green-600 tracking-tight">
                           {result.healthScore || 0}%
                         </div>
                       </div>
-                      <div className="bg-red-50/50 p-6 rounded-[24px] border border-red-100/50">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="bg-red-50/70 p-5 rounded-2xl border border-red-200/60">
+                        <div className="flex items-center gap-2 mb-1">
                           <div className="w-2 h-2 bg-red-500 rounded-full" />
-                          <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">{t('cropHealth.badAffected')}</span>
+                          <span className="text-[10px] font-black text-red-700 uppercase tracking-widest">{t('cropHealth.badAffected')}</span>
                         </div>
-                        <div className="text-5xl font-black text-red-600 tracking-tighter">
+                        <div className="text-4xl font-black text-red-600 tracking-tight">
                           {100 - (result.healthScore || 0)}%
                         </div>
                       </div>
                     </div>
 
-                    <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50 mb-4">
+                    <div className="relative h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50 mb-3">
                       <div 
-                        className={`absolute left-0 top-0 h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(34,197,94,0.3)] ${
+                        className={`absolute left-0 top-0 h-full transition-all duration-1000 ease-out ${
                           result.status === 'Critical' ? 'bg-red-500' : (result.status === 'Warning' ? 'bg-orange-500' : 'bg-green-500')
                         }`}
                         style={{ width: `${result.healthScore}%` }}
                       />
                     </div>
-                    
-                    <div className="flex items-center gap-2 mt-4 text-[11px] font-bold text-slate-500 italic">
-                      <Sparkles className="w-3.5 h-3.5 text-prodmast-primary" />
-                      {t('cropHealth.primaryStressor').replace('{{disease}}', result.disease?.toLowerCase() || 'no specific disease')}
+
+                    {/* What Happened To This Plant Card */}
+                    <div className="mt-5 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-amber-700 shrink-0" />
+                        <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
+                          {language === 'kn' ? 'ಗಿಡಕ್ಕೆ ಏನಾಯಿತು? (ರೋಗ ವಿವರಣೆ)' : 'What Happened to this Plant?'}
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-700 leading-relaxed font-semibold">
+                        {result.causes || (result.disease 
+                          ? `Visual analysis detected active pathogen symptoms consistent with ${result.disease}. Cellular damage is currently affecting ${100 - (result.healthScore || 0)}% of the examined leaf area.`
+                          : 'The leaf tissue exhibits normal chlorophyll levels and cellular integrity with no visible pathogens.')}
+                      </p>
                     </div>
                   </div>
                 </div>

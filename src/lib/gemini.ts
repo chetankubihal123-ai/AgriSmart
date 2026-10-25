@@ -4,7 +4,12 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 // Force V1 stable API version to avoid 404 v1beta issues
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-const MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"];
+const MODELS = [
+  "gemini-flash-lite-latest",
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-flash-latest"
+];
 
 export async function analyzeImageWithGemini(base64Image: string, cropType: string = 'plant', language: string = 'en') {
   const base64Data = base64Image.split(',')[1];
@@ -40,26 +45,42 @@ export async function analyzeImageWithGemini(base64Image: string, cropType: stri
 export async function analyzeDetailedPlantHealth(base64Image: string, cropType: string = 'plant', language: string = 'en') {
   const base64Data = base64Image.split(',')[1];
   const langPrompt = language === 'kn' ? 'IMPORTANT: Return ALL string values (names, descriptions, treatments, causes, spread) in KANNADA language. Use English for technical categories only if absolutely necessary.' : 'Return all values in English.';
-  const prompt = `Analyze this ${cropType} image for health and disease. 
+  const prompt = `You are an expert agricultural plant pathologist and computer vision model.
+  Analyze this crop leaf image with 100% precision.
   ${langPrompt}
-  Return ONLY a JSON object with:
+
+  Goals:
+  1. Identify the exact crop plant species and any disease, fungus, bacteria, virus, or pest damage (or confirm if 100% healthy).
+  2. Estimate healthScore (0 to 100): 100 is completely healthy, 80-90 is mild, 40-70 is moderate, 10-30 is severe.
+  3. Detect growthStage ("Seedling" | "Vegetative" | "Flowering" | "Fruiting" | "Maturity").
+  4. CRITICAL FOR LESIONS: Return 1 to 4 precise bounding boxes [ymin, xmin, ymax, xmax] (normalized on a 0-1000 scale, where 0 is top/left, 1000 is bottom/right) accurately outlining ONLY the visibly discolored, spotted, rusted, or infected areas on the leaf.
+  5. Provide a detailed explanation of what happened to the plant, why the symptoms developed (causes), how it spreads, and clear treatments.
+
+  Return ONLY a JSON object matching this schema:
   {
-    "healthScore": number (0-100),
+    "healthScore": number,
     "growthStage": "Seedling" | "Vegetative" | "Flowering" | "Fruiting" | "Maturity",
     "stressIndicators": [{"type": "string", "severity": "Low" | "Moderate" | "High", "box": [ymin, xmin, ymax, xmax]}],
-    "topDiagnosis": {"name": "string", "confidence": number, "severity": "Low" | "Moderate" | "High"},
+    "topDiagnosis": {"name": "Specific Crop & Disease Name (e.g. Soybean Rust, Tomato Early Blight, Corn Common Rust, Healthy Plant)", "confidence": number, "severity": "Low" | "Moderate" | "High"},
     "alternatives": [{"name": "string", "confidence": number}],
-    "lesions": [{"box": [ymin, xmin, ymax, xmax], "type": "Spot" | "Blight" | "Mold"}],
-    "causes": "string",
-    "spread": "string",
-    "treatment": {"conventional": ["string"], "biological": ["string"], "prevention": ["string"]}
+    "lesions": [{"box": [ymin, xmin, ymax, xmax], "type": "Rust Pustule" | "Blight Lesion" | "Necrotic Spot" | "Affected Area"}],
+    "causes": "2-3 comprehensive sentences explaining what pathogen (fungus, bacterium, virus, or pest) or stress caused these spots and what happened to the leaf cells/chlorophyll",
+    "spread": "1-2 sentences on how the disease spreads in the field (wind, rain splash, soil)",
+    "treatment": {
+      "conventional": ["Specific fungicide/bactericide sprays with recommended usage"],
+      "biological": ["Organic solutions such as neem oil, Trichoderma, biocontrol agents"],
+      "prevention": ["Crop rotation, avoiding overhead watering, pruning infected lower leaves"]
+    }
   }`;
 
   for (const modelName of MODELS) {
     try {
       const model = genAI.getGenerativeModel({ 
         model: modelName,
-        generationConfig: { responseMimeType: "application/json" }
+        generationConfig: { 
+          responseMimeType: "application/json",
+          temperature: 0.2
+        }
       });
       const result = await model.generateContent([
         { inlineData: { data: base64Data, mimeType: "image/jpeg" } },
@@ -154,33 +175,27 @@ export async function identifyCropType(base64Image: string, language: string = '
   const mimeType = base64Image.split(',')[0].split(':')[1].split(';')[0];
   const base64Data = base64Image.split(',')[1];
   
-  const prompt = `CRITICAL TASK: Validate if this image is a CROP/PLANT for agricultural analysis.
+  const prompt = `CRITICAL TASK: Strictly determine if this image depicts a REAL agricultural crop, plant, leaf, crop fruit, or farm vegetation.
   
   Categories:
-  1. "tomato", "corn", "chilli" - if specifically identified.
-  2. "other" - if it is a plant/crop/leaf/flower but NOT one of the above.
-  3. "invalid" - if it is a HUMAN, FACE, SELFIE, CLOTHING, CAR, BUILDING, TEXT, or unrelated object.
+  1. "tomato", "corn", "chilli" - if specifically identified as one of these crops/leaves.
+  2. "other" - if it is a real plant, crop, leaf, flower, or agricultural produce, but not tomato/corn/chilli.
+  3. "invalid" - STRICTLY assign "invalid" if the image shows:
+     - Handwritten text, signatures, paper, documents, drawings, sketches
+     - Humans, faces, hands, selfies, skin, clothing
+     - Animals, pets
+     - Vehicles, buildings, furniture, indoor items, screens, electronics
+     - Blank, plain, or non-vegetative objects
+     - Anything that is NOT a genuine living plant/leaf/crop.
 
-  CRITICAL RULES:
-  - NEVER use "invalid" if there is even a hint of a green leaf, plant part, or organic structure.
-  - If the background is white, transparent, checkered, or plain gray, IGNORE it and focus on the subject.
-  - Macro/Close-up shots of leaves are 100% VALID agricultural samples.
-  - Diseased, brown, or spotted leaves are STILL VALID plants.
-  - IF YOU ARE UNSURE, RETURN "other" INSTEAD OF "invalid".
-
-  Validation Rules:
-  - Macro/Close-up shots of leaves are VALID and should be categorized.
-  - Diseased, brown, or spotted leaves are STILL VALID plants.
-  - Plain, gray, or blue backgrounds are common in labs/offices; ignore the background and focus on the subject.
-  - High confidence (>90%) if it's a clear leaf/plant part.
-  - Medium confidence (50-80%) if blurry, highly diseased, or macro-zoomed.
-  - Low confidence (<50%) ONLY if it's truly ambiguous.
-
-  Return ONLY a JSON object in this format:
+  STRICT RULE:
+  Do NOT hallucinate or guess a plant where none exists. If there is NO botanical plant leaf, stem, or crop in the image, you MUST return "invalid" with high confidence (95-100).
+  
+  Return ONLY JSON in this format:
   {
     "category": "tomato" | "corn" | "chilli" | "other" | "invalid",
     "confidence": number (0-100),
-    "reason": "Short explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
+    "reason": "Short, clear explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
   }`;
 
   for (const modelName of MODELS) {
@@ -188,7 +203,8 @@ export async function identifyCropType(base64Image: string, language: string = '
       const model = genAI.getGenerativeModel({ 
         model: modelName,
         generationConfig: { 
-          temperature: 0.4
+          responseMimeType: "application/json",
+          temperature: 0.1
         }
       });
       const result = await model.generateContent([
@@ -202,7 +218,7 @@ export async function identifyCropType(base64Image: string, language: string = '
       const parsed = JSON.parse(match[0]);
       const validCategories = ['tomato', 'corn', 'chilli', 'other', 'invalid'];
       let category = (parsed.category || 'invalid').toLowerCase();
-      if (!validCategories.includes(category)) category = 'other';
+      if (!validCategories.includes(category)) category = 'invalid';
       
       return {
         category: category as any,

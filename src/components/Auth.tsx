@@ -36,8 +36,9 @@ export function Auth() {
     setError('');
     setLoading(true);
     try {
+      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
       const { error } = await supabase.auth.signInWithPassword({
-        phone: phone,
+        phone: formattedPhone,
         password: password,
       });
       if (error) throw error;
@@ -56,8 +57,9 @@ export function Auth() {
     setError('');
     setLoading(true);
     try {
+      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
       const { error } = await supabase.auth.signUp({
-        phone: phone,
+        phone: formattedPhone,
         password: password,
       });
       if (error) throw error;

@@ -121,21 +121,22 @@ export function ClassifierProvider({ children }: { children: React.ReactNode }) 
             const plantKeywords = [
                 'plant', 'tree', 'flower', 'vegetable', 'fruit', 'leaf', 'grass', 'agriculture', 'farm', 'crop',
                 'wheat', 'corn', 'rice', 'potato', 'tomato', 'broccoli', 'cabbage', 'carrot', 'pepper', 'chilli', 'capsicum',
-                'garden', 'field', 'greenhouse', 'pot', 'vase', 'produce', 'food', 'grain', 'seed', 'bush', 'shrub', 'herb',
-                'ear', 'spike', 'head', 'maize', 'fodder', 'hay', 'rapeseed', 'daisy', 'buckeye', 'coral fungus', 'agaric', 'mushroom',
-                'cardoon', 'thistle', 'vine', 'weed', 'texture', 'pattern', 'velvet', 'organic', 'structure', 'vein'
+                'garden', 'field', 'greenhouse', 'produce', 'grain', 'bush', 'shrub', 'herb',
+                'ear', 'spike', 'maize', 'daisy', 'vine', 'weed', 'foliage', 'botany'
             ];
 
             const artificialKeywords = [
                 'comic', 'cartoon', 'book', 'illustration', 'toy', 'doll', 'action figure', 'poster', 'screen', 'monitor',
-                'jigsaw', 'puzzle', 'art', 'sketch', 'drawing', 'painting', 'graffiti'
+                'jigsaw', 'puzzle', 'art', 'sketch', 'drawing', 'painting', 'graffiti', 'envelope', 'paper', 'document',
+                'menu', 'packet', 'web site', 'newspaper', 'receipt', 'ballpoint', 'fountain pen', 'pen', 'pencil', 'signature'
             ];
 
             const rejectKeywords = [
                 'person', 'human', 'face', 'selfie', 'man', 'woman', 'child', 'guy', 'lady', 'boy', 'girl',
                 'groom', 'jersey', 't-shirt', 'sweatshirt', 'cardigan', 'suit', 'coat', 'jacket', 'dress', 'clothing',
                 'cellular telephone', 'handheld computer', 'smartphone', 'phone', 'computer', 'monitor', 'screen', 'laptop',
-                'hand', 'finger', 'arm', 'leg', 'body', 'skin', 'mirror'
+                'hand', 'finger', 'arm', 'leg', 'body', 'skin', 'mirror', 'paper', 'envelope', 'binder', 'cardboard',
+                'writing', 'signature', 'pen', 'fountain pen', 'ballpoint', 'web site', 'text', 'document', 'page'
             ];
 
             const topPredictions = predictions.slice(0, 5);
@@ -161,18 +162,12 @@ export function ClassifierProvider({ children }: { children: React.ReactNode }) 
                 plantKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
 
-            const hasRejectKeyword = predictions.slice(0, 3).some(p =>
-                rejectKeywords.some(keyword => p.className.toLowerCase().includes(keyword)) && 
-                (p.probability > 0.65 || !hasPlantKeyword)
+            const hasRejectKeyword = predictions.slice(0, 5).some(p =>
+                rejectKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
             );
 
-            const isTMConfident = !!(customPredictions && customPredictions.length > 0 && (
-                customPredictions[0].probability > 0.75 ||
-                (customPredictions[0].probability > 0.35 && hasPlantKeyword)
-            ));
-
-            const isPlant = (!isArtificial && hasPlantKeyword && !hasRejectKeyword) || 
-                            (!isArtificial && isTMConfident && !hasRejectKeyword);
+            // Strictly require genuine botanical plant features from MobileNet; never allow paper/artifacts
+            const isPlant = !isArtificial && !hasRejectKeyword && hasPlantKeyword;
 
             return {
                 isPlant,
