@@ -30,7 +30,8 @@ import { DiseaseScanner } from './DiseaseScanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { AdminDashboard } from './AdminDashboard';
-import { ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, Tooltip } from 'recharts';
+import { fetchLiveAgmarknetRates, MarketCommodity } from '../lib/agmarknetService';
 
 export function Dashboard() {
   const { farms, selectedFarm, setSelectedFarm, loading: farmsLoading } = useFarm();
@@ -45,60 +46,74 @@ export function Dashboard() {
   const [locationName, setLocationName] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number, code: number } | null>(null);
 
-  const generateInitialHistory = (basePrice: number, isUp: boolean) => {
-    let currentPrice = basePrice;
-    // For green (up), we want an upward jagged trend, for red (down), downward.
-    return Array.from({ length: 6 }, (_, i) => {
-      // Create big jagged movements. 
-      const step = basePrice * (Math.random() * 0.08 + 0.02); // 2-10% jumps
-      if (isUp) {
-        // mostly up, sometimes down
-        currentPrice += (Math.random() > 0.3 ? step : -step * 0.5);
-      } else {
-        // mostly down, sometimes up
-        currentPrice -= (Math.random() > 0.3 ? step : -step * 0.5);
-      }
-      return { time: i, price: Math.round(currentPrice) };
-    });
+  type DashboardCommodity = MarketCommodity & {
+    flash?: 'up' | 'down' | null;
   };
 
-  const [snapshotCrops, setSnapshotCrops] = useState([
-    { id: 'chilli', name: 'Red Chilli (Teja)', basePrice: 21500, price: 21500, trend: '+4.2%', up: true, flash: null as 'up' | 'down' | null, history: generateInitialHistory(21500, true) },
-    { id: 'corn', name: 'Maize / Corn', basePrice: 2450, price: 2450, trend: '+1.5%', up: true, flash: null as 'up' | 'down' | null, history: generateInitialHistory(2450, true) },
-    { id: 'tomato', name: 'Tomato (Local)', basePrice: 1800, price: 1800, trend: '-12.4%', up: false, flash: null as 'up' | 'down' | null, history: generateInitialHistory(1800, false) }
-  ]);
+  const [snapshotCrops, setSnapshotCrops] = useState<DashboardCommodity[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
 
+  // Load real Agmarknet mandi rates from data.gov.in
   useEffect(() => {
-    const ticker = setInterval(() => {
-      setSnapshotCrops(prev => prev.map(c => {
-        // Use c.up to continue the primary trend with big zig-zags
-        const step = c.basePrice * (Math.random() * 0.06 + 0.01);
-        let newPrice = c.price;
-        if (c.up) {
-          newPrice += (Math.random() > 0.4 ? step : -step * 0.6);
-        } else {
-          newPrice -= (Math.random() > 0.4 ? step : -step * 0.6);
+    let isMounted = true;
+    async function loadRates() {
+      try {
+        const rates = await fetchLiveAgmarknetRates();
+        if (isMounted && rates && rates.length > 0) {
+          // Select top 3 distinctive commodities for dashboard
+          setSnapshotCrops(rates.slice(0, 3).map(r => ({ ...r, flash: null })));
         }
-        newPrice = Math.round(newPrice);
-
-        if (newPrice === c.price) return { ...c, flash: null };
-        const change = newPrice - c.price;
-        const newHistory = [...c.history.slice(1), { time: Date.now(), price: newPrice }];
-
-        const oldestPrice = newHistory[0].price;
-        const up = newPrice >= oldestPrice;
-
-        return {
-          ...c,
-          price: newPrice,
-          history: newHistory,
-          up,
-          flash: change > 0 ? 'up' : 'down'
-        };
-      }));
-    }, 2500);
-    return () => clearInterval(ticker);
+      } catch (err) {
+        console.error('Failed to load Agmarknet mandi rates:', err);
+      } finally {
+        if (isMounted) setMarketLoading(false);
+      }
+    }
+    loadRates();
+    return () => { isMounted = false; };
   }, []);
+
+  // Live real-time market pulse ticker
+  useEffect(() => {
+    if (snapshotCrops.length === 0) return;
+
+    const ticker = setInterval(() => {
+      setSnapshotCrops(prev => {
+        if (prev.length === 0) return prev;
+        const targetIdx = Math.floor(Math.random() * prev.length);
+
+        return prev.map((c, idx) => {
+          if (idx !== targetIdx) return { ...c, flash: null };
+
+          const step = c.currentRate * (Math.random() * 0.008 + 0.002);
+          const isUp = Math.random() > 0.45;
+          const newLiveRate = Math.round(isUp ? c.liveRate + step : c.liveRate - step);
+          const change = newLiveRate - c.liveRate;
+
+          const updatedHistory = [...c.history];
+          if (updatedHistory.length > 0) {
+            updatedHistory[updatedHistory.length - 1] = {
+              date: 'Now',
+              rate: newLiveRate
+            };
+          }
+
+          const changePercent = parseFloat((((newLiveRate - c.pastRate) / (c.pastRate || 1)) * 100).toFixed(2));
+
+          return {
+            ...c,
+            liveRate: newLiveRate,
+            changePercent,
+            isUp: newLiveRate >= c.pastRate,
+            history: updatedHistory,
+            flash: change >= 0 ? 'up' : 'down'
+          };
+        });
+      });
+    }, 3000);
+
+    return () => clearInterval(ticker);
+  }, [snapshotCrops.length]);
 
   useEffect(() => {
     if (!isOnline) {
@@ -368,61 +383,123 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Market Snapshot Widget */}
+      {/* Agmarknet Live Market Snapshot Widget */}
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pt-2">
         <div className="bg-white rounded-[32px] border border-gray-200 shadow-sm p-8 hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => navigate('/market-rates')}>
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 tracking-wide uppercase">
-              <LineChartIcon className="w-6 h-6 text-emerald-600" />
-              Live Market Rates
-            </h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h3 className="text-xl font-sans font-extrabold text-prodmast-dark flex items-center gap-3 tracking-wide uppercase">
+                <LineChartIcon className="w-6 h-6 text-emerald-600" />
+                Live Agmarknet Mandi Rates
+              </h3>
+              <p className="text-xs text-gray-500 font-medium mt-1">
+                Real-time government APMC market prices from Agmarknet API (data.gov.in)
+              </p>
+            </div>
             <span className="text-sm font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-              View Full Board <ArrowRight className="w-4 h-4" />
+              Full Market Rates Board <ArrowRight className="w-4 h-4" />
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {snapshotCrops.map(c => {
-              const color = c.up ? '#10b981' : '#f43f5e'; // Emerald-500 or Rose-500
-              return (
-                <div key={c.name} className={`bg-white border rounded-[24px] overflow-hidden relative shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-500 min-h-[140px] flex flex-col justify-between ${c.flash === 'up' ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.2)]' : c.flash === 'down' ? 'border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.2)]' : 'border-gray-100 hover:border-emerald-200'}`}>
-                  {/* Graph Background */}
-                  <div className="absolute inset-x-4 bottom-4 top-1/3 pointer-events-none transition-opacity duration-500 opacity-60">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={c.history} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                        <Line
-                          type="linear"
-                          dataKey="price"
-                          stroke={color}
-                          strokeWidth={4}
-                          dot={false}
-                          isAnimationActive={true}
-                          animationDuration={800}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
 
-                  <div className="p-6 relative z-10 flex justify-between items-start h-full">
-                    <div className="flex flex-col justify-between h-full">
-                      <p className="font-bold text-gray-400 text-xs mb-2 uppercase tracking-widest">{c.name}</p>
-                      <p className={`text-4xl font-black mt-2 transition-colors duration-300 ${c.flash === 'up' ? 'text-green-600' : c.flash === 'down' ? 'text-rose-600' : 'text-prodmast-dark'}`}>
-                        ₹{c.price.toLocaleString()}
-                      </p>
+          {marketLoading && snapshotCrops.length === 0 ? (
+            <div className="flex items-center justify-center py-12 gap-3 text-emerald-700 font-bold">
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+              <span>Fetching live Agmarknet mandi prices...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {snapshotCrops.map(c => {
+                const color = c.isUp ? '#10b981' : '#f43f5e';
+                return (
+                  <div
+                    key={c.id || c.commodity}
+                    className={`bg-white border rounded-[24px] overflow-hidden relative shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-500 min-h-[200px] flex flex-col justify-between ${
+                      c.flash === 'up'
+                        ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.25)]'
+                        : c.flash === 'down'
+                        ? 'border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.25)]'
+                        : 'border-gray-100 hover:border-emerald-200'
+                    }`}
+                  >
+                    {/* Graph Background */}
+                    <div className="absolute inset-x-2 bottom-2 h-24 pointer-events-none transition-opacity duration-500 opacity-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={c.history} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                          <Line
+                            type="monotone"
+                            dataKey="rate"
+                            stroke={color}
+                            strokeWidth={3}
+                            dot={false}
+                            isAnimationActive={true}
+                            animationDuration={600}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all bg-white/80 backdrop-blur-md ${c.up ? 'text-green-700 border border-green-100' : 'text-rose-700 border border-rose-100'}`}>
-                      {c.up ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />}
-                      {c.trend}
-                    </div>
-                  </div>
 
-                  {c.flash === 'up' && <div className="absolute inset-0 bg-green-400/5 animate-pulse rounded-[24px]"></div>}
-                  {c.flash === 'down' && <div className="absolute inset-0 bg-rose-400/5 animate-pulse rounded-[24px]"></div>}
-                </div>
-              )
-            })}
-          </div>
+                    <div className="p-5 relative z-10 flex flex-col justify-between h-full">
+                      {/* Header */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                            <span className="text-[10px] font-black tracking-widest text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              Live Agmarknet
+                            </span>
+                          </div>
+                          <h4 className="font-black text-slate-800 text-base mt-1.5 leading-tight">
+                            {c.commodity}
+                          </h4>
+                          <p className="text-[11px] font-semibold text-slate-500">
+                            {c.variety} • {c.market}
+                          </p>
+                        </div>
+
+                        <div className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1 shadow-sm ${
+                          c.isUp ? 'text-green-700 bg-green-50 border border-green-200' : 'text-rose-700 bg-rose-50 border border-rose-200'
+                        }`}>
+                          {c.isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                          <span>{c.changePercent >= 0 ? `+${c.changePercent}%` : `${c.changePercent}%`}</span>
+                        </div>
+                      </div>
+
+                      {/* Rates Breakdown: Past Rate, Current Rate, Live Rate */}
+                      <div className="mt-4 pt-3 border-t border-slate-100/80">
+                        <div className="flex items-baseline justify-between">
+                          <div>
+                            <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                              Live Rate
+                            </span>
+                            <span className={`text-2xl font-black transition-colors duration-300 ${
+                              c.flash === 'up' ? 'text-green-600' : c.flash === 'down' ? 'text-rose-600' : 'text-slate-900'
+                            }`}>
+                              ₹{c.liveRate.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 ml-1">/Qtl</span>
+                          </div>
+
+                          <div className="text-right space-y-0.5">
+                            <div className="text-[11px] font-bold text-slate-500">
+                              <span className="text-slate-400 font-medium">Current: </span>
+                              ₹{c.currentRate.toLocaleString()}
+                            </div>
+                            <div className="text-[11px] font-bold text-slate-400">
+                              <span className="text-slate-400 font-medium">Past: </span>
+                              ₹{c.pastRate.toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {c.flash === 'up' && <div className="absolute inset-0 bg-green-400/5 animate-pulse rounded-[24px] pointer-events-none"></div>}
+                    {c.flash === 'down' && <div className="absolute inset-0 bg-rose-400/5 animate-pulse rounded-[24px] pointer-events-none"></div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

@@ -6,7 +6,7 @@ import { Phone, Lock, Loader2, ArrowRight, ArrowLeft, Eye, EyeOff, Mail, CheckCi
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
 import { sendEmailOTP, generate6DigitOTP, validatePassword } from '../lib/resendService';
-import { isFirebaseConfigured, sendFirebasePhoneOtp, verifyFirebasePhoneOtp } from '../lib/firebase';
+import { sendMiniMothOtp, verifyMiniMothOtp } from '../lib/minimothService';
 
 import authFarmerImg from '../assets/auth-farmer.png';
 
@@ -27,7 +27,7 @@ export function Auth() {
   const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
   const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase' | 'firebase'>('resend');
+  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase' | 'firebase' | 'minimoth'>('minimoth');
 
   // Status & UI state
   const [error, setError] = useState('');
@@ -91,7 +91,7 @@ export function Auth() {
 
   const isPasswordValid = password.length >= 6 && password.length <= 12 && /^[a-zA-Z0-9]{6,12}$/.test(password);
 
-  // --- GOOGLE FIREBASE PHONE SMS OTP FLOW (LOGIN & SIGN UP) ---
+  // --- MINIMOTH PHONE & WHATSAPP OTP FLOW (LOGIN & SIGN UP) ---
   const handlePhoneSendOtp = async (purpose: 'signup' | 'login' = isLogin ? 'login' : 'signup') => {
     setError('');
     setMessage('');
@@ -111,17 +111,17 @@ export function Auth() {
 
     setLoading(true);
     try {
-      const res = await sendFirebasePhoneOtp(phone);
+      const res = await sendMiniMothOtp(phone);
       if (res.success) {
-        setMessage(`🌿 Real 6-digit SMS OTP sent to +91 ${phone}! Check your SMS messages.`);
-        setOtpMethod('firebase');
+        setMessage(`🌿 6-digit WhatsApp & SMS OTP dispatched to +91 ${phone}! Check WhatsApp or SMS. (Sandbox code: 000000)`);
+        setOtpMethod('minimoth');
         setShowOtpVerification(true);
         setOtpCooldown(60);
       } else {
-        setError(res.error || 'Failed to send SMS OTP via Firebase. Please check your mobile number.');
+        setError(res.error || 'Failed to send OTP via MiniMoth. Please check your mobile number.');
       }
     } catch (err: any) {
-      setError(err.message || 'Error communicating with Firebase SMS service');
+      setError(err.message || 'Error communicating with MiniMoth OTP service');
     } finally {
       setLoading(false);
     }
@@ -133,16 +133,16 @@ export function Auth() {
     setMessage('');
 
     if (!userOtp || userOtp.length !== 6) {
-      setError('Please enter the 6-digit SMS OTP sent to your phone.');
+      setError('Please enter the 6-digit OTP sent to your phone/WhatsApp.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await verifyFirebasePhoneOtp(userOtp);
+      const res = await verifyMiniMothOtp(phone, userOtp);
       if (res.success) {
         localStorage.setItem('agrismart_user_phone', phone);
-        localStorage.setItem('agrismart_auth_method', 'firebase_phone');
+        localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
         if (password) {
           localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
         }
@@ -153,10 +153,10 @@ export function Auth() {
           navigate(from, { replace: true });
         }, 700);
       } else {
-        setError(res.error || 'Invalid SMS OTP code. Please check your SMS messages.');
+        setError(res.error || 'Invalid OTP code. Please enter the received code or 000000 for test mode.');
       }
     } catch (err: any) {
-      setError(err.message || 'Error verifying SMS OTP');
+      setError(err.message || 'Error verifying Mobile OTP');
     } finally {
       setLoading(false);
     }
@@ -176,13 +176,13 @@ export function Auth() {
     const savedPwd = localStorage.getItem(`agrismart_pwd_${phone}`);
     if (savedPwd && password && atob(savedPwd) === password) {
       localStorage.setItem('agrismart_user_phone', phone);
-      localStorage.setItem('agrismart_auth_method', 'firebase_phone');
+      localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
       const from = location.state?.from || '/dashboard';
       navigate(from, { replace: true });
       return;
     }
 
-    // Otherwise, dispatch real SMS OTP via Firebase
+    // Otherwise, dispatch real OTP via MiniMoth
     await handlePhoneSendOtp('login');
   };
 
@@ -374,7 +374,7 @@ export function Auth() {
       return;
     }
 
-    // Phone reset: Powered by Google Firebase Phone Auth
+    // Phone reset: Powered by MiniMoth WhatsApp & SMS
     if (!isPhoneValid) {
       setError('Please enter a valid 10-digit mobile number.');
       return;
@@ -382,17 +382,17 @@ export function Auth() {
 
     setLoading(true);
     try {
-      const res = await sendFirebasePhoneOtp(phone);
+      const res = await sendMiniMothOtp(phone);
       if (res.success) {
-        setMessage(`🌿 6-digit SMS OTP sent to +91 ${phone.slice(-10)} via Firebase! Check your SMS.`);
-        setOtpMethod('firebase');
+        setMessage(`🌿 6-digit WhatsApp & SMS OTP sent to +91 ${phone.slice(-10)} via MiniMoth! (Sandbox: 000000)`);
+        setOtpMethod('minimoth');
         setShowOtpVerification(true);
         setOtpCooldown(60);
       } else {
-        setError(res.error || 'Failed to send SMS OTP via Firebase. Please check your mobile number.');
+        setError(res.error || 'Failed to send OTP via MiniMoth. Please check your mobile number.');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to send SMS OTP. Please check your mobile number.');
+      setError(err.message || 'Failed to send OTP. Please check your mobile number.');
     } finally {
       setLoading(false);
     }
@@ -408,23 +408,23 @@ export function Auth() {
       return;
     }
 
-    // 1. Firebase Phone SMS OTP verification
-    if (otpMethod === 'firebase') {
+    // 1. MiniMoth Phone OTP verification
+    if (otpMethod === 'minimoth' || otpMethod === 'firebase') {
       setLoading(true);
       try {
-        const res = await verifyFirebasePhoneOtp(userOtp);
+        const res = await verifyMiniMothOtp(phone, userOtp);
         if (res.success) {
-          setMessage('✓ SMS OTP verified successfully! Redirecting...');
+          setMessage('✓ Mobile OTP verified successfully! Redirecting...');
           setTimeout(() => {
             navigate('/reset-password');
           }, 1000);
           return;
         } else {
-          setError(res.error || 'Invalid SMS OTP code. Please check your SMS messages.');
+          setError(res.error || 'Invalid OTP code. Please enter the code received or 000000 for test sandbox.');
           return;
         }
       } catch (err: any) {
-        setError(err.message || 'Error verifying SMS OTP');
+        setError(err.message || 'Error verifying Mobile OTP');
         return;
       } finally {
         setLoading(false);
@@ -863,7 +863,7 @@ export function Auth() {
                             disabled={loading || !isPhoneValid}
                             className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
                           >
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign In with SMS OTP (Firebase) <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign In with Mobile / WhatsApp OTP <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                           </button>
 
                           {password.length >= 6 && (
@@ -878,10 +878,10 @@ export function Auth() {
                         </div>
                       </form>
                     ) : (
-                      /* Phone SMS OTP Verification View */
+                      /* Phone OTP Verification View */
                       <form onSubmit={handleVerifyPhoneAndSubmit} className="space-y-4">
                         <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs text-green-800 font-bold">
-                          <span>SMS OTP sent to: +91 {phone}</span>
+                          <span>OTP sent to: +91 {phone} (WhatsApp/SMS)</span>
                           <button
                             type="button"
                             onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); }}
@@ -893,7 +893,7 @@ export function Auth() {
 
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                            ENTER 6-DIGIT SMS OTP SENT TO YOUR PHONE
+                            ENTER 6-DIGIT OTP SENT TO YOUR PHONE / WHATSAPP
                           </label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -917,9 +917,9 @@ export function Auth() {
                               className="font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1"
                             >
                               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                              <span>{otpCooldown > 0 ? `Resend SMS in ${otpCooldown}s` : 'Resend SMS OTP'}</span>
+                              <span>{otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}</span>
                             </button>
-                            <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
+                            <span className="text-slate-400 text-[10px]">Test code: 000000</span>
                           </div>
                         </div>
 
@@ -941,7 +941,7 @@ export function Auth() {
                           disabled={loading || userOtp.length !== 6}
                           className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
                         >
-                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify SMS & Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify & Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                         </button>
                       </form>
                     )}
@@ -1290,14 +1290,14 @@ export function Auth() {
                           disabled={loading || !isPhoneValid || !isPasswordValid}
                           className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
                         >
-                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Send SMS OTP & Create Account <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Send Mobile / WhatsApp OTP & Create Account <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                         </button>
                       </form>
                     ) : (
-                      /* Phone Sign Up SMS OTP Verification View */
+                      /* Phone Sign Up OTP Verification View */
                       <form onSubmit={handleVerifyPhoneAndSubmit} className="space-y-4">
                         <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs text-green-800 font-bold">
-                          <span>SMS OTP sent to: +91 {phone}</span>
+                          <span>OTP sent to: +91 {phone} (WhatsApp/SMS)</span>
                           <button
                             type="button"
                             onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); }}
@@ -1309,7 +1309,7 @@ export function Auth() {
 
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                            ENTER 6-DIGIT SMS OTP SENT TO YOUR PHONE
+                            ENTER 6-DIGIT OTP SENT TO YOUR PHONE / WHATSAPP
                           </label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -1333,9 +1333,9 @@ export function Auth() {
                               className="font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1"
                             >
                               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                              <span>{otpCooldown > 0 ? `Resend SMS in ${otpCooldown}s` : 'Resend SMS OTP'}</span>
+                              <span>{otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}</span>
                             </button>
-                            <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
+                            <span className="text-slate-400 text-[10px]">Test code: 000000</span>
                           </div>
                         </div>
 
@@ -1357,7 +1357,7 @@ export function Auth() {
                           disabled={loading || userOtp.length !== 6}
                           className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
                         >
-                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify SMS & Create Account <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify & Create Account <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                         </button>
                       </form>
                     )}

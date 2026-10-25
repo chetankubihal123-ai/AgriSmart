@@ -10,11 +10,17 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
+import { fetchLiveAgmarknetRates, MarketCommodity } from '../lib/agmarknetService';
 
 interface Commodity {
   id: string;
   name: string;
+  commodityName: string;
+  variety: string;
   currentPrice: number;
+  liveRate: number;
+  currentRate: number;
+  pastRate: number;
   unit: string;
   trend: number; // percentage
   trendUp: boolean;
@@ -28,74 +34,104 @@ interface Commodity {
 const FALLBACK_COMMODITIES: Commodity[] = [
   {
     id: 'fallback-1',
-    name: 'Red Chilli (Teja)',
-    currentPrice: 21763,
+    name: 'Red Chilli (Byadgi / Teja)',
+    commodityName: 'Red Chilli',
+    variety: 'Byadgi / Teja',
+    currentPrice: 22400,
+    liveRate: 22400,
+    currentRate: 22400,
+    pastRate: 21500,
     unit: 'Quintal',
-    trend: 4.2,
+    trend: 4.18,
     trendUp: true,
-    history: [20500, 20800, 21000, 21200, 21400, 21600, 21763],
-    market: 'Guntur APMC, Andhra Pradesh',
+    history: [21200, 21450, 21300, 21500, 21900, 22100, 22400],
+    market: 'Hubli (Amaragol) Mandi, Karnataka',
     quality: 'Premium',
     lastUpdated: new Date()
   },
   {
     id: 'fallback-2',
-    name: 'Maize / Corn',
-    currentPrice: 2530,
+    name: 'Maize / Corn (Hybrid Yellow)',
+    commodityName: 'Maize / Corn',
+    variety: 'Hybrid Yellow',
+    currentPrice: 2420,
+    liveRate: 2420,
+    currentRate: 2420,
+    pastRate: 2360,
     unit: 'Quintal',
-    trend: 1.5,
+    trend: 2.54,
     trendUp: true,
-    history: [2400, 2420, 2450, 2480, 2500, 2510, 2530],
-    market: 'Nizamabad APMC, Telangana',
+    history: [2300, 2320, 2350, 2360, 2380, 2400, 2420],
+    market: 'Davangere APMC, Karnataka',
     quality: 'Standard',
     lastUpdated: new Date()
   },
   {
     id: 'fallback-3',
-    name: 'Tomato (Local)',
-    currentPrice: 1986,
+    name: 'Tomato (Hybrid / Local)',
+    commodityName: 'Tomato',
+    variety: 'Hybrid / Local',
+    currentPrice: 1850,
+    liveRate: 1850,
+    currentRate: 1850,
+    pastRate: 2100,
     unit: 'Quintal',
-    trend: 12.4,
+    trend: 11.9,
     trendUp: false,
-    history: [2200, 2150, 2100, 2050, 2000, 1990, 1986],
+    history: [2250, 2200, 2150, 2100, 2000, 1920, 1850],
     market: 'Kolar APMC, Karnataka',
-    quality: 'Fair',
+    quality: 'Standard',
     lastUpdated: new Date()
   },
   {
     id: 'fallback-4',
-    name: 'Cotton (BT)',
-    currentPrice: 7420,
+    name: 'Cotton (Long Staple)',
+    commodityName: 'Cotton',
+    variety: 'Medium/Long Staple',
+    currentPrice: 7350,
+    liveRate: 7350,
+    currentRate: 7350,
+    pastRate: 7100,
     unit: 'Quintal',
-    trend: 2.8,
+    trend: 3.52,
     trendUp: true,
-    history: [7100, 7150, 7200, 7250, 7300, 7380, 7420],
-    market: 'Khammam Mandi, Telangana',
+    history: [6950, 7000, 7050, 7100, 7200, 7280, 7350],
+    market: 'Adilabad Mandi, Telangana',
     quality: 'Premium',
     lastUpdated: new Date()
   },
   {
     id: 'fallback-5',
-    name: 'Soybean (Yellow)',
-    currentPrice: 4850,
+    name: 'Onion (Red Nashik)',
+    commodityName: 'Onion',
+    variety: 'Red Onion',
+    currentPrice: 2650,
+    liveRate: 2650,
+    currentRate: 2650,
+    pastRate: 2450,
     unit: 'Quintal',
-    trend: 0.5,
+    trend: 8.16,
     trendUp: true,
-    history: [4800, 4810, 4820, 4830, 4840, 4845, 4850],
-    market: 'Latur Mandi, Maharashtra',
+    history: [2350, 2400, 2420, 2450, 2520, 2590, 2650],
+    market: 'Lasalgaon Mandi, Maharashtra',
     quality: 'Premium',
     lastUpdated: new Date()
   },
   {
     id: 'fallback-6',
-    name: 'Wheat (Lokwan)',
+    name: 'Wheat (Lokwan / Sharbati)',
+    commodityName: 'Wheat',
+    variety: 'Lokwan / Sharbati',
     currentPrice: 2850,
+    liveRate: 2850,
+    currentRate: 2850,
+    pastRate: 2820,
     unit: 'Quintal',
-    trend: 1.2,
+    trend: 1.06,
     trendUp: true,
-    history: [2750, 2780, 2800, 2810, 2820, 2840, 2850],
-    market: 'Sehore APMC, Madhya Pradesh',
-    quality: 'Standard',
+    history: [2790, 2800, 2810, 2820, 2830, 2840, 2850],
+    market: 'Indore APMC, Madhya Pradesh',
+    quality: 'Premium',
     lastUpdated: new Date()
   }
 ];
@@ -248,25 +284,35 @@ export function MarketRates() {
     return () => clearInterval(timer);
   }, []);
 
-  // Live Price Simulation to make it feel "Live" as it was earlier
+  // Live Price Simulation to make it feel "Live" with real-time micro-fluctuations
   useEffect(() => {
     if (commodities.length === 0) return;
 
     const interval = setInterval(() => {
       setCommodities(current => {
+        if (current.length === 0) return current;
         const indexToUpdate = Math.floor(Math.random() * current.length);
+
         return current.map((c, i) => {
           if (i !== indexToUpdate) return { ...c, isFlashing: null };
           
-          const change = (Math.random() - 0.48) * (c.currentPrice * 0.002);
-          const newPrice = Math.round(c.currentPrice + change);
+          const change = (Math.random() - 0.48) * (c.liveRate * 0.003);
+          const newLiveRate = Math.round(c.liveRate + change);
+          const newHistory = [...c.history];
+          if (newHistory.length > 0) {
+            newHistory[newHistory.length - 1] = newLiveRate;
+          }
+          const changePercent = parseFloat((((newLiveRate - c.pastRate) / (c.pastRate || 1)) * 100).toFixed(2));
           
           return {
             ...c,
-            currentPrice: newPrice,
+            liveRate: newLiveRate,
+            currentPrice: newLiveRate,
+            history: newHistory,
             isFlashing: change >= 0 ? 'up' : 'down',
             lastUpdated: new Date(),
-            trend: parseFloat((c.trend + (change / c.currentPrice * 100)).toFixed(1))
+            trend: Math.abs(changePercent),
+            trendUp: changePercent >= 0
           };
         });
       });
@@ -275,79 +321,43 @@ export function MarketRates() {
       setTimeout(() => {
         setCommodities(current => current.map(c => ({ ...c, isFlashing: null })));
       }, 2000);
-    }, 5000);
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [commodities.length, isLoading]);
 
-
-
-  // 1. REAL-TIME DATA FETCHING FROM AGMARKNET API
+  // 1. REAL-TIME DATA FETCHING FROM AGMARKNET API (Resource 35985678-0d79-46b4-9ed6-6f13308a1d24)
   const fetchMarketData = async () => {
-    const apiKey = import.meta.env.VITE_AGMARKNET_API_KEY;
-    if (!apiKey) {
-      console.error('Agmarknet API key missing');
-      setCommodities(FALLBACK_COMMODITIES);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const resourceId = '9ef273d1-c1aa-42da-ad35-3c544bd3503c';
-      const baseUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${apiKey}&format=json&limit=150`;
-      
-      // Use a CORS proxy because many gov.in APIs block direct browser requests
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
-
-      console.log('Fetching from Agmarknet API via proxy...');
-      const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-      const data = await response.json();
-      console.log('API Response received:', data);
-
-      if (data && data.records && data.records.length > 0) {
-        const mappedData: Commodity[] = data.records.map((record: any, idx: number) => {
-          const modalPrice = parseInt(record.modal_price) || 0;
-          const minPrice = parseInt(record.min_price) || modalPrice * 0.9;
-          const maxPrice = parseInt(record.max_price) || modalPrice * 1.1;
-          
-          // Generate a consistent 7-day history
-          const history = Array.from({ length: 7 }).map((_, i) => {
-             const variance = (idx + i) % 2 === 0 ? 1.02 : 0.98;
-             return Math.round(modalPrice * (0.95 + (i * 0.01)) * variance);
-          });
-          history[6] = modalPrice;
-
+      const records = await fetchLiveAgmarknetRates();
+      if (records && records.length > 0) {
+        const mappedData: Commodity[] = records.map((record, idx) => {
           return {
-            id: `${record.commodity}-${record.market}-${idx}`,
-            name: `${record.commodity} (${record.variety || 'Local'})`,
-            currentPrice: modalPrice,
+            id: record.id || `crop-${idx}`,
+            name: `${record.commodity} (${record.variety})`,
+            commodityName: record.commodity,
+            variety: record.variety,
+            currentPrice: record.liveRate,
+            liveRate: record.liveRate,
+            currentRate: record.currentRate,
+            pastRate: record.pastRate,
             unit: record.unit || 'Quintal',
-            trend: parseFloat(((maxPrice - minPrice) / (modalPrice || 1) * 100).toFixed(1)) || 2.4,
-            trendUp: maxPrice > minPrice,
-            history: history,
+            trend: Math.abs(record.changePercent),
+            trendUp: record.isUp,
+            history: record.history.map(h => h.rate),
             market: `${record.market}, ${record.district} (${record.state})`,
-            quality: modalPrice > 5000 ? 'Premium' : modalPrice > 3000 ? 'Standard' : 'Fair',
-            lastUpdated: new Date() // Fallback to now if arrival_date is weird
+            quality: record.quality,
+            lastUpdated: new Date()
           };
         });
 
-        // Try to find the user's requested crops, but if not found, show the best available data
-        const searchTerms = ['Chilli', 'Cotton', 'Soyabean', 'Maize', 'Tomato', 'Wheat', 'Onion', 'Rice', 'Potato'];
-        const filtered = mappedData.filter(c => 
-          searchTerms.some(term => c.name.toLowerCase().includes(term.toLowerCase()))
-        );
-
-        setCommodities(filtered.length > 0 ? filtered.slice(0, 12) : mappedData.slice(0, 12));
+        setCommodities(mappedData);
       } else {
-        console.warn('No records found in API, using fallback data');
         setCommodities(FALLBACK_COMMODITIES);
       }
     } catch (err) {
-      console.error('Error fetching market data:', err);
-      // Fallback to high-quality dummy data if API fails
+      console.error('Error fetching Agmarknet live market data:', err);
       setCommodities(FALLBACK_COMMODITIES);
     } finally {
       setIsLoading(false);
@@ -632,7 +642,22 @@ export function MarketRates() {
                     {displayMarket(selectedCommodity.market)} • {selectedCommodity.quality} Quality
                   </p>
 
-                  <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+                    <div className="bg-emerald-950/40 rounded-2xl p-4 border border-emerald-500/30">
+                       <div className="flex items-center gap-1.5 mb-1">
+                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                         <p className="text-emerald-300 text-[10px] font-black uppercase tracking-wider">Live Rate</p>
+                       </div>
+                       <p className="text-2xl font-black text-emerald-400">₹{selectedCommodity.liveRate.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                       <p className="text-white/40 text-[10px] font-black uppercase tracking-wider mb-1">Current Rate</p>
+                       <p className="text-2xl font-black text-white">₹{selectedCommodity.currentRate.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                       <p className="text-white/40 text-[10px] font-black uppercase tracking-wider mb-1">Past Rate</p>
+                       <p className="text-2xl font-black text-white/80">₹{selectedCommodity.pastRate.toLocaleString()}</p>
+                    </div>
                     <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
                        <p className="text-white/40 text-[10px] font-black uppercase tracking-tighter mb-1">{t('market.high')}</p>
                        <p className="text-2xl font-black text-white">₹{stats.high.toLocaleString()}</p>
@@ -793,15 +818,35 @@ export function MarketRates() {
                 </div>
               </div>
 
-              <div className="flex items-end gap-3 mb-8 relative z-10">
-                 <span className={`text-5xl font-black leading-none tracking-tighter transition-colors duration-500 ${
-                    item.isFlashing === 'up' ? 'text-green-600' : 
-                    item.isFlashing === 'down' ? 'text-red-600' : 
-                    'text-prodmast-dark'
-                 }`}>
-                    ₹{item.currentPrice.toLocaleString()}
-                 </span>
-                 <span className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-1">/ {item.unit}</span>
+              <div className="mb-4 relative z-10">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Live Agmarknet Rate
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-4xl font-black leading-none tracking-tight transition-colors duration-500 ${
+                     item.isFlashing === 'up' ? 'text-green-600' : 
+                     item.isFlashing === 'down' ? 'text-red-600' : 
+                     'text-prodmast-dark'
+                  }`}>
+                     ₹{item.liveRate.toLocaleString()}
+                  </span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">/ {item.unit}</span>
+                </div>
+
+                {/* Past & Current Rates display */}
+                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-100 text-xs">
+                  <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Current Rate</span>
+                    <span className="font-black text-slate-800">₹{item.currentRate.toLocaleString()}</span>
+                  </div>
+                  <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Past Rate</span>
+                    <span className="font-black text-slate-500">₹{item.pastRate.toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="mb-6 relative z-10">

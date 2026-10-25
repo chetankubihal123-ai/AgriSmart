@@ -1,12 +1,16 @@
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-function resendDevPlugin(resendApiKey: string): Plugin {
+function agriSmartDevPlugin(env: Record<string, string>): Plugin {
+  const resendApiKey = env.VITE_RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || '';
+  const minimothApiKey = env.VITE_MINIMOTH_API_KEY || process.env.VITE_MINIMOTH_API_KEY || 'mm_test_228cbe86487cb6e23322caad39355e06700a6e783a9c909e90757817c6af674c63499d3f21bfebd3fc60314db0092745';
+  const agmarknetApiKey = env.VITE_AGMARKNET_API_KEY || process.env.VITE_AGMARKNET_API_KEY || '579b464db66ec23bdd0000015ecd53fda7cd452c4c6d7eaa78973f6e';
+
   return {
-    name: 'resend-dev-api',
+    name: 'agrismart-dev-api',
     configureServer(server) {
+      // 1. Resend Email OTP
       server.middlewares.use('/api/send-email-otp', async (req, res) => {
-        // Handle preflight
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -25,10 +29,7 @@ function resendDevPlugin(resendApiKey: string): Plugin {
         }
 
         let body = '';
-        req.on('data', chunk => {
-          body += chunk;
-        });
-
+        req.on('data', chunk => { body += chunk; });
         req.on('end', async () => {
           try {
             const parsed = JSON.parse(body || '{}');
@@ -43,12 +44,10 @@ function resendDevPlugin(resendApiKey: string): Plugin {
               return;
             }
 
-            const apiKey = resendApiKey || process.env.VITE_RESEND_API_KEY || '';
-
             const resendRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${resendApiKey}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
@@ -99,6 +98,142 @@ function resendDevPlugin(resendApiKey: string): Plugin {
           }
         });
       });
+
+      // 2. MiniMoth Send OTP
+      server.middlewares.use('/api/minimoth/send', async (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const parsed = JSON.parse(body || '{}');
+            const phone = parsed.phone;
+
+            if (!phone) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Phone number is required' }));
+              return;
+            }
+
+            const mmRes = await fetch('https://api.minimoth.dev/v1/otp/send', {
+              method: 'POST',
+              headers: {
+                'X-Api-Key': minimothApiKey,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ phone })
+            });
+
+            const data = await mmRes.json();
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = mmRes.status;
+            res.end(JSON.stringify(data));
+          } catch (err: any) {
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err.message || 'MiniMoth send OTP error' }));
+          }
+        });
+      });
+
+      // 3. MiniMoth Verify OTP
+      server.middlewares.use('/api/minimoth/verify', async (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const parsed = JSON.parse(body || '{}');
+            const { phone, code } = parsed;
+
+            if (!phone || !code) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Phone number and verification code are required' }));
+              return;
+            }
+
+            const mmRes = await fetch('https://api.minimoth.dev/v1/otp/verify', {
+              method: 'POST',
+              headers: {
+                'X-Api-Key': minimothApiKey,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ phone, code })
+            });
+
+            const data = await mmRes.json();
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = mmRes.status;
+            res.end(JSON.stringify(data));
+          } catch (err: any) {
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err.message || 'MiniMoth verify OTP error' }));
+          }
+        });
+      });
+
+      // 4. Agmarknet Live Mandi Prices Proxy
+      server.middlewares.use('/api/agmarknet', async (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        try {
+          const resourceId = '35985678-0d79-46b4-9ed6-6f13308a1d24';
+          const apiUrl = `https://api.data.gov.in/resource/${resourceId}?api-key=${agmarknetApiKey}&format=json&offset=0&limit=100`;
+
+          const agRes = await fetch(apiUrl);
+          const data = await agRes.json();
+
+          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = agRes.status;
+          res.end(JSON.stringify(data));
+        } catch (err: any) {
+          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err.message || 'Failed to fetch Agmarknet prices' }));
+        }
+      });
     }
   };
 }
@@ -106,10 +241,9 @@ function resendDevPlugin(resendApiKey: string): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const resendKey = env.VITE_RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || '';
 
   return {
-    plugins: [react(), resendDevPlugin(resendKey)],
+    plugins: [react(), agriSmartDevPlugin(env)],
     optimizeDeps: {
       include: [
         'react',
