@@ -308,10 +308,32 @@ const FALLBACK_RECORDS: MarketCommodity[] = [
 ];
 
 export async function fetchLiveAgmarknetRates(): Promise<MarketCommodity[]> {
+  const AGMARKNET_API_KEY = import.meta.env.VITE_AGMARKNET_API_KEY || '579b464db66ec23bdd0000015ecd53fda7cd452c4c6d7eaa78973f6e';
+  const RESOURCE_ID = '35985678-0d79-46b4-9ed6-6f13308a1d24';
+
   try {
-    const res = await fetch('/api/agmarknet');
+    let res: Response;
+
+    // In development, try local proxy first
+    if (import.meta.env.DEV) {
+      try {
+        const proxyRes = await fetch('/api/agmarknet');
+        const contentType = proxyRes.headers.get('content-type') || '';
+        if (proxyRes.ok && contentType.includes('application/json')) {
+          res = proxyRes;
+        } else {
+          res = await fetch(`https://api.data.gov.in/resource/${RESOURCE_ID}?api-key=${AGMARKNET_API_KEY}&format=json&offset=0&limit=100`);
+        }
+      } catch {
+        res = await fetch(`https://api.data.gov.in/resource/${RESOURCE_ID}?api-key=${AGMARKNET_API_KEY}&format=json&offset=0&limit=100`);
+      }
+    } else {
+      // Production: call data.gov.in API directly
+      res = await fetch(`https://api.data.gov.in/resource/${RESOURCE_ID}?api-key=${AGMARKNET_API_KEY}&format=json&offset=0&limit=100`);
+    }
+
     if (!res.ok) {
-      console.warn('API route /api/agmarknet response not OK:', res.status);
+      console.warn('Agmarknet API response not OK:', res.status);
       return FALLBACK_RECORDS;
     }
 
