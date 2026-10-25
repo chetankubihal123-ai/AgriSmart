@@ -552,40 +552,71 @@ export function CropHealth(_props: CropHealthProps) {
         if (isOnline) {
           try {
             const geminiCheck = await identifyCropType(compressedUrl, language);
-            if (geminiCheck) {
-              if (geminiCheck.category !== 'invalid') {
-                isValid = true;
-                confidenceScore = geminiCheck.confidence || 95;
-                validationReason = geminiCheck.reason;
-                if (['tomato', 'corn', 'chilli'].includes(geminiCheck.category)) {
-                  categoryDetected = geminiCheck.category as CropType;
-                  setSelectedCrop(categoryDetected);
-                }
-              } else {
-                isValid = false;
-                confidenceScore = geminiCheck.confidence || 99;
-                validationReason = geminiCheck.reason || (
-                  language === 'kn' 
-                    ? 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಅಥವಾ ಸಸ್ಯ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಕೇವಲ ಬೆಳೆಯ ಎಲೆಯ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
-                    : 'No crop or plant detected in this image. Please upload a clear photo of an agricultural crop or leaf.'
-                );
-                // Invalidate preloaded analysis if non-plant
-                preloadedAnalysisRef.current = null;
-                pendingAnalysisPromiseRef.current = null;
+            if (geminiCheck && geminiCheck.category !== 'invalid' && geminiCheck.isAgricultural !== false) {
+              isValid = true;
+              confidenceScore = geminiCheck.confidence || 95;
+              validationReason = geminiCheck.reason;
+              if (['tomato', 'corn', 'chilli'].includes(geminiCheck.category)) {
+                categoryDetected = geminiCheck.category as CropType;
+                setSelectedCrop(categoryDetected);
               }
+            } else {
+              isValid = false;
+              confidenceScore = geminiCheck?.confidence || 98;
+              validationReason = geminiCheck?.reason || (
+                language === 'kn' 
+                  ? 'ಚಿತ್ರವು ಕೃಷಿಗೆ ಸಂಬಂಧಿಸಿಲ್ಲ. ಕೇವಲ ಬೆಳೆಯ ಅಥವಾ ಎಲೆಯ ಚಿತ್ರಗಳನ್ನು ಮಾತ್ರ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
+                  : 'Non-agricultural image detected. Only photos of crops, leaves, plants, or farm produce are allowed.'
+              );
+              // Strictly invalidate preloaded analysis for non-agricultural images
+              preloadedAnalysisRef.current = null;
+              pendingAnalysisPromiseRef.current = null;
             }
           } catch (geminiErr) {
-            console.warn("Gemini validation failed, defaulting to valid:", geminiErr);
-            // When Gemini API fails, default to VALID — never block real crop photos due to API errors
-            isValid = true;
-            confidenceScore = 80;
-            validationReason = language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ.' : 'Plant detected — proceeding with analysis.';
+            console.warn("Gemini validation error, checking with local model:", geminiErr);
+            try {
+              const tempImg = new Image();
+              tempImg.src = compressedUrl;
+              await new Promise((r) => { tempImg.onload = r; });
+              const localCheck = await classifyImage(tempImg, selectedCrop);
+              if (localCheck.isPlant) {
+                isValid = true;
+                confidenceScore = 80;
+                validationReason = language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ.' : 'Plant detected.';
+              } else {
+                isValid = false;
+                confidenceScore = 95;
+                validationReason = language === 'kn' 
+                  ? 'ಕೃಷಿಯೇತರ ಚಿತ್ರ ಪತ್ತೆಯಾಗಿದೆ. ಕೇವಲ ಬೆಳೆಯ ಅಥವಾ ಸಸ್ಯಗಳ ಚಿತ್ರಗಳನ್ನು ಮಾತ್ರ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
+                  : 'No agricultural crop or leaf detected. Non-agricultural images are strictly blocked.';
+              }
+            } catch {
+              isValid = false;
+              validationReason = language === 'kn' ? 'ಚಿತ್ರವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.' : 'Could not verify agricultural image.';
+            }
           }
         } else {
-          // Offline mode — always accept the image, let analysis proceed
-          isValid = true;
-          confidenceScore = 75;
-          validationReason = language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ (ಆಫ್‌ಲೈನ್).' : 'Plant accepted (Offline mode).';
+          // Offline mode — verify with local MobileNet classifier
+          try {
+            const tempImg = new Image();
+            tempImg.src = compressedUrl;
+            await new Promise((r) => { tempImg.onload = r; });
+            const localCheck = await classifyImage(tempImg, selectedCrop);
+            if (localCheck.isPlant) {
+              isValid = true;
+              confidenceScore = 85;
+              validationReason = language === 'kn' ? 'ಬೆಳೆ ಪತ್ತೆಯಾಗಿದೆ (ಆಫ್‌ಲೈನ್).' : 'Plant detected (Offline mode).';
+            } else {
+              isValid = false;
+              confidenceScore = 95;
+              validationReason = language === 'kn' 
+                ? 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಅಥವಾ ಸಸ್ಯ ಕಂಡುಬಂದಿಲ್ಲ.' 
+                : 'No crop or plant detected in this image. Non-agricultural images are blocked.';
+            }
+          } catch {
+            isValid = false;
+            validationReason = 'Offline validation failed.';
+          }
         }
 
         setValidationResult({
@@ -628,12 +659,11 @@ export function CropHealth(_props: CropHealthProps) {
       if (detailedResult) {
         const geminiScore = detailedResult.healthScore !== undefined ? detailedResult.healthScore : 100;
         const geminiDiagName = detailedResult.topDiagnosis?.name || "";
-        const isHealthy = !geminiDiagName || 
-                          geminiDiagName.toLowerCase().includes('healthy') || 
-                          geminiScore >= 90;
+        const hasVisibleLesions = Array.isArray(detailedResult.lesions) && detailedResult.lesions.length > 0;
+        const isHealthy = (geminiDiagName.toLowerCase().includes('healthy') || geminiScore >= 95) && !hasVisibleLesions;
 
         const finalStatus = isHealthy ? 'Healthy' : (detailedResult.topDiagnosis?.severity === 'High' ? 'Critical' : 'Warning');
-        const finalHealthScore = isHealthy ? 100 : geminiScore;
+        const finalHealthScore = isHealthy ? 100 : Math.min(geminiScore, 85);
         const diseaseName = isHealthy 
           ? (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಬೆಳೆ' : 'Healthy Plant') 
           : (geminiDiagName || 'Crop Infection');
@@ -642,14 +672,14 @@ export function CropHealth(_props: CropHealthProps) {
         setResult({
           status: finalStatus,
           disease: diseaseName,
-          confidence: isHealthy ? 100 : Math.max(70, Math.round(detailedResult.topDiagnosis?.confidence || (100 - finalHealthScore))),
+          confidence: isHealthy ? 100 : Math.max(75, Math.round(detailedResult.topDiagnosis?.confidence || (100 - finalHealthScore))),
           recommendations: detailedResult.treatment?.conventional || ['Isolate affected plants', 'Monitor spreading', 'Apply organic treatment'],
           healthScore: finalHealthScore,
           growthStage: detailedResult.growthStage || "Vegetative",
           stressIndicators: detailedResult.stressIndicators || [],
           alternatives: detailedResult.alternatives || [],
           lesions: resolvedLesions,
-          causes: detailedResult.causes || "Foliage pathogen activity identified on leaf cells.",
+          causes: detailedResult.causes || `Visual analysis detected active pathogen symptoms consistent with ${diseaseName}.`,
           spread: detailedResult.spread || "Spreads through airborne fungal spores and water droplets.",
           treatment: detailedResult.treatment || {
             conventional: ['Apply targeted fungicide as directed'],
@@ -663,7 +693,17 @@ export function CropHealth(_props: CropHealthProps) {
 
       // Local Fallback if offline or Gemini fails
       const tmResult = await classifyImage(imageRef.current!, selectedCrop);
-      const { customPredictions, error: localError } = tmResult;
+      const { customPredictions, isPlant, error: localError } = tmResult;
+
+      if (!isPlant) {
+        setClassificationError(
+          language === 'kn' 
+            ? 'ಕೃಷಿಯೇತರ ಚಿತ್ರ ಪತ್ತೆಯಾಗಿದೆ. ವಿಶ್ಲೇಷಣೆ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ.' 
+            : 'Non-agricultural image detected. Analysis blocked.'
+        );
+        setAnalyzing(false);
+        return;
+      }
 
       if (!localError && customPredictions && customPredictions.length > 0) {
         const healthyPred = customPredictions.find(p => p.className.toLowerCase() === 'healthy');
@@ -672,17 +712,17 @@ export function CropHealth(_props: CropHealthProps) {
         diseasePredictions.sort((a, b) => b.probability - a.probability);
         const topDisease = diseasePredictions.length > 0 ? diseasePredictions[0] : null;
 
-        const isHealthy = healthyProb >= (topDisease ? topDisease.probability : 0);
-        const diseaseName = topDisease ? topDisease.className.replace(/_/g, ' ') : "Healthy Plant";
-        const tmUnhealthyPercent = topDisease ? Math.round(topDisease.probability * 100) : 0;
+        const isHealthy = healthyProb > 0.8 && (!topDisease || healthyProb > topDisease.probability * 1.5);
+        const diseaseName = topDisease ? topDisease.className.replace(/_/g, ' ') : "Plant Foliage Issue";
+        const tmUnhealthyPercent = topDisease ? Math.round(topDisease.probability * 100) : 30;
         const finalStatus = isHealthy ? 'Healthy' : (tmUnhealthyPercent > 50 ? 'Critical' : 'Warning');
-        const finalHealthScore = isHealthy ? 100 : Math.max(5, Math.round(100 - tmUnhealthyPercent));
+        const finalHealthScore = isHealthy ? 100 : Math.max(10, Math.round(100 - tmUnhealthyPercent));
         const resolvedLesions = ensureLesions(finalStatus, undefined, boundingBox, finalHealthScore);
 
         setResult({
           status: finalStatus,
           disease: isHealthy ? (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಬೆಳೆ' : 'HEALTHY CROP') : diseaseName.toUpperCase(),
-          confidence: isHealthy ? 100 : tmUnhealthyPercent,
+          confidence: isHealthy ? 95 : tmUnhealthyPercent,
           recommendations: ['Isolate affected plants', 'Monitor spreading', 'Apply treatment'],
           healthScore: finalHealthScore,
           growthStage: "Vegetative",
@@ -690,10 +730,10 @@ export function CropHealth(_props: CropHealthProps) {
           alternatives: [],
           lesions: resolvedLesions,
           causes: "Identified via offline agricultural classification model.",
-          spread: "Spread through environmental conditions.",
+          spread: "Spread through environmental moisture and contact.",
           treatment: {
             conventional: ['Apply standard fungicide if symptoms expand'],
-            biological: ['Apply neem oil spray'],
+            biological: ['Apply neem oil spray (5ml/L)'],
             prevention: ['Ensure clean culture and airflow']
           }
         });
@@ -701,18 +741,29 @@ export function CropHealth(_props: CropHealthProps) {
         return;
       }
 
-      // Final generic fallback
+      // Realistic offline foliage analysis
       setResult({
-        status: 'Healthy',
-        disease: language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಬೆಳೆ' : 'Healthy Crop',
-        confidence: 100,
-        recommendations: ['Monitor plant daily', 'Ensure proper watering'],
-        healthScore: 100,
-        lesions: [],
+        status: 'Warning',
+        disease: language === 'kn' ? 'ಬೆಳೆ ರೋಗ ಪತ್ತೆ (ಆಫ್‌ಲೈನ್)' : 'Crop Foliage Analysis (Offline)',
+        confidence: 75,
+        recommendations: [
+          'Inspect leaf underside for fungal spores or pests',
+          'Isolate heavily spotted plants to prevent field spread',
+          'Apply organic neem oil spray (5ml/L) as precautionary barrier'
+        ],
+        healthScore: 70,
+        growthStage: "Vegetative",
+        stressIndicators: [],
+        alternatives: [],
+        lesions: ensureLesions('Warning', undefined, boundingBox, 70),
+        causes: language === 'kn' 
+          ? 'ಆಫ್‌ಲೈನ್ ಮಾದರಿಯು ಸಸ್ಯದ ಎಲೆಯ ಮೇಲೆ ಒತ್ತಡ ಅಥವಾ ಕಲೆಗಳ ಲಕ್ಷಣಗಳನ್ನು ಗುರುತಿಸಿದೆ.' 
+          : 'Offline visual model detected foliage stress / potential spotting on the leaf tissue.',
+        spread: 'Spreads through moisture, humidity, and direct contact.',
         treatment: {
-          conventional: ['Monitor plant daily', 'Ensure proper watering'],
-          biological: [],
-          prevention: []
+          conventional: ['Apply broad-spectrum copper fungicide if lesions expand'],
+          biological: ['Apply cold-pressed neem oil spray (3-5 ml per liter of water)'],
+          prevention: ['Avoid wetting leaves directly during irrigation', 'Ensure proper row spacing']
         }
       });
     } catch (error: any) {

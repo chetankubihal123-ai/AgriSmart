@@ -127,14 +127,14 @@ export function DiseaseScanner() {
       const compressedUrl = await compressImageForAI(previewUrl, 640);
 
       if (isOnline) {
-        // 2. Crop Validation with Gemini — only block if VERY confident it's not a plant
+        // 2. Strict Crop Validation with Gemini
         const geminiCheck = await identifyCropType(compressedUrl, language);
-        if (geminiCheck.category === 'invalid' && geminiCheck.confidence >= 85) {
+        if (geminiCheck.category === 'invalid' || geminiCheck.isAgricultural === false) {
           throw new Error(
             geminiCheck.reason || (
               language === 'kn' 
-                ? 'ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಬೆಳೆ ಅಥವಾ ಸಸ್ಯ ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಕೇವಲ ಬೆಳೆಯ ಎಲೆಯ ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
-                : 'No crop detected in this image. Please upload a clear photo of an agricultural plant or leaf.'
+                ? 'ಕೃಷಿಯೇತರ ಚಿತ್ರ ಪತ್ತೆಯಾಗಿದೆ. ಕೇವಲ ಬೆಳೆಯ ಅಥವಾ ಸಸ್ಯಗಳ ಚಿತ್ರಗಳನ್ನು ಮಾತ್ರ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.' 
+                : 'Non-agricultural image detected. Only photos of crops, leaves, plants, or farm produce are accepted.'
             )
           );
         }
@@ -143,18 +143,18 @@ export function DiseaseScanner() {
         const detailed = await analyzeDetailedPlantHealth(compressedUrl, geminiCheck.category, language);
         if (detailed && detailed.topDiagnosis) {
           const diagName = detailed.topDiagnosis.name || (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಸಸ್ಯ' : 'Healthy Plant');
-          const isPlantHealthy = !diagName || 
-                                 diagName.toLowerCase().includes('healthy') || 
-                                 (detailed.healthScore !== undefined && detailed.healthScore >= 90);
+          const hasVisibleLesions = Array.isArray(detailed.lesions) && detailed.lesions.length > 0;
+          const isPlantHealthy = (diagName.toLowerCase().includes('healthy') || (detailed.healthScore !== undefined && detailed.healthScore >= 95)) && !hasVisibleLesions;
+          const finalHealth = isPlantHealthy ? 100 : Math.min(detailed.healthScore ?? 65, 85);
 
           setResult({
             disease: isPlantHealthy ? (language === 'kn' ? 'ಆರೋಗ್ಯಕರ ಸಸ್ಯ' : 'HEALTHY PLANT') : diagName,
-            confidence: isPlantHealthy ? 100 : Math.max(75, Math.round(detailed.topDiagnosis.confidence || 94)),
+            confidence: isPlantHealthy ? 100 : Math.max(75, Math.round(detailed.topDiagnosis.confidence || (100 - finalHealth))),
             raw_class: isPlantHealthy ? 'healthy' : diagName,
             causes: detailed.causes,
             spread: detailed.spread,
             treatment: detailed.treatment,
-            healthScore: detailed.healthScore
+            healthScore: finalHealth
           });
           return;
         }
