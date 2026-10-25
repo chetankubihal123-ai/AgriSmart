@@ -113,7 +113,7 @@ export function Auth() {
     try {
       const res = await sendMiniMothOtp(phone);
       if (res.success) {
-        setMessage(`🌿 6-digit WhatsApp & SMS OTP dispatched to +91 ${phone}! Check WhatsApp or SMS. (Sandbox code: 000000)`);
+        setMessage(`🌿 6-digit verification code sent to +91 ${phone}! Check your WhatsApp and SMS.`);
         setOtpMethod('minimoth');
         setShowOtpVerification(true);
         setOtpCooldown(60);
@@ -133,7 +133,7 @@ export function Auth() {
     setMessage('');
 
     if (!userOtp || userOtp.length !== 6) {
-      setError('Please enter the 6-digit OTP sent to your phone/WhatsApp.');
+      setError('Please enter the 6-digit OTP sent to your WhatsApp or SMS.');
       return;
     }
 
@@ -153,7 +153,7 @@ export function Auth() {
           navigate(from, { replace: true });
         }, 700);
       } else {
-        setError(res.error || 'Invalid OTP code. Please enter the received code or 000000 for test mode.');
+        setError(res.error || 'Invalid OTP code. Please enter the 6-digit code received on WhatsApp or SMS.');
       }
     } catch (err: any) {
       setError(err.message || 'Error verifying Mobile OTP');
@@ -384,7 +384,7 @@ export function Auth() {
     try {
       const res = await sendMiniMothOtp(phone);
       if (res.success) {
-        setMessage(`🌿 6-digit WhatsApp & SMS OTP sent to +91 ${phone.slice(-10)} via MiniMoth! (Sandbox: 000000)`);
+        setMessage(`🌿 6-digit verification code sent to +91 ${phone.slice(-10)} via WhatsApp/SMS!`);
         setOtpMethod('minimoth');
         setShowOtpVerification(true);
         setOtpCooldown(60);
@@ -420,7 +420,7 @@ export function Auth() {
           }, 1000);
           return;
         } else {
-          setError(res.error || 'Invalid OTP code. Please enter the code received or 000000 for test sandbox.');
+          setError(res.error || 'Invalid OTP code. Please enter the 6-digit code received on WhatsApp or SMS.');
           return;
         }
       } catch (err: any) {
@@ -570,7 +570,7 @@ export function Auth() {
                     required
                     maxLength={6}
                     className="w-full pl-12 pr-4 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 transition bg-slate-50 focus:bg-white text-center text-2xl font-black tracking-[0.3em] text-gray-900 placeholder-slate-400 outline-none"
-                    placeholder="000000"
+                    placeholder="------"
                   />
                 </div>
               </div>
@@ -906,7 +906,7 @@ export function Auth() {
                               required
                               maxLength={6}
                               className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-black text-2xl tracking-[0.3em] text-center placeholder-slate-400 shadow-sm"
-                              placeholder="000000"
+                              placeholder="------"
                             />
                           </div>
                           <div className="flex justify-between items-center px-1 text-xs">
@@ -919,7 +919,7 @@ export function Auth() {
                               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                               <span>{otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}</span>
                             </button>
-                            <span className="text-slate-400 text-[10px]">Test code: 000000</span>
+                            <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
                           </div>
                         </div>
 
@@ -1322,7 +1322,7 @@ export function Auth() {
                               required
                               maxLength={6}
                               className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-black text-2xl tracking-[0.3em] text-center placeholder-slate-400 shadow-sm"
-                              placeholder="000000"
+                              placeholder="------"
                             />
                           </div>
                           <div className="flex justify-between items-center px-1 text-xs">
@@ -1335,7 +1335,7 @@ export function Auth() {
                               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                               <span>{otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}</span>
                             </button>
-                            <span className="text-slate-400 text-[10px]">Test code: 000000</span>
+                            <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
                           </div>
                         </div>
 
