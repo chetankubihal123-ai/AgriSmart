@@ -4,11 +4,12 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 // Force V1 stable API version to avoid 404 v1beta issues
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+// Use proven stable Gemini model names
 const MODELS = [
-  "gemini-flash-lite-latest",
-  "gemini-3.5-flash-lite",
-  "gemini-3.5-flash",
-  "gemini-flash-latest"
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-pro",
+  "gemini-pro-vision"
 ];
 
 export async function analyzeImageWithGemini(base64Image: string, cropType: string = 'plant', language: string = 'en') {
@@ -175,28 +176,41 @@ export async function identifyCropType(base64Image: string, language: string = '
   const mimeType = base64Image.split(',')[0].split(':')[1].split(';')[0];
   const base64Data = base64Image.split(',')[1];
   
-  const prompt = `CRITICAL TASK: Strictly determine if this image depicts a REAL agricultural crop, plant, leaf, crop fruit, or farm vegetation.
-  
-  Categories:
-  1. "tomato", "corn", "chilli" - if specifically identified as one of these crops/leaves.
-  2. "other" - if it is a real plant, crop, leaf, flower, or agricultural produce, but not tomato/corn/chilli.
-  3. "invalid" - STRICTLY assign "invalid" if the image shows:
-     - Handwritten text, signatures, paper, documents, drawings, sketches
-     - Humans, faces, hands, selfies, skin, clothing
-     - Animals, pets
-     - Vehicles, buildings, furniture, indoor items, screens, electronics
-     - Blank, plain, or non-vegetative objects
-     - Anything that is NOT a genuine living plant/leaf/crop.
+  const prompt = `You are an agricultural image classifier for Indian farmers. Your job is to ALLOW agricultural images and BLOCK only clearly non-agricultural ones.
 
-  STRICT RULE:
-  Do NOT hallucinate or guess a plant where none exists. If there is NO botanical plant leaf, stem, or crop in the image, you MUST return "invalid" with high confidence (95-100).
-  
-  Return ONLY JSON in this format:
-  {
-    "category": "tomato" | "corn" | "chilli" | "other" | "invalid",
-    "confidence": number (0-100),
-    "reason": "Short, clear explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
-  }`;
+ACCEPT as VALID (return category "tomato", "corn", "chilli", or "other") for ANY of:
+- Leaves of any plant (green, yellow, brown, diseased, wilted)
+- Crops: rice, wheat, cotton, sugarcane, maize, potato, tomato, chilli, onion, soybean, turmeric, ginger, etc.
+- Plant stems, roots, seeds, flowers, fruits, vegetables
+- Farm fields, paddy fields, soil with plants
+- Diseased plants showing spots, lesions, yellowing, rust, blight
+- Seedlings, sprouts, saplings
+- Harvested produce: vegetables, fruits, grains
+- Any green vegetation or plant matter whatsoever
+- Agricultural tools or equipment in a farm setting
+
+REJECT as INVALID (return "invalid") ONLY for clearly non-agricultural images:
+- Human faces, selfies, portraits (person with NO plant visible)
+- Pure text documents, screenshots of apps, QR codes
+- Vehicles (cars, bikes) with no farm context
+- Indoor electronics, laptops, phones
+- Animals (dogs, cats) with no agricultural context
+
+IMPORTANT: When in doubt, ACCEPT the image. A leaf photo should ALWAYS be accepted. Green color = plant = accept.
+
+Categories:
+- "tomato" = tomato plant leaf/fruit
+- "corn" = maize/corn plant  
+- "chilli" = chilli/pepper plant
+- "other" = any other plant, crop, leaf, or agricultural image
+- "invalid" = ONLY if clearly and obviously not agricultural at all
+
+Return ONLY JSON:
+{
+  "category": "tomato" | "corn" | "chilli" | "other" | "invalid",
+  "confidence": number (0-100),
+  "reason": "Short explanation in ${language === 'kn' ? 'Kannada' : 'English'}"
+}`;
 
   for (const modelName of MODELS) {
     try {
@@ -217,12 +231,12 @@ export async function identifyCropType(base64Image: string, language: string = '
       
       const parsed = JSON.parse(match[0]);
       const validCategories = ['tomato', 'corn', 'chilli', 'other', 'invalid'];
-      let category = (parsed.category || 'invalid').toLowerCase();
-      if (!validCategories.includes(category)) category = 'invalid';
+      let category = (parsed.category || 'other').toLowerCase();
+      if (!validCategories.includes(category)) category = 'other';
       
       return {
         category: category as any,
-        confidence: parsed.confidence || 0,
+        confidence: parsed.confidence || 85,
         reason: parsed.reason || ''
       };
     } catch (error) {
@@ -231,10 +245,12 @@ export async function identifyCropType(base64Image: string, language: string = '
     }
   }
 
+  // If ALL Gemini models fail (API error, quota, etc.) → default to VALID so real crop photos are never wrongly blocked
+  console.warn('All Gemini models failed for crop identification — defaulting to valid plant.');
   return {
-    category: 'invalid',
-    confidence: 0,
-    reason: language === 'kn' ? 'ಚಿತ್ರವನ್ನು ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.' : 'Could not identify image.'
+    category: 'other',
+    confidence: 70,
+    reason: language === 'kn' ? 'ಚಿತ್ರ ಸಂಸ್ಕರಣೆ ಮಾಡಲಾಗುತ್ತಿದೆ.' : 'Image accepted for analysis.'
   };
 }
 

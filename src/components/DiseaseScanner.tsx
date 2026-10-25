@@ -127,9 +127,9 @@ export function DiseaseScanner() {
       const compressedUrl = await compressImageForAI(previewUrl, 640);
 
       if (isOnline) {
-        // 2. Strict Crop Validation with Gemini
+        // 2. Crop Validation with Gemini — only block if VERY confident it's not a plant
         const geminiCheck = await identifyCropType(compressedUrl, language);
-        if (geminiCheck.category === 'invalid') {
+        if (geminiCheck.category === 'invalid' && geminiCheck.confidence >= 85) {
           throw new Error(
             geminiCheck.reason || (
               language === 'kn' 
