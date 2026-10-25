@@ -91,65 +91,99 @@ export function Auth() {
 
   const isPasswordValid = password.length >= 6 && password.length <= 12 && /^[a-zA-Z0-9]{6,12}$/.test(password);
 
-  // --- PHONE LOGIN FLOW ---
-  const handlePhoneLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // --- GOOGLE FIREBASE PHONE SMS OTP FLOW (LOGIN & SIGN UP) ---
+  const handlePhoneSendOtp = async (purpose: 'signup' | 'login' = isLogin ? 'login' : 'signup') => {
     setError('');
     setMessage('');
 
-    if (!isPasswordValid) {
-      setError('Password must be between 6 and 12 characters (letters and numbers only).');
+    if (!isPhoneValid) {
+      setError('Please enter a valid 10-digit mobile number.');
       return;
+    }
+
+    if (purpose === 'signup') {
+      const pwdVal = validatePassword(password);
+      if (!pwdVal.isValid) {
+        setError(pwdVal.message);
+        return;
+      }
     }
 
     setLoading(true);
     try {
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-      const { error } = await supabase.auth.signInWithPassword({
-        phone: formattedPhone,
-        password: password,
-      });
-      if (error) throw error;
-      const from = location.state?.from || '/dashboard';
-      navigate(from, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during sign in');
+      const res = await sendFirebasePhoneOtp(phone);
+      if (res.success) {
+        setMessage(`🌿 Real 6-digit SMS OTP sent to +91 ${phone}! Check your SMS messages.`);
+        setOtpMethod('firebase');
+        setShowOtpVerification(true);
+        setOtpCooldown(60);
+      } else {
+        setError(res.error || 'Failed to send SMS OTP via Firebase. Please check your mobile number.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error communicating with Firebase SMS service');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- PHONE SIGN UP FLOW ---
-  const handlePhoneSignUp = async (e: React.FormEvent) => {
+  const handleVerifyPhoneAndSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
 
-    if (!isPasswordValid) {
-      setError('Password must be between 6 and 12 characters (letters and numbers only).');
+    if (!userOtp || userOtp.length !== 6) {
+      setError('Please enter the 6-digit SMS OTP sent to your phone.');
       return;
     }
 
     setLoading(true);
     try {
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-      const { error } = await supabase.auth.signUp({
-        phone: formattedPhone,
-        password: password,
-      });
-      if (error) throw error;
-      setMessage('Registration successful! Please sign in with your credentials.');
-      setIsLogin(true);
-    } catch (err: any) {
-      const errMsg = err instanceof Error ? err.message : String(err?.message || err || '');
-      if (errMsg.includes('unverified') || errMsg.includes('21608') || errMsg.includes('Trial accounts')) {
-        setError('Twilio Free Trial limitation: Twilio blocks SMS to unverified numbers. In your Supabase Dashboard -> Authentication -> Providers -> Phone: Turn OFF "Enable phone confirmations" so all farmers can register completely free without SMS charges!');
+      const res = await verifyFirebasePhoneOtp(userOtp);
+      if (res.success) {
+        localStorage.setItem('agrismart_user_phone', phone);
+        localStorage.setItem('agrismart_auth_method', 'firebase_phone');
+        if (password) {
+          localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
+        }
+
+        setMessage('✓ Phone verified successfully! Logging you in...');
+        setTimeout(() => {
+          const from = location.state?.from || '/dashboard';
+          navigate(from, { replace: true });
+        }, 700);
       } else {
-        setError(errMsg || 'An error occurred during registration');
+        setError(res.error || 'Invalid SMS OTP code. Please check your SMS messages.');
       }
+    } catch (err: any) {
+      setError(err.message || 'Error verifying SMS OTP');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePhoneLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+
+    if (!isPhoneValid) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    // Check if user has saved password locally
+    const savedPwd = localStorage.getItem(`agrismart_pwd_${phone}`);
+    if (savedPwd && password && atob(savedPwd) === password) {
+      localStorage.setItem('agrismart_user_phone', phone);
+      localStorage.setItem('agrismart_auth_method', 'firebase_phone');
+      const from = location.state?.from || '/dashboard';
+      navigate(from, { replace: true });
+      return;
+    }
+
+    // Otherwise, dispatch real SMS OTP via Firebase
+    await handlePhoneSendOtp('login');
   };
 
   // --- EMAIL + OTP FLOW (USING RESEND) ---
@@ -330,42 +364,6 @@ export function Auth() {
     }
   };
 
-  // --- TWILIO WHATSAPP OTP (FOR PHONE RESET) ---
-  const sendWhatsAppOTP = async (phoneNumber: string, otp: string) => {
-    const sid = import.meta.env.VITE_TWILIO_SID;
-    const token = import.meta.env.VITE_TWILIO_TOKEN;
-    const fromNumber = import.meta.env.VITE_TWILIO_WHATSAPP_NUMBER;
-
-    if (!sid || !token || !fromNumber) {
-      throw new Error('Twilio credentials not configured in .env');
-    }
-
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-    const toFormatted = `whatsapp:+91${cleanPhone}`;
-    const fromFormatted = `whatsapp:${fromNumber}`;
-
-    const formData = new URLSearchParams();
-    formData.append('To', toFormatted);
-    formData.append('From', fromFormatted);
-    formData.append('Body', `🌿 *AgriSmart AI Verification*\n\nYour OTP for password reset is: *${otp}*\n\nThis OTP is valid for 10 minutes.`);
-
-    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${btoa(`${sid}:${token}`)}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `Twilio Error: ${response.status}`);
-    }
-
-    return true;
-  };
-
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -376,36 +374,25 @@ export function Auth() {
       return;
     }
 
-    // Phone reset: Check if Firebase Phone Auth is configured
+    // Phone reset: Powered by Google Firebase Phone Auth
+    if (!isPhoneValid) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setLoading(true);
     try {
-      if (isFirebaseConfigured()) {
-        const res = await sendFirebasePhoneOtp(phone);
-        if (res.success) {
-          setMessage(`🌿 6-digit SMS OTP sent to +91${phone.slice(-10)} via Firebase! Check your SMS.`);
-          setOtpMethod('firebase');
-          setShowOtpVerification(true);
-          return;
-        } else {
-          setError(res.error || 'Failed to send SMS OTP via Firebase.');
-          return;
-        }
+      const res = await sendFirebasePhoneOtp(phone);
+      if (res.success) {
+        setMessage(`🌿 6-digit SMS OTP sent to +91 ${phone.slice(-10)} via Firebase! Check your SMS.`);
+        setOtpMethod('firebase');
+        setShowOtpVerification(true);
+        setOtpCooldown(60);
+      } else {
+        setError(res.error || 'Failed to send SMS OTP via Firebase. Please check your mobile number.');
       }
-
-      // If Firebase credentials not in .env, use WhatsApp OTP
-      const otp = generate6DigitOTP();
-      setGeneratedOtp(otp);
-      setOtpExpiresAt(Date.now() + 10 * 60 * 1000);
-      try {
-        await sendWhatsAppOTP(phone, otp);
-      } catch (e) {
-        console.warn('Twilio dispatch:', e);
-      }
-      setMessage('OTP has been dispatched to your WhatsApp number.');
-      setOtpMethod('resend');
-      setShowOtpVerification(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send OTP. Please check your number.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send SMS OTP. Please check your mobile number.');
     } finally {
       setLoading(false);
     }
@@ -787,100 +774,178 @@ export function Auth() {
                   </button>
                 </div>
 
-                {/* --- A. PHONE LOGIN FORM --- */}
+                {/* --- A. PHONE LOGIN FORM (FIREBASE SMS OTP) --- */}
                 {authMethod === 'phone' && (
-                  <form onSubmit={handlePhoneLogin} className="space-y-5">
-                    <div className="space-y-1.5">
-                      <label htmlFor="phone-login" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.mobileNumber')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Phone className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                  <div className="space-y-4">
+                    {!showOtpVerification ? (
+                      <form onSubmit={handlePhoneLogin} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label htmlFor="phone-login" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                            {t('auth.mobileNumber')}
+                          </label>
+                          <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Phone className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                            </div>
+                            <input
+                              id="phone-login"
+                              type="tel"
+                              value={phone}
+                              onChange={handlePhoneChange}
+                              required
+                              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                              placeholder="9876543210"
+                            />
+                          </div>
+                          <div className="flex justify-between px-1">
+                            <p className="text-[9px] text-slate-400 uppercase tracking-[0.1em] font-bold">10 digits required</p>
+                            <p className="text-[9px] text-slate-400 font-bold">{phone.length}/10</p>
+                          </div>
                         </div>
-                        <input
-                          id="phone-login"
-                          type="tel"
-                          value={phone}
-                          onChange={handlePhoneChange}
-                          required
-                          className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="9876543210"
-                        />
-                      </div>
-                      <div className="flex justify-between px-1">
-                        <p className="text-[9px] text-slate-400 uppercase tracking-[0.1em] font-bold">10 digits required</p>
-                        <p className="text-[9px] text-slate-400 font-bold">{phone.length}/10</p>
-                      </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <label htmlFor="password-login" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.password')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center px-1">
+                            <label htmlFor="password-login" className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              {t('auth.password')} <span className="text-slate-400 font-normal lowercase">(optional if using SMS OTP)</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForgotPasswordMethod('phone');
+                                setIsForgotPassword(true);
+                              }}
+                              className="text-xs font-bold text-green-600 hover:text-green-700 transition tracking-tight decoration-2 underline-offset-4 hover:underline"
+                            >
+                              {t('auth.forgotPassword')}
+                            </button>
+                          </div>
+                          <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                            </div>
+                            <input
+                              id="password-login"
+                              type={showPassword ? 'text' : 'password'}
+                              value={password}
+                              onChange={handlePasswordChange}
+                              onKeyDown={handlePasswordKeyDown}
+                              maxLength={12}
+                              className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                              placeholder="Enter password or use SMS OTP below"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
+                            >
+                              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                          </div>
                         </div>
-                        <input
-                          id="password-login"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={handlePasswordChange}
-                          onKeyDown={handlePasswordKeyDown}
-                          required
-                          maxLength={12}
-                          className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="6-12 letters/numbers"
-                        />
+
+                        {error && (
+                          <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                            <span>{error}</span>
+                          </div>
+                        )}
+                        {message && (
+                          <div className="p-3.5 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                            <span>{message}</span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-2.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handlePhoneSendOtp('login')}
+                            disabled={loading || !isPhoneValid}
+                            className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
+                          >
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Sign In with SMS OTP (Firebase) <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                          </button>
+
+                          {password.length >= 6 && (
+                            <button
+                              type="submit"
+                              disabled={loading || !isPhoneValid}
+                              className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm transition"
+                            >
+                              Sign In with Password
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    ) : (
+                      /* Phone SMS OTP Verification View */
+                      <form onSubmit={handleVerifyPhoneAndSubmit} className="space-y-4">
+                        <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs text-green-800 font-bold">
+                          <span>SMS OTP sent to: +91 {phone}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); }}
+                            className="text-green-700 hover:text-green-900 underline font-black"
+                          >
+                            Change
+                          </button>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                            ENTER 6-DIGIT SMS OTP SENT TO YOUR PHONE
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Lock className="h-5 w-5 text-slate-400" />
+                            </div>
+                            <input
+                              type="text"
+                              value={userOtp}
+                              onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              required
+                              maxLength={6}
+                              className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-black text-2xl tracking-[0.3em] text-center placeholder-slate-400 shadow-sm"
+                              placeholder="000000"
+                            />
+                          </div>
+                          <div className="flex justify-between items-center px-1 text-xs">
+                            <button
+                              type="button"
+                              disabled={otpCooldown > 0 || loading}
+                              onClick={() => handlePhoneSendOtp('login')}
+                              className="font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                              <span>{otpCooldown > 0 ? `Resend SMS in ${otpCooldown}s` : 'Resend SMS OTP'}</span>
+                            </button>
+                            <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
+                          </div>
+                        </div>
+
+                        {error && (
+                          <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                            <span>{error}</span>
+                          </div>
+                        )}
+                        {message && (
+                          <div className="p-3.5 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                            <span>{message}</span>
+                          </div>
+                        )}
+
                         <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
+                          type="submit"
+                          disabled={loading || userOtp.length !== 6}
+                          className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
                         >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify SMS & Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                         </button>
-                      </div>
-                      <div className="flex justify-between items-center px-1">
-                        <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
-                          {password.length < 6 ? '6-12 characters (letters & numbers only)' : '✓ Valid password length'}
-                        </p>
-                        <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-400'}`}>
-                          {password.length}/12
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForgotPasswordMethod('phone');
-                          setIsForgotPassword(true);
-                        }}
-                        className="text-xs font-bold text-green-600 hover:text-green-700 transition tracking-tight decoration-2 underline-offset-4 hover:underline"
-                      >
-                        {t('auth.forgotPassword')}
-                      </button>
-                    </div>
-
-                    {error && (
-                      <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                        <span>{error}</span>
-                      </div>
+                      </form>
                     )}
-
-                    <button
-                      type="submit"
-                      disabled={loading || !isPhoneValid || !isPasswordValid}
-                      className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                    >
-                      <div className="relative flex items-center justify-center gap-2 text-base tracking-tight">
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t('auth.signIn')} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
-                      </div>
-                    </button>
-                  </form>
+                  </div>
                 )}
 
                 {/* --- B. EMAIL LOGIN + RESEND OTP FLOW --- */}
@@ -1141,93 +1206,162 @@ export function Auth() {
                   </button>
                 </div>
 
-                {/* Sign up form */}
+                {/* Sign up form - Phone (Google Firebase SMS OTP) */}
                 {authMethod === 'phone' ? (
-                  <form onSubmit={handlePhoneSignUp} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label htmlFor="phone-signup" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.mobileNumber')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Phone className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                  <div className="space-y-4">
+                    {!showOtpVerification ? (
+                      <form onSubmit={(e) => { e.preventDefault(); handlePhoneSendOtp('signup'); }} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label htmlFor="phone-signup" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                            {t('auth.mobileNumber')}
+                          </label>
+                          <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Phone className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                            </div>
+                            <input
+                              id="phone-signup"
+                              type="tel"
+                              value={phone}
+                              onChange={handlePhoneChange}
+                              required
+                              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                              placeholder="9876543210"
+                            />
+                          </div>
+                          <div className="flex justify-between px-1">
+                            <p className="text-[9px] text-slate-400 uppercase tracking-[0.1em] font-bold">{t('auth.digitsRequired')}</p>
+                            <p className="text-[9px] text-slate-400 font-bold">{phone.length}/10</p>
+                          </div>
                         </div>
-                        <input
-                          id="phone-signup"
-                          type="tel"
-                          value={phone}
-                          onChange={handlePhoneChange}
-                          required
-                          className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="9876543210"
-                        />
-                      </div>
-                      <div className="flex justify-between px-1">
-                        <p className="text-[9px] text-slate-400 uppercase tracking-[0.1em] font-bold">{t('auth.digitsRequired')}</p>
-                        <p className="text-[9px] text-slate-400 font-bold">{phone.length}/10</p>
-                      </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <label htmlFor="password-signup" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.password')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                        <div className="space-y-1.5">
+                          <label htmlFor="password-signup" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                            {t('auth.password')}
+                          </label>
+                          <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                            </div>
+                            <input
+                              id="password-signup"
+                              type={showPassword ? 'text' : 'password'}
+                              value={password}
+                              onChange={handlePasswordChange}
+                              onKeyDown={handlePasswordKeyDown}
+                              required
+                              maxLength={12}
+                              className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                              placeholder="6-12 letters/numbers"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
+                            >
+                              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                          </div>
+                          <div className="flex justify-between items-center px-1">
+                            <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
+                              {password.length < 6 ? '6-12 characters required' : '✓ Password valid'}
+                            </p>
+                            <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
+                              {password.length}/12
+                            </p>
+                          </div>
                         </div>
-                        <input
-                          id="password-signup"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={handlePasswordChange}
-                          onKeyDown={handlePasswordKeyDown}
-                          required
-                          maxLength={12}
-                          className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="6-12 letters/numbers"
-                        />
+
+                        {error && (
+                          <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                            <span>{error}</span>
+                          </div>
+                        )}
+                        {message && (
+                          <div className="p-3.5 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                            <span>{message}</span>
+                          </div>
+                        )}
+
                         <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
+                          type="submit"
+                          disabled={loading || !isPhoneValid || !isPasswordValid}
+                          className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
                         >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Send SMS OTP & Create Account <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                         </button>
-                      </div>
-                      <div className="flex justify-between items-center px-1">
-                        <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
-                          {password.length < 6 ? '6-12 characters required' : '✓ Password valid'}
-                        </p>
-                        <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
-                          {password.length}/12
-                        </p>
-                      </div>
-                    </div>
+                      </form>
+                    ) : (
+                      /* Phone Sign Up SMS OTP Verification View */
+                      <form onSubmit={handleVerifyPhoneAndSubmit} className="space-y-4">
+                        <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs text-green-800 font-bold">
+                          <span>SMS OTP sent to: +91 {phone}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); }}
+                            className="text-green-700 hover:text-green-900 underline font-black"
+                          >
+                            Change
+                          </button>
+                        </div>
 
-                    {error && (
-                      <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                        <span>{error}</span>
-                      </div>
-                    )}
-                    {message && (
-                      <div className="p-3.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                        <span>{message}</span>
-                      </div>
-                    )}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                            ENTER 6-DIGIT SMS OTP SENT TO YOUR PHONE
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Lock className="h-5 w-5 text-slate-400" />
+                            </div>
+                            <input
+                              type="text"
+                              value={userOtp}
+                              onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              required
+                              maxLength={6}
+                              className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-black text-2xl tracking-[0.3em] text-center placeholder-slate-400 shadow-sm"
+                              placeholder="000000"
+                            />
+                          </div>
+                          <div className="flex justify-between items-center px-1 text-xs">
+                            <button
+                              type="button"
+                              disabled={otpCooldown > 0 || loading}
+                              onClick={() => handlePhoneSendOtp('signup')}
+                              className="font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                              <span>{otpCooldown > 0 ? `Resend SMS in ${otpCooldown}s` : 'Resend SMS OTP'}</span>
+                            </button>
+                            <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
+                          </div>
+                        </div>
 
-                    <button
-                      type="submit"
-                      disabled={loading || !isPhoneValid || !isPasswordValid}
-                      className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                    >
-                      <div className="relative flex items-center justify-center gap-2 text-base tracking-tight">
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t('auth.signUp')} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
-                      </div>
-                    </button>
-                  </form>
+                        {error && (
+                          <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                            <span>{error}</span>
+                          </div>
+                        )}
+                        {message && (
+                          <div className="p-3.5 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-sm font-bold flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                            <span>{message}</span>
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={loading || userOtp.length !== 6}
+                          className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-base tracking-tight"
+                        >
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify SMS & Create Account <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 ) : (
                   /* Email Sign Up Flow */
                   <div className="space-y-4">
