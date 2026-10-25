@@ -37,8 +37,12 @@ export async function sendEmailOTP(
 
     // Check for Resend test domain restriction message
     const errorMsg = data.message || data.error || 'Failed to send email';
-    const isDomainRestricted = errorMsg.toLowerCase().includes('testing email address') || 
-                              errorMsg.toLowerCase().includes('verify your domain');
+    const msgLower = errorMsg.toLowerCase();
+    const isDomainRestricted = 
+      msgLower.includes('testing email') || 
+      msgLower.includes('verify a domain') || 
+      msgLower.includes('verify your domain') ||
+      msgLower.includes('own email address');
 
     return {
       success: false,

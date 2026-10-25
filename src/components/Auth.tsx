@@ -26,6 +26,7 @@ export function Auth() {
   const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
   const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
+  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase'>('resend');
 
   // Status & UI state
   const [error, setError] = useState('');
@@ -173,19 +174,56 @@ export function Auth() {
       const res = await sendEmailOTP(email, otp, purpose === 'reset' ? 'reset' : 'login');
 
       if (res.success) {
-        setMessage(`🌿 OTP sent to ${email} via Resend! Check your inbox (or spam).`);
+        setMessage(`🌿 OTP sent to ${email} via Resend! Check your inbox (or spam folder).`);
+        setOtpMethod('resend');
         setShowOtpVerification(true);
         setOtpCooldown(60);
       } else if (res.isDomainRestricted) {
-        // Resend test domain guidance
-        setMessage(`Resend test mode: OTP generated for ${email}. (Resend free trial sends to registered account or delivered@resend.dev). Your verification code is: ${otp}`);
+        // Resend trial limitation: onboarding@resend.dev only sends to account owner until custom domain is verified.
+        // Automatically dispatch real email OTP using Supabase email delivery so ANY user gets the real email!
+        console.log('Resend test domain restricted. Dispatching real OTP via Supabase Auth email engine to:', email);
+        try {
+          const { error: supaOtpError } = await supabase.auth.signInWithOtp({
+            email: email,
+          });
+
+          if (!supaOtpError) {
+            setMessage(`🌿 Real OTP code sent to ${email}! Please check your email inbox.`);
+            setOtpMethod('supabase');
+            setShowOtpVerification(true);
+            setOtpCooldown(60);
+            return;
+          } else {
+            console.warn('Supabase signInWithOtp error:', supaOtpError.message);
+          }
+        } catch (supaErr: any) {
+          console.warn('Supabase email OTP error:', supaErr);
+        }
+
+        // If Supabase rate-limited or error, provide generated code directly so user is never locked out
+        setMessage(`OTP generated for ${email}. (Note: Add domain at resend.com to send via Resend). Your verification code is: ${otp}`);
+        setOtpMethod('resend');
         setShowOtpVerification(true);
         setOtpCooldown(60);
       } else {
+        // If Resend failed with network/other error, attempt Supabase email delivery as fallback
+        try {
+          const { error: supaOtpError } = await supabase.auth.signInWithOtp({
+            email: email,
+          });
+          if (!supaOtpError) {
+            setMessage(`🌿 OTP verification code sent to ${email}! Please check your email inbox.`);
+            setOtpMethod('supabase');
+            setShowOtpVerification(true);
+            setOtpCooldown(60);
+            return;
+          }
+        } catch (e) {}
+
         setError(res.error || 'Failed to send OTP email. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'Error communicating with Resend email service');
+      setError(err.message || 'Error communicating with email service');
     } finally {
       setLoading(false);
     }
@@ -207,37 +245,65 @@ export function Auth() {
       return;
     }
 
-    if (userOtp !== generatedOtp) {
-      setError('Invalid OTP code. Please check your email and try again.');
-      return;
-    }
-
     setLoading(true);
     try {
+      if (otpMethod === 'supabase') {
+        // Verify via Supabase Auth OTP token
+        const { data: supaData, error: supaVerifyError } = await supabase.auth.verifyOtp({
+          email: email,
+          token: userOtp,
+          type: 'email',
+        });
+
+        if (!supaVerifyError && supaData?.session) {
+          if (password) {
+            await supabase.auth.updateUser({ password }).catch(() => {});
+          }
+          localStorage.setItem('agrismart_user_email', email);
+          localStorage.setItem('agrismart_auth_method', 'email');
+          setMessage('✓ OTP verified successfully! Logging you in...');
+          setTimeout(() => {
+            const from = location.state?.from || '/dashboard';
+            navigate(from, { replace: true });
+          }, 700);
+          return;
+        }
+
+        // Fallback: check against locally generated OTP
+        if (userOtp !== generatedOtp) {
+          setError(supaVerifyError?.message || 'Invalid OTP code. Please check your email.');
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Resend method verification
+        if (userOtp !== generatedOtp) {
+          setError('Invalid OTP code. Please check your email and try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Complete sign in / sign up with password
       if (isLogin) {
-        // Sign in with email & password in Supabase
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: email,
           password: password,
         });
 
         if (signInError) {
-          // If account doesn't exist yet in Supabase, sign them up
-          console.warn('Supabase sign-in fallback:', signInError.message);
           await supabase.auth.signUp({
             email: email,
             password: password,
           });
         }
       } else {
-        // Sign up with email & password
         await supabase.auth.signUp({
           email: email,
           password: password,
         });
       }
 
-      // Store local authentication state
       localStorage.setItem('agrismart_user_email', email);
       localStorage.setItem('agrismart_auth_method', 'email');
 
@@ -247,8 +313,7 @@ export function Auth() {
         navigate(from, { replace: true });
       }, 700);
     } catch (err: any) {
-      console.warn('Auth completion:', err);
-      // Fallback navigate to dashboard if OTP was verified
+      console.warn('Auth completion error:', err);
       localStorage.setItem('agrismart_user_email', email);
       navigate('/dashboard', { replace: true });
     } finally {
@@ -854,7 +919,7 @@ export function Auth() {
                       <form onSubmit={handleVerifyEmailAndSubmit} className="space-y-4">
                         <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs">
                           <div>
-                            <p className="text-green-800 font-bold">OTP sent via Resend to:</p>
+                            <p className="text-green-800 font-bold">OTP sent {otpMethod === 'resend' ? 'via Resend' : 'to your email'}:</p>
                             <p className="text-green-900 font-black truncate max-w-[220px]">{email}</p>
                           </div>
                           <button
@@ -1176,7 +1241,7 @@ export function Auth() {
                       <form onSubmit={handleVerifyEmailAndSubmit} className="space-y-4">
                         <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs">
                           <div>
-                            <p className="text-green-800 font-bold">OTP sent via Resend to:</p>
+                            <p className="text-green-800 font-bold">OTP sent {otpMethod === 'resend' ? 'via Resend' : 'to your email'}:</p>
                             <p className="text-green-900 font-black truncate max-w-[220px]">{email}</p>
                           </div>
                           <button
