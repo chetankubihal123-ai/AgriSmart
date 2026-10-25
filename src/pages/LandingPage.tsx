@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Sprout, ArrowRight, Leaf, BarChart3, CheckCircle2, BrainCircuit } from 'lucide-react';
+import { Sprout, ArrowRight, Leaf, BarChart3, CheckCircle2, BrainCircuit, CloudSun, Droplets, Sun, Cloud, CloudRain, LineChart } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSelector } from '../components/LanguageSelector';
@@ -16,6 +16,10 @@ export function LandingPage() {
         return !sessionStorage.getItem('splashShown');
     });
     const [isFading, setIsFading] = useState(false);
+
+    // Live weather for hero
+    const [heroWeather, setHeroWeather] = useState<{ temp: number; code: number; city: string; state: string } | null>(null);
+    const [heroSoilMoisture] = useState(68);
 
     // Typewriter State
     const fullText = "Welcome to AgriSmart";
@@ -63,6 +67,55 @@ export function LandingPage() {
             };
         }
     }, [typingComplete, showSplash]);
+
+    // Fetch live weather for hero
+    useEffect(() => {
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                try {
+                    const { latitude, longitude } = pos.coords;
+                    const [geoRes, weatherRes] = await Promise.all([
+                        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`),
+                        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`)
+                    ]);
+                    const geoData = await geoRes.json();
+                    const weatherData = await weatherRes.json();
+                    setHeroWeather({
+                        temp: Math.round(weatherData.current_weather.temperature),
+                        code: weatherData.current_weather.weathercode,
+                        city: geoData.city || geoData.locality || 'Your City',
+                        state: geoData.principalSubdivision || 'Karnataka'
+                    });
+                } catch (_) {
+                    setHeroWeather({ temp: 29, code: 2, city: 'Dharwad', state: 'Karnataka' });
+                }
+            }, () => {
+                setHeroWeather({ temp: 29, code: 2, city: 'Dharwad', state: 'Karnataka' });
+            });
+        } else {
+            setHeroWeather({ temp: 29, code: 2, city: 'Dharwad', state: 'Karnataka' });
+        }
+    }, []);
+
+    const getWeatherDesc = (code: number) => {
+        if (code === 0) return 'Sunny';
+        if (code <= 3) return 'Partly cloudy';
+        if (code >= 51) return 'Rainy';
+        return 'Cloudy';
+    };
+
+    const getWeatherIcon = (code: number) => {
+        if (code === 0) return <Sun className="w-7 h-7 text-amber-400" />;
+        if (code <= 3) return <CloudSun className="w-7 h-7 text-amber-300" />;
+        if (code >= 51) return <CloudRain className="w-7 h-7 text-blue-400" />;
+        return <Cloud className="w-7 h-7 text-gray-300" />;
+    };
+
+    const getSoilStatus = (pct: number) => {
+        if (pct >= 60) return 'Good Level';
+        if (pct >= 40) return 'Moderate';
+        return 'Low';
+    };
 
     // Scroll to top on mount
     useEffect(() => {
@@ -132,47 +185,122 @@ export function LandingPage() {
                 </div>
             </nav>
 
-            {/* Hero Section */}
-            <section id="home" className="pt-28 md:pt-40 pb-20 px-4 md:px-6 max-w-7xl mx-auto text-center flex flex-col items-center overflow-hidden">
+            {/* ─── HERO BANNER ─── */}
+            <section id="home" className="pt-[72px]">
                 <motion.div
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    className="inline-block mb-6 px-4 py-1.5 rounded-full border border-green-300 bg-white text-xs font-semibold text-green-700 uppercase tracking-wider shadow-sm"
+                    transition={{ duration: 0.7 }}
+                    className="relative w-full min-h-[420px] md:min-h-[480px] overflow-hidden"
                 >
-                    {t('landing.smartAgriPlatform')}
-                </motion.div>
-                <motion.h1
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.3 }}
-                    className="text-3xl sm:text-4xl md:text-7xl font-bold text-prodmast-dark tracking-tight leading-[1.1] max-w-4xl drop-shadow-sm"
-                >
-                    {t('landing.heroTitleMain')}
-                </motion.h1>
-                <motion.p
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.4 }}
-                    className="mt-6 text-base md:text-lg text-prodmast-dark/70 max-w-2xl font-medium"
-                >
-                    {t('landing.heroSubtitleMain')}
-                </motion.p>
-                <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.5 }}
-                    className="mt-10 flex flex-col sm:flex-row items-center gap-4"
-                >
-                    <button
-                        onClick={handleGetStarted}
-                        className="bg-prodmast-primary text-white px-12 py-5 text-lg rounded-full font-bold hover:bg-[#0f2426] transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl hover:-translate-y-1 w-full sm:w-auto"
-                    >
-                        {t('landing.getStarted')} <ArrowRight className="w-5 h-5" />
-                    </button>
-                </motion.div>
+                    {/* Background farm photo */}
+                    <img
+                        src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&q=85&w=1800"
+                        alt="Green farm fields at golden hour"
+                        className="absolute inset-0 w-full h-full object-cover object-center"
+                    />
+                    {/* Dark gradient overlay — left strong, right transparent */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0d2b0e]/92 via-[#0d2b0e]/65 to-[#0d2b0e]/20"></div>
+                    {/* Bottom fade */}
+                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0d1f0e]/60 to-transparent"></div>
 
+                    {/* Content row */}
+                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between h-full px-8 md:px-14 lg:px-20 py-16 md:py-20 gap-8">
 
+                        {/* Left — headline + CTAs */}
+                        <div className="flex-1 max-w-xl">
+                            <motion.h1
+                                initial={{ opacity: 0, x: -30 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.6, delay: 0.2 }}
+                                className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight text-white mb-0"
+                            >
+                                Grow smarter.
+                            </motion.h1>
+                            <motion.h1
+                                initial={{ opacity: 0, x: -30 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.6, delay: 0.3 }}
+                                className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight text-[#4ade80] mb-5"
+                            >
+                                Harvest better.
+                            </motion.h1>
+                            <motion.p
+                                initial={{ opacity: 0, x: -30 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.6, delay: 0.4 }}
+                                className="text-white/80 text-sm md:text-base font-medium leading-relaxed mb-8 max-w-sm"
+                            >
+                                AI-powered insights for healthier crops, higher yields
+                                and a more sustainable future.
+                            </motion.p>
+
+                            {/* CTA Buttons */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.6, delay: 0.5 }}
+                                className="flex flex-wrap gap-3"
+                            >
+                                <button
+                                    onClick={handleGetStarted}
+                                    id="hero-analyze-farm-btn"
+                                    className="flex items-center gap-2 bg-[#1a7a32] hover:bg-[#22a843] text-white font-bold px-6 py-3 rounded-full text-sm transition-all duration-300 hover:scale-105 hover:shadow-lg shadow-md"
+                                >
+                                    <Leaf className="w-4 h-4" />
+                                    Analyze my farm
+                                    <ArrowRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => navigate('/market-rates')}
+                                    id="hero-view-insights-btn"
+                                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold px-6 py-3 rounded-full text-sm transition-all duration-300 hover:scale-105"
+                                >
+                                    <LineChart className="w-4 h-4" />
+                                    View crop insights
+                                </button>
+                            </motion.div>
+                        </div>
+
+                        {/* Right — Weather + Soil Moisture widgets */}
+                        <motion.div
+                            initial={{ opacity: 0, x: 30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.6, delay: 0.5 }}
+                            className="flex flex-row md:flex-col gap-3 shrink-0"
+                        >
+                            {/* Weather Widget */}
+                            <div className="bg-black/40 backdrop-blur-xl border border-white/20 rounded-2xl px-5 py-4 flex items-center gap-4 min-w-[170px]">
+                                <div className="shrink-0">
+                                    {heroWeather ? getWeatherIcon(heroWeather.code) : <CloudSun className="w-7 h-7 text-amber-300" />}
+                                </div>
+                                <div>
+                                    <p className="text-white font-extrabold text-2xl leading-none">
+                                        {heroWeather ? `${heroWeather.temp}°C` : '—'}
+                                    </p>
+                                    <p className="text-white/70 text-xs font-semibold mt-0.5">
+                                        {heroWeather ? getWeatherDesc(heroWeather.code) : 'Loading...'}
+                                    </p>
+                                    <p className="text-white/50 text-[10px] font-medium">
+                                        {heroWeather ? `${heroWeather.city}, ${heroWeather.state}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Soil Moisture Widget */}
+                            <div className="bg-black/40 backdrop-blur-xl border border-white/20 rounded-2xl px-5 py-4 flex items-center gap-4 min-w-[170px]">
+                                <div className="shrink-0">
+                                    <Droplets className="w-7 h-7 text-sky-400" />
+                                </div>
+                                <div>
+                                    <p className="text-white font-extrabold text-2xl leading-none">{heroSoilMoisture}%</p>
+                                    <p className="text-white/70 text-xs font-semibold mt-0.5">Soil Moisture</p>
+                                    <p className="text-[#4ade80] text-[10px] font-bold">{getSoilStatus(heroSoilMoisture)}</p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                </motion.div>
             </section>
 
             {/* Features / Services Section (Dark) */}
