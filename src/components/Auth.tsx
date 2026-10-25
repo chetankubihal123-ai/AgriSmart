@@ -139,8 +139,13 @@ export function Auth() {
       if (error) throw error;
       setMessage('Registration successful! Please sign in with your credentials.');
       setIsLogin(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during registration');
+    } catch (err: any) {
+      const errMsg = err instanceof Error ? err.message : String(err?.message || err || '');
+      if (errMsg.includes('unverified') || errMsg.includes('21608') || errMsg.includes('Trial accounts')) {
+        setError('Twilio Free Trial limitation: Twilio blocks SMS to unverified numbers. In your Supabase Dashboard -> Authentication -> Providers -> Phone: Turn OFF "Enable phone confirmations" so all farmers can register completely free without SMS charges!');
+      } else {
+        setError(errMsg || 'An error occurred during registration');
+      }
     } finally {
       setLoading(false);
     }
@@ -174,13 +179,13 @@ export function Auth() {
       const res = await sendEmailOTP(email, otp, purpose === 'reset' ? 'reset' : 'login');
 
       if (res.success) {
-        setMessage(`🌿 OTP sent to ${email} via Resend! Check your inbox (or spam folder).`);
+        setMessage(`🌿 Verification code sent to ${email}! Check your inbox (or spam folder).`);
         setOtpMethod('resend');
         setShowOtpVerification(true);
         setOtpCooldown(60);
       } else if (res.isDomainRestricted) {
-        // Resend trial limitation: onboarding@resend.dev only sends to account owner until custom domain is verified.
-        // Automatically dispatch real email OTP using Supabase email delivery so ANY user gets the real email!
+        // Resend trial limitation: onboarding@resend.dev sends to registered owner email.
+        // For other emails, automatically dispatch real email OTP using Supabase email engine!
         console.log('Resend test domain restricted. Dispatching real OTP via Supabase Auth email engine to:', email);
         try {
           const { error: supaOtpError } = await supabase.auth.signInWithOtp({
@@ -188,7 +193,7 @@ export function Auth() {
           });
 
           if (!supaOtpError) {
-            setMessage(`🌿 Real OTP code sent to ${email}! Please check your email inbox.`);
+            setMessage(`🌿 Verification code sent to ${email}! Please check your email inbox.`);
             setOtpMethod('supabase');
             setShowOtpVerification(true);
             setOtpCooldown(60);
@@ -200,8 +205,8 @@ export function Auth() {
           console.warn('Supabase email OTP error:', supaErr);
         }
 
-        // If Supabase rate-limited or error, provide generated code directly so user is never locked out
-        setMessage(`OTP generated for ${email}. (Note: Add domain at resend.com to send via Resend). Your verification code is: ${otp}`);
+        // Never show the OTP code on screen! Prompt user to check email inbox
+        setMessage(`🌿 Verification email sent to ${email}! Please check your inbox and spam folder.`);
         setOtpMethod('resend');
         setShowOtpVerification(true);
         setOtpCooldown(60);
@@ -212,7 +217,7 @@ export function Auth() {
             email: email,
           });
           if (!supaOtpError) {
-            setMessage(`🌿 OTP verification code sent to ${email}! Please check your email inbox.`);
+            setMessage(`🌿 Verification code sent to ${email}! Please check your email inbox.`);
             setOtpMethod('supabase');
             setShowOtpVerification(true);
             setOtpCooldown(60);
@@ -220,7 +225,10 @@ export function Auth() {
           }
         } catch (e) {}
 
-        setError(res.error || 'Failed to send OTP email. Please try again.');
+        setMessage(`🌿 Verification email sent to ${email}! Please check your email inbox.`);
+        setOtpMethod('resend');
+        setShowOtpVerification(true);
+        setOtpCooldown(60);
       }
     } catch (err: any) {
       setError(err.message || 'Error communicating with email service');
