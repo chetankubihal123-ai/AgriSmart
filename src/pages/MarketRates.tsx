@@ -45,12 +45,46 @@ const FALLBACK_COMMODITIES: Commodity[] = [
     trend: 4.18,
     trendUp: true,
     history: [21200, 21450, 21300, 21500, 21900, 22100, 22400],
-    market: 'Hubli (Amaragol) Mandi, Karnataka',
+    market: 'Hubli (Amaragol) Mandi, Dharwad (Karnataka)',
     quality: 'Premium',
     lastUpdated: new Date()
   },
   {
     id: 'fallback-2',
+    name: 'Cotton (Long Staple BT)',
+    commodityName: 'Cotton',
+    variety: 'Medium / Long Staple BT',
+    currentPrice: 7350,
+    liveRate: 7350,
+    currentRate: 7350,
+    pastRate: 7100,
+    unit: 'Quintal',
+    trend: 3.52,
+    trendUp: true,
+    history: [6950, 7000, 7050, 7100, 7200, 7280, 7350],
+    market: 'Adilabad Mandi, Adilabad (Telangana)',
+    quality: 'Premium',
+    lastUpdated: new Date()
+  },
+  {
+    id: 'fallback-3',
+    name: 'Soybean (Yellow)',
+    commodityName: 'Soybean',
+    variety: 'Yellow Graded',
+    currentPrice: 4850,
+    liveRate: 4850,
+    currentRate: 4850,
+    pastRate: 4720,
+    unit: 'Quintal',
+    trend: 2.75,
+    trendUp: true,
+    history: [4650, 4680, 4700, 4720, 4780, 4810, 4850],
+    market: 'Latur APMC, Latur (Maharashtra)',
+    quality: 'Premium',
+    lastUpdated: new Date()
+  },
+  {
+    id: 'fallback-4',
     name: 'Maize / Corn (Hybrid Yellow)',
     commodityName: 'Maize / Corn',
     variety: 'Hybrid Yellow',
@@ -62,15 +96,15 @@ const FALLBACK_COMMODITIES: Commodity[] = [
     trend: 2.54,
     trendUp: true,
     history: [2300, 2320, 2350, 2360, 2380, 2400, 2420],
-    market: 'Davangere APMC, Karnataka',
+    market: 'Davangere APMC, Davangere (Karnataka)',
     quality: 'Standard',
     lastUpdated: new Date()
   },
   {
-    id: 'fallback-3',
-    name: 'Tomato (Hybrid / Local)',
+    id: 'fallback-5',
+    name: 'Tomato (Hybrid Fresh)',
     commodityName: 'Tomato',
-    variety: 'Hybrid / Local',
+    variety: 'Hybrid Fresh Local',
     currentPrice: 1850,
     liveRate: 1850,
     currentRate: 1850,
@@ -79,32 +113,15 @@ const FALLBACK_COMMODITIES: Commodity[] = [
     trend: 11.9,
     trendUp: false,
     history: [2250, 2200, 2150, 2100, 2000, 1920, 1850],
-    market: 'Kolar APMC, Karnataka',
+    market: 'Kolar APMC Market, Kolar (Karnataka)',
     quality: 'Standard',
     lastUpdated: new Date()
   },
   {
-    id: 'fallback-4',
-    name: 'Cotton (Long Staple)',
-    commodityName: 'Cotton',
-    variety: 'Medium/Long Staple',
-    currentPrice: 7350,
-    liveRate: 7350,
-    currentRate: 7350,
-    pastRate: 7100,
-    unit: 'Quintal',
-    trend: 3.52,
-    trendUp: true,
-    history: [6950, 7000, 7050, 7100, 7200, 7280, 7350],
-    market: 'Adilabad Mandi, Telangana',
-    quality: 'Premium',
-    lastUpdated: new Date()
-  },
-  {
-    id: 'fallback-5',
+    id: 'fallback-6',
     name: 'Onion (Red Nashik)',
     commodityName: 'Onion',
-    variety: 'Red Onion',
+    variety: 'Red Nashik Special',
     currentPrice: 2650,
     liveRate: 2650,
     currentRate: 2650,
@@ -113,12 +130,12 @@ const FALLBACK_COMMODITIES: Commodity[] = [
     trend: 8.16,
     trendUp: true,
     history: [2350, 2400, 2420, 2450, 2520, 2590, 2650],
-    market: 'Lasalgaon Mandi, Maharashtra',
+    market: 'Lasalgaon Mandi, Nashik (Maharashtra)',
     quality: 'Premium',
     lastUpdated: new Date()
   },
   {
-    id: 'fallback-6',
+    id: 'fallback-7',
     name: 'Wheat (Lokwan / Sharbati)',
     commodityName: 'Wheat',
     variety: 'Lokwan / Sharbati',
@@ -130,8 +147,59 @@ const FALLBACK_COMMODITIES: Commodity[] = [
     trend: 1.06,
     trendUp: true,
     history: [2790, 2800, 2810, 2820, 2830, 2840, 2850],
-    market: 'Indore APMC, Madhya Pradesh',
+    market: 'Indore Mandi, Indore (Madhya Pradesh)',
     quality: 'Premium',
+    lastUpdated: new Date()
+  },
+  {
+    id: 'fallback-8',
+    name: 'Basmati Rice (1121 Pusa)',
+    commodityName: 'Basmati Rice',
+    variety: '1121 Pusa Super',
+    currentPrice: 4150,
+    liveRate: 4150,
+    currentRate: 4150,
+    pastRate: 3980,
+    unit: 'Quintal',
+    trend: 4.27,
+    trendUp: true,
+    history: [3920, 3950, 3980, 4020, 4080, 4110, 4150],
+    market: 'Karnal Grain Market, Karnal (Haryana)',
+    quality: 'Premium',
+    lastUpdated: new Date()
+  },
+  {
+    id: 'fallback-9',
+    name: 'Turmeric (Finger / Salem)',
+    commodityName: 'Turmeric',
+    variety: 'Finger / Salem Grade',
+    currentPrice: 14200,
+    liveRate: 14200,
+    currentRate: 14200,
+    pastRate: 13600,
+    unit: 'Quintal',
+    trend: 4.41,
+    trendUp: true,
+    history: [13200, 13400, 13600, 13750, 13900, 14050, 14200],
+    market: 'Nizamabad Mandi, Nizamabad (Telangana)',
+    quality: 'Premium',
+    lastUpdated: new Date()
+  },
+  {
+    id: 'fallback-10',
+    name: 'Potato (Kufri Jyoti)',
+    commodityName: 'Potato',
+    variety: 'Kufri Jyoti / Pukhraj',
+    currentPrice: 1680,
+    liveRate: 1680,
+    currentRate: 1680,
+    pastRate: 1590,
+    unit: 'Quintal',
+    trend: 5.66,
+    trendUp: true,
+    history: [1520, 1550, 1570, 1590, 1620, 1650, 1680],
+    market: 'Agra APMC Mandi, Agra (Uttar Pradesh)',
+    quality: 'Standard',
     lastUpdated: new Date()
   }
 ];
@@ -159,7 +227,7 @@ export function MarketRates() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [commodities, setCommodities] = useState<Commodity[]>(FALLBACK_COMMODITIES);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
+  const [selectedCropId, setSelectedCropId] = useState<string | null>('fallback-1');
   const [timeRange, setTimeRange] = useState<'1D' | '1M' | '1Y'>('1D');
   const [now, setNow] = useState(new Date());
   const { t } = useLanguage();
@@ -321,7 +389,7 @@ export function MarketRates() {
       setTimeout(() => {
         setCommodities(current => current.map(c => ({ ...c, isFlashing: null })));
       }, 2000);
-    }, 4000);
+    }, 12000);
 
     return () => clearInterval(interval);
   }, [commodities.length, isLoading]);
@@ -353,8 +421,11 @@ export function MarketRates() {
         });
 
         setCommodities(mappedData);
+        // Auto-select first crop so graph is immediately visible
+        setSelectedCropId(prev => prev || mappedData[0]?.id || null);
       } else {
         setCommodities(FALLBACK_COMMODITIES);
+        setSelectedCropId(prev => prev || 'fallback-1');
       }
     } catch (err) {
       console.error('Error fetching Agmarknet live market data:', err);
@@ -569,7 +640,7 @@ export function MarketRates() {
             {t('market.liveTicker')}
         </div>
         <div className="marquee-container overflow-hidden w-full whitespace-nowrap relative">
-           <div className="animate-[marquee_20s_linear_infinite] inline-flex space-x-12">
+           <div className="animate-[marquee_75s_linear_infinite] inline-flex space-x-12">
                {commodities.map(c => (
                    <span key={`ticker-${c.id}`} className="font-bold text-sm tracking-wide">
                        {c.name}: <span className={c.trendUp ? 'text-green-400' : 'text-red-400'}>₹{c.currentPrice}</span>
@@ -788,10 +859,12 @@ export function MarketRates() {
               key={item.id} 
               onClick={() => {
                 setSelectedCropId(item.id);
-                const analysisEl = document.getElementById('price-analysis');
-                if (analysisEl) {
-                  analysisEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+                setTimeout(() => {
+                  const analysisEl = document.getElementById('price-analysis');
+                  if (analysisEl) {
+                    analysisEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 80);
               }}
               className={`bg-white border-2 rounded-[32px] p-8 hover:shadow-xl transition-all duration-300 group flex flex-col relative overflow-hidden cursor-pointer ${
                 selectedCropId === item.id ? 'border-prodmast-primary ring-4 ring-prodmast-primary/10 scale-[1.02]' : 
@@ -873,11 +946,14 @@ export function MarketRates() {
                   {item.trend}%
                 </div>
                 
-                <div className="flex flex-col items-end">
+                <div className="flex flex-col items-end gap-1">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('market.lastTrade')}</span>
                   <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
                      <Clock className="w-3.5 h-3.5 text-blue-500" />
                      {getTimeAgo(item.lastUpdated)}
+                  </span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-all duration-300 ${selectedCropId === item.id ? 'bg-prodmast-primary/10 text-prodmast-primary' : 'opacity-0 group-hover:opacity-100 bg-gray-100 text-gray-500'}`}>
+                    {selectedCropId === item.id ? '✓ Graph Active' : '↗ Click to View Graph'}
                   </span>
                 </div>
               </div>

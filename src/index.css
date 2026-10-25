@@ -119,3 +119,20 @@
 .leaflet-container {
   font-family: inherit;
 }
+
+/* Smooth Slow Ticker Marquee */
+@keyframes slowMarquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee-slow {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: slowMarquee 75s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-slow:hover {
+  animation-play-state: paused;
+}
