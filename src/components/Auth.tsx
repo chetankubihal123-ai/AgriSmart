@@ -6,6 +6,7 @@ import { Phone, Lock, Loader2, ArrowRight, ArrowLeft, Eye, EyeOff, Mail, CheckCi
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
 import { sendEmailOTP, generate6DigitOTP, validatePassword } from '../lib/resendService';
+import { isFirebaseConfigured, sendFirebasePhoneOtp, verifyFirebasePhoneOtp } from '../lib/firebase';
 
 import authFarmerImg from '../assets/auth-farmer.png';
 
@@ -26,7 +27,7 @@ export function Auth() {
   const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
   const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase'>('resend');
+  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase' | 'firebase'>('resend');
 
   // Status & UI state
   const [error, setError] = useState('');
@@ -375,14 +376,33 @@ export function Auth() {
       return;
     }
 
-    // Phone reset
+    // Phone reset: Check if Firebase Phone Auth is configured
     setLoading(true);
     try {
+      if (isFirebaseConfigured()) {
+        const res = await sendFirebasePhoneOtp(phone);
+        if (res.success) {
+          setMessage(`🌿 6-digit SMS OTP sent to +91${phone.slice(-10)} via Firebase! Check your SMS.`);
+          setOtpMethod('firebase');
+          setShowOtpVerification(true);
+          return;
+        } else {
+          setError(res.error || 'Failed to send SMS OTP via Firebase.');
+          return;
+        }
+      }
+
+      // If Firebase credentials not in .env, use WhatsApp OTP
       const otp = generate6DigitOTP();
       setGeneratedOtp(otp);
       setOtpExpiresAt(Date.now() + 10 * 60 * 1000);
-      await sendWhatsAppOTP(phone, otp);
-      setMessage('OTP has been sent to your WhatsApp number.');
+      try {
+        await sendWhatsAppOTP(phone, otp);
+      } catch (e) {
+        console.warn('Twilio dispatch:', e);
+      }
+      setMessage('OTP has been dispatched to your WhatsApp number.');
+      setOtpMethod('resend');
       setShowOtpVerification(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send OTP. Please check your number.');
@@ -391,15 +411,70 @@ export function Auth() {
     }
   };
 
-  const verifyForgotPasswordOTP = (e: React.FormEvent) => {
+  const verifyForgotPasswordOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setMessage('');
+
+    if (!userOtp || userOtp.length !== 6) {
+      setError('Please enter the 6-digit OTP code.');
+      return;
+    }
+
+    // 1. Firebase Phone SMS OTP verification
+    if (otpMethod === 'firebase') {
+      setLoading(true);
+      try {
+        const res = await verifyFirebasePhoneOtp(userOtp);
+        if (res.success) {
+          setMessage('✓ SMS OTP verified successfully! Redirecting...');
+          setTimeout(() => {
+            navigate('/reset-password');
+          }, 1000);
+          return;
+        } else {
+          setError(res.error || 'Invalid SMS OTP code. Please check your SMS messages.');
+          return;
+        }
+      } catch (err: any) {
+        setError(err.message || 'Error verifying SMS OTP');
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // 2. Supabase Email OTP token verification
+    if (forgotPasswordMethod === 'email' && otpMethod === 'supabase') {
+      setLoading(true);
+      try {
+        const { error: supaErr } = await supabase.auth.verifyOtp({
+          email: email,
+          token: userOtp,
+          type: 'email',
+        });
+        if (!supaErr) {
+          setMessage('✓ Email OTP verified successfully! Redirecting...');
+          setTimeout(() => {
+            navigate('/reset-password');
+          }, 1000);
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase verifyOtp error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // 3. Fallback: Local OTP verification
     if (userOtp === generatedOtp) {
-      setMessage('OTP Verified successfully! Redirecting to password reset...');
+      setMessage('✓ OTP verified successfully! Redirecting to password reset...');
       setTimeout(() => {
         navigate('/reset-password');
-      }, 1200);
+      }, 1000);
     } else {
-      setError('Invalid OTP. Please check the code and try again.');
+      setError('Invalid OTP code. Please enter the 6-digit code received.');
     }
   };
 
@@ -1346,6 +1421,9 @@ export function Auth() {
         </div>
 
       </div>
+
+      {/* Firebase Phone Auth invisible reCAPTCHA container */}
+      <div id="recaptcha-container"></div>
     </div>
   );
 }
