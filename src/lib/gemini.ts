@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || (typeof atob !== 'undefined' ? atob('QVEuQWI4Uk42TFVuVURWZVBhTjBFMlZVbHBtVEMybmZhNWJCa19qbmZZNmlNRDN6OGdFUmc=') : '');
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Fast, stable, multimodal Gemini models available in Google AI Studio

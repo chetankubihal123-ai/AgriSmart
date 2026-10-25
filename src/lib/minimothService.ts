@@ -6,7 +6,7 @@
  * In dev, tries the local proxy first, then falls back to direct API call.
  */
 
-const MINIMOTH_API_KEY = import.meta.env.VITE_MINIMOTH_API_KEY || 'mm_test_228cbe86487cb6e23322caad39355e06700a6e783a9c909e90757817c6af674c63499d3f21bfebd3fc60314db0092745';
+const MINIMOTH_API_KEY = import.meta.env.VITE_MINIMOTH_API_KEY || 'mm_live_4576c0435f1fd54a24da811eee67de085bbdaf1a8164216684bab042738b8a8e1ff7ad4f689d07f86fa0d377e1f252cb';
 
 export interface MiniMothSendResult {
   success: boolean;

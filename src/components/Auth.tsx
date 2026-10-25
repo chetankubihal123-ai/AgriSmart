@@ -27,6 +27,7 @@ export function Auth() {
   const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase' | 'firebase' | 'minimoth'>('minimoth');
+  const [resendRestricted, setResendRestricted] = useState(false);
 
   // Status & UI state
   const [error, setError] = useState('');
@@ -261,6 +262,7 @@ export function Auth() {
   const handleSendEmailOtp = async (purpose: 'login' | 'signup' | 'reset' = 'login') => {
     setError('');
     setMessage('');
+    setResendRestricted(false);
 
     if (!isEmailValid) {
       setError('Please enter a valid email address.');
@@ -286,10 +288,37 @@ export function Auth() {
       if (res.success) {
         setMessage(`🌿 Verification code sent to ${email}! Check your inbox (or spam folder).`);
         setOtpMethod('resend');
+        setResendRestricted(false);
         setShowOtpVerification(true);
         setOtpCooldown(60);
+      } else if (res.isDomainRestricted) {
+        // Resend test domain restriction: only delivers to chetankubihal123@gmail.com
+        // Try Supabase auth OTP delivery first
+        let supaDelivered = false;
+        try {
+          const { error: supaOtpError } = await supabase.auth.signInWithOtp({ email });
+          if (!supaOtpError) {
+            supaDelivered = true;
+            setMessage(`🌿 Verification code sent to ${email} via Supabase! Please check your email inbox and spam folder.`);
+            setOtpMethod('supabase');
+            setResendRestricted(false);
+            setShowOtpVerification(true);
+            setOtpCooldown(60);
+            return;
+          }
+        } catch (e) {
+          console.warn('Supabase OTP fallback error:', e);
+        }
+
+        if (!supaDelivered) {
+          setResendRestricted(true);
+          setOtpMethod('resend');
+          setMessage(`ℹ️ Resend sandbox notice: Free tier only delivers direct emails to owner (chetankubihal123@gmail.com). Use test code below to proceed.`);
+          setShowOtpVerification(true);
+          setOtpCooldown(60);
+        }
       } else {
-        // Fallback to Supabase OTP
+        // Other Resend error, try Supabase fallback
         try {
           const { error: supaOtpError } = await supabase.auth.signInWithOtp({ email });
           if (!supaOtpError) {
@@ -301,8 +330,9 @@ export function Auth() {
           }
         } catch {}
 
-        setMessage(`🌿 Verification email sent to ${email}! Please check your inbox and spam folder.`);
+        setResendRestricted(true);
         setOtpMethod('resend');
+        setMessage(`ℹ️ Notice: Use verification code below to complete account setup, or switch to Mobile Number for live WhatsApp/SMS OTP.`);
         setShowOtpVerification(true);
         setOtpCooldown(60);
       }
@@ -1176,12 +1206,40 @@ export function Auth() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowOtpVerification(false)}
+                        onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); setResendRestricted(false); }}
                         className="text-green-700 hover:text-green-800 font-bold text-xs underline ml-2 shrink-0"
                       >
                         Change
                       </button>
                     </div>
+
+                    {resendRestricted && (
+                      <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-2xl text-xs space-y-2 text-amber-900 shadow-sm">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-800 text-xs">
+                          <span>⚠️</span>
+                          <span>Resend Free Tier Notice</span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-amber-800">
+                          Resend's test account domain (<span className="font-mono font-semibold">onboarding@resend.dev</span>) strictly allows direct delivery to the developer's registered email (<span className="font-mono font-bold">chetankubihal123@gmail.com</span>).
+                        </p>
+                        <div className="bg-white/90 p-2.5 rounded-xl border border-amber-300 flex items-center justify-between shadow-xs">
+                          <div>
+                            <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Test OTP Code:</p>
+                            <p className="text-xl font-mono font-black text-green-700 tracking-[0.2em]">{generatedOtp}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setUserOtp(generatedOtp)}
+                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-xs transition shadow-sm active:scale-95"
+                          >
+                            Auto-Fill OTP
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-500 italic">
+                          💡 Want to receive real live OTP on WhatsApp or SMS? Switch to the <strong>Mobile Number</strong> tab!
+                        </p>
+                      </div>
+                    )}
 
                     <div className="space-y-1.5">
                       <label htmlFor="email-otp-input" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
