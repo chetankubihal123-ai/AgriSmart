@@ -195,7 +195,9 @@ export function Auth() {
 
       setMessage('✓ Account created successfully! Logging you in...');
       setTimeout(() => {
-        if (phone === '9739623988') {
+        if (location.state?.from === '/shop') {
+          navigate('/shop', { replace: true });
+        } else if (phone === '9739623988') {
           navigate('/admin/dashboard', { replace: true });
         } else {
           const from = location.state?.from || '/dashboard';
@@ -242,7 +244,11 @@ export function Auth() {
         window.dispatchEvent(new Event('agrismart_auth_state_changed'));
         setMessage('✓ Welcome Administrator! Accessing Admin Dashboard...');
         setTimeout(() => {
-          navigate('/admin/dashboard', { replace: true });
+          if (location.state?.from === '/shop') {
+            navigate('/shop', { replace: true });
+          } else {
+            navigate('/admin/dashboard', { replace: true });
+          }
         }, 600);
         return;
       }
@@ -265,7 +271,9 @@ export function Auth() {
 
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
-          if (localStorage.getItem('agrismart_is_admin') === 'true' || phone === '9739623988') {
+          if (location.state?.from === '/shop') {
+            navigate('/shop', { replace: true });
+          } else if (localStorage.getItem('agrismart_is_admin') === 'true' || phone === '9739623988') {
             navigate('/admin/dashboard', { replace: true });
           } else {
             const from = location.state?.from || '/dashboard';
@@ -292,7 +300,9 @@ export function Auth() {
 
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
-          if (phone === '9739623988') {
+          if (location.state?.from === '/shop') {
+            navigate('/shop', { replace: true });
+          } else if (phone === '9739623988') {
             navigate('/admin/dashboard', { replace: true });
           } else {
             const from = location.state?.from || '/dashboard';
@@ -363,8 +373,12 @@ export function Auth() {
 
       setMessage('✓ Account created successfully! Logging you in...');
       setTimeout(() => {
-        const from = location.state?.from || '/dashboard';
-        navigate(from, { replace: true });
+        if (location.state?.from === '/shop') {
+          navigate('/shop', { replace: true });
+        } else {
+          const from = location.state?.from || '/dashboard';
+          navigate(from, { replace: true });
+        }
       }, 600);
     } catch (err: any) {
       setError(err.message || 'Error creating account. Please try again.');
@@ -414,8 +428,12 @@ export function Auth() {
 
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
-          const from = location.state?.from || '/dashboard';
-          navigate(from, { replace: true });
+          if (location.state?.from === '/shop') {
+            navigate('/shop', { replace: true });
+          } else {
+            const from = location.state?.from || '/dashboard';
+            navigate(from, { replace: true });
+          }
         }, 600);
       }
     } catch (err: any) {
@@ -606,7 +624,11 @@ export function Auth() {
 
         setMessage('✓ OTP verified & password reset successful! Logging you in...');
         setTimeout(() => {
-          navigate('/dashboard', { replace: true });
+          if (location.state?.from === '/shop') {
+            navigate('/shop', { replace: true });
+          } else {
+            navigate('/dashboard', { replace: true });
+          }
         }, 700);
         return;
       }
@@ -649,7 +671,11 @@ export function Auth() {
 
       setMessage('✓ OTP verified & password reset successful! Logging you in...');
       setTimeout(() => {
-        navigate('/dashboard', { replace: true });
+        if (location.state?.from === '/shop') {
+          navigate('/shop', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       }, 700);
     } catch (err: any) {
       setError(err.message || 'Error updating password. Please try again.');
@@ -1079,6 +1105,20 @@ export function Auth() {
                   : 'Create your account instantly with Mobile Number or Email & Password.'}
               </p>
             </div>
+
+            {location.state?.from === '/shop' && (
+              <div className="mb-5 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm text-base">
+                  🛍️
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-emerald-950">Agri Shop Access Required</p>
+                  <p className="text-[11px] text-emerald-800 font-medium leading-tight mt-0.5">
+                    Please log in or sign up to browse products, select PhonePe QR / COD payment, and order supplies. You will be directed straight to the shop after login.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Authentication Method Selector: Mobile Number vs Email & Password */}
             <div className="flex p-1 bg-slate-100 rounded-2xl mb-5 sm:mb-6 border border-slate-200">

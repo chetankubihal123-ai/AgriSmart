@@ -63,6 +63,19 @@ function DiseaseDetectionWrapper() {
   return <DiseaseDetection />;
 }
 
+// Guard specifically for Shop - only accessible after login
+function ShopAuthGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const storedPhone = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_phone') : null;
+  const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_email') : null;
+
+  if (!user && !storedPhone && !storedEmail) {
+    return <Navigate to="/auth" state={{ from: '/shop' }} replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   useRole();
@@ -73,6 +86,9 @@ function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
   const isAdmin = storedPhone === '9739623988' || (typeof window !== 'undefined' && localStorage.getItem('agrismart_is_admin') === 'true');
 
   if (user || storedPhone || storedEmail) {
+    if (location.state?.from === '/shop') {
+      return <Navigate to="/shop" replace />;
+    }
     if (isAdmin) {
       return <Navigate to="/admin/dashboard" replace />;
     }
@@ -136,7 +152,7 @@ function AppContent() {
                    <Route path="crop-health" element={<CropHealthWrapper />} />
                    <Route path="disease-detection" element={<DiseaseDetectionWrapper />} />
                    <Route path="weather" element={<WeatherImpactWrapper />} />
-                   <Route path="shop" element={<Shop />} />
+                   <Route path="shop" element={<ShopAuthGuard><Shop /></ShopAuthGuard>} />
                    <Route path="market-rates" element={<MarketRates />} />
                    <Route path="schemes" element={<SchemesFinder />} />
                    <Route path="*" element={<Navigate to="/dashboard" replace />} />

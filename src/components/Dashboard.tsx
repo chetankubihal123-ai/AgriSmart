@@ -36,7 +36,7 @@ import { fetchLiveAgmarknetRates, MarketCommodity } from '../lib/agmarknetServic
 export function Dashboard() {
   const { farms, selectedFarm, setSelectedFarm, loading: farmsLoading } = useFarm();
   const { t, language } = useLanguage();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [recentData, setRecentData] = useState<(CropData & { prediction?: Prediction })[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState('All');
@@ -516,7 +516,17 @@ export function Dashboard() {
             return (
               <div
                 key={idx}
-                onClick={() => navigate(card.path)}
+                onClick={() => {
+                  if (card.path === '/shop') {
+                    const storedPhone = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_phone') : null;
+                    const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_email') : null;
+                    if (!user && !storedPhone && !storedEmail) {
+                      navigate('/auth', { state: { from: '/shop' } });
+                      return;
+                    }
+                  }
+                  navigate(card.path);
+                }}
                 className={`group cursor-pointer bg-white rounded-[32px] border border-gray-200 shadow-sm hover:shadow-2xl hover:border-prodmast-primary/50 transition-all duration-500 overflow-hidden flex flex-col md:flex-row max-h-fit md:max-h-[380px] ${isReverse ? 'md:flex-row-reverse' : ''}`}
               >
                 <div className="md:w-[40%] h-56 md:h-auto relative overflow-hidden">

@@ -110,6 +110,15 @@ export function Layout({ children }: LayoutProps) {
                                 <button
                                     key={item.path}
                                     onClick={() => {
+                                        if (item.path === '/shop') {
+                                            const storedPhone = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_phone') : null;
+                                            const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_email') : null;
+                                            if (!user && !storedPhone && !storedEmail) {
+                                                navigate('/auth', { state: { from: '/shop' } });
+                                                setIsSidebarOpen(false);
+                                                return;
+                                            }
+                                        }
                                         navigate(item.path);
                                         setIsSidebarOpen(false);
                                     }}
