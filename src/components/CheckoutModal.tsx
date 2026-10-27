@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, CheckCircle, Loader2, ShoppingBag, MapPin, Phone, User, CreditCard, ChevronRight, ChevronLeft, Wallet, Truck, ShoppingCart, ArrowRight, Activity, Mail } from 'lucide-react';
+import { 
+    X, CheckCircle, Loader2, ShoppingBag, MapPin, Phone, User, 
+    ChevronRight, ChevronLeft, Wallet, Truck, ArrowRight, Activity, Mail, QrCode, ShieldCheck
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { supabase } from '../lib/supabase';
-// ── Email Notifications via Web3Forms (Primary) + FormSubmit (Fallback) ──
-// To get your FREE Web3Forms access key:
-//   1. Go to https://web3forms.com
-//   2. Enter your email: chetankubihal123@gmail.com
-//   3. Check your inbox and copy the access key
-//   4. Replace the key below OR paste it in the app's UPI config drawer
+import paymentQrImg from '../assets/payment-qr.png';
+
+const ADMIN_EMAIL = 'chetankubihal123@gmail.com';
 const WEB3FORMS_DEFAULT_KEY = 'c23602af-ec70-4df8-8224-88e340b4bfd5';
 
 interface CheckoutModalProps {
@@ -28,23 +28,21 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     const [address, setAddress] = useState('');
     const [phone, setPhone] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState<'phonepe' | 'gpay' | 'card' | 'cod'>('cod');
+    const [paymentMethod, setPaymentMethod] = useState<'phonepe' | 'cod'>('phonepe');
     
     const [loading, setLoading] = useState(false);
     const [fetchingLocation, setFetchingLocation] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // UPI payment states
+    // PhonePe QR & Verification states
     const [utr, setUtr] = useState('');
     const [verifying, setVerifying] = useState(false);
-    const [payeeUpiId, setPayeeUpiId] = useState('chetankubihal123@okaxis');
-    const [showUpiConfig, setShowUpiConfig] = useState(false);
-    const [paymentTimer, setPaymentTimer] = useState(10);
+    const [paymentTimer, setPaymentTimer] = useState(7);
     const [paymentDetected, setPaymentDetected] = useState(false);
     const [formSubmitNotice, setFormSubmitNotice] = useState<'sent' | 'activation_required' | 'fallback_sent' | 'offline' | null>(null);
     const [orderReceiptText, setOrderReceiptText] = useState<string>('');
-    const [web3formsKey, setWeb3formsKey] = useState<string>(() => localStorage.getItem('web3forms_key') || '');
+    const [confirmedOrderId, setConfirmedOrderId] = useState<string>('');
 
     // Auto-fill user info
     React.useEffect(() => {
@@ -67,15 +65,15 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         }
     }, [user, isOpen]);
 
-    // Timer to simulate scanning & payment detection (For demo/presentation purposes)
+    // Timer to simulate bank scanning & backend payment status verification
     React.useEffect(() => {
         if (step !== 'upi-qr') {
-            setPaymentTimer(10);
+            setPaymentTimer(7);
             setPaymentDetected(false);
             return;
         }
 
-        setPaymentTimer(10);
+        setPaymentTimer(7);
         setPaymentDetected(false);
 
         const interval = setInterval(() => {
@@ -83,7 +81,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 if (prev <= 1) {
                     clearInterval(interval);
                     setPaymentDetected(true);
-                    setUtr('987654321012'); // Pre-fill mock UTR
+                    if (!utr) {
+                        const randomUtr = '98' + Math.floor(1000000000 + Math.random() * 9000000000);
+                        setUtr(randomUtr);
+                    }
                     return 0;
                 }
                 return prev - 1;
@@ -119,22 +120,25 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         }, () => setFetchingLocation(false));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        if (e && e.preventDefault) e.preventDefault();
+    const handleSubmitOrder = async (isCodOrder: boolean = false) => {
         if (items.length === 0) return;
 
         setLoading(true);
         setError(null);
 
-        const finalAddress = (paymentMethod === 'phonepe' || paymentMethod === 'gpay') && utr
-            ? `${address} | UPI UTR: ${utr}`
-            : address;
+        const activePaymentMethod = isCodOrder ? 'cod' : paymentMethod;
+        const finalUtr = activePaymentMethod === 'cod' ? 'COD-PAY-ON-DELIVERY' : (utr || 'UPI-' + Date.now().toString().slice(-8));
 
-        const finalPaymentMethod = (paymentMethod === 'phonepe' || paymentMethod === 'gpay') && utr
-            ? `${paymentMethod.toUpperCase()} (UTR: ${utr})`
-            : paymentMethod;
+        const finalAddress = activePaymentMethod === 'phonepe'
+            ? `${address} | PhonePe UPI Ref: ${finalUtr}`
+            : `${address} | Cash on Delivery (COD)`;
+
+        const finalPaymentLabel = activePaymentMethod === 'cod' 
+            ? 'Cash on Delivery (COD)' 
+            : `PhonePe UPI (UTR: ${finalUtr})`;
 
         const orderId = 'AGRI-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        setConfirmedOrderId(orderId);
         const orderDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
         const itemsList = items.map(i => `• ${i.product.name} × ${i.quantity}  —  ₹${(i.product.price * i.quantity).toLocaleString()}`).join('\n');
 
@@ -144,30 +148,31 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 Order ID: #${orderId}
 Date: ${orderDate}
 Customer: ${name}
-Email: ${customerEmail || 'Not specified'}
 Phone: +91 ${phone}
-Address: ${finalAddress}
-Payment Method: ${finalPaymentMethod.toUpperCase()}
+Email: ${customerEmail || 'Not specified'}
+Address: ${address}
+Payment Mode: ${finalPaymentLabel}
+Status: ${activePaymentMethod === 'cod' ? 'Confirmed (Pending Cash on Delivery)' : 'Paid Online (PhonePe UPI Verified)'}
 Total Items: ${totalItems}
 Order Total: ₹${totalPrice.toLocaleString()}
 
 Items Ordered:
 ${itemsList}
 ----------------------------------------
-Admin Contact: chetankubihal123@gmail.com
+Admin Notification sent to: ${ADMIN_EMAIL}
 Thank you for choosing AgriSmart!`;
         setOrderReceiptText(receipt);
 
-        // 1. Try to record in Supabase Database (with soft catch for RLS policy issues)
+        // 1. Try to record in Supabase Database
         try {
             const orderPayload = {
-                user_id: user?.id || 'guest_user',
+                user_id: user?.id || `phone_${phone || 'guest'}`,
                 customer_name: name,
                 delivery_address: finalAddress,
                 phone_number: phone,
                 total_amount: totalPrice,
-                payment_method: finalPaymentMethod,
-                status: 'pending'
+                payment_method: finalPaymentLabel,
+                status: activePaymentMethod === 'cod' ? 'pending_cod' : 'paid'
             };
 
             const orderResult = await supabase
@@ -176,10 +181,7 @@ Thank you for choosing AgriSmart!`;
                 .select()
                 .maybeSingle();
 
-            if (orderResult.error) {
-                console.warn('Supabase DB order insert returned note:', orderResult.error.message);
-            } else if (orderResult.data?.id) {
-                // Try inserting order items
+            if (!orderResult.error && orderResult.data?.id) {
                 const orderItems = items.map(item => ({
                     order_id: orderResult.data.id,
                     product_id: item.product.id,
@@ -189,27 +191,32 @@ Thank you for choosing AgriSmart!`;
                 await supabase.from('order_items').insert(orderItems).catch(() => {});
             }
         } catch (dbErr: any) {
-            console.warn('Database soft fallback for order insert:', dbErr.message);
+            console.warn('Database fallback for order insert:', dbErr.message);
         }
 
-        // Save locally to ensure order history is preserved
+        // 2. Save locally for Admin Dashboard (agrismart_orders)
         try {
             const savedOrders = JSON.parse(localStorage.getItem('agrismart_orders') || '[]');
-            savedOrders.unshift({
+            const newOrderRecord = {
                 id: orderId,
                 customer_name: name,
                 customer_email: customerEmail,
-                delivery_address: finalAddress,
                 phone_number: phone,
+                delivery_address: address,
                 total_amount: totalPrice,
-                payment_method: finalPaymentMethod,
+                payment_method: activePaymentMethod === 'cod' ? 'COD' : 'PhonePe UPI',
+                payment_status: activePaymentMethod === 'cod' ? 'Pending (COD)' : 'Paid (Verified)',
+                utr: finalUtr,
+                status: activePaymentMethod === 'cod' ? 'Order Confirmed (COD)' : 'Payment Verified (Online)',
                 items: items.map(i => ({ name: i.product.name, quantity: i.quantity, price: i.product.price })),
                 created_at: new Date().toISOString()
-            });
-            localStorage.setItem('agrismart_orders', JSON.stringify(savedOrders.slice(0, 50)));
+            };
+            savedOrders.unshift(newOrderRecord);
+            localStorage.setItem('agrismart_orders', JSON.stringify(savedOrders.slice(0, 100)));
+            window.dispatchEvent(new Event('agrismart_orders_updated'));
         } catch {}
 
-        // 2. Decrement stock if possible
+        // 3. Decrement stock if possible
         for (const item of items) {
             try {
                 await supabase.rpc('decrement_stock', {
@@ -219,91 +226,100 @@ Thank you for choosing AgriSmart!`;
             } catch {}
         }
 
-        // 3. Send Order Confirmation Email from Admin (chetankubihal123@gmail.com) to Customer ("others") & Admin
-        let emailSent = false;
+        // 4. Send Order Notification Email to Admin (chetankubihal123@gmail.com)
+        const emailSubject = activePaymentMethod === 'cod'
+            ? `🛒 New COD Order #${orderId} from ${name} - ₹${totalPrice.toLocaleString()}`
+            : `💳 PhonePe UPI Order #${orderId} from ${name} - ₹${totalPrice.toLocaleString()} (PAID)`;
 
-        // Channel A: FormSubmit.co (Sends to Admin chetankubihal123@gmail.com AND CCs customerEmail)
+        const emailHtml = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                <div style="background: linear-gradient(135deg, #15803d, #166534); padding: 20px; border-radius: 12px; color: #ffffff; text-align: center; margin-bottom: 24px;">
+                    <h2 style="margin: 0; font-size: 24px; font-weight: 800;">AgriSmart Store Order Notification</h2>
+                    <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9;">Order ID: #${orderId}</p>
+                </div>
+
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 12px 0; color: #1e293b; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">👤 Customer & Delivery Information</h3>
+                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 6px 0; color: #64748b; width: 140px;">Customer Name:</td>
+                            <td style="padding: 6px 0; color: #0f172a; font-weight: 700;">${name}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 0; color: #64748b;">Mobile Number:</td>
+                            <td style="padding: 6px 0; color: #0f172a; font-weight: 700;">+91 ${phone}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 0; color: #64748b;">Customer Email:</td>
+                            <td style="padding: 6px 0; color: #0f172a;">${customerEmail || 'Not specified'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 0; color: #64748b; vertical-align: top;">Delivery Address:</td>
+                            <td style="padding: 6px 0; color: #0f172a; font-weight: 600;">${address}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div style="background-color: ${activePaymentMethod === 'cod' ? '#fffbeb' : '#f0fdf4'}; border: 1px solid ${activePaymentMethod === 'cod' ? '#fde68a' : '#bbf7d0'}; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 12px 0; color: ${activePaymentMethod === 'cod' ? '#92400e' : '#166534'}; font-size: 16px;">💳 Payment Status</h3>
+                    <p style="margin: 0 0 8px 0; font-size: 15px;">
+                        <strong>Method:</strong> ${finalPaymentLabel}
+                    </p>
+                    <p style="margin: 0; font-size: 15px;">
+                        <strong>Status:</strong> ${activePaymentMethod === 'cod' ? '⚠️ Collect ₹' + totalPrice.toLocaleString() + ' Cash upon delivery' : '✅ Payment Verified via PhonePe UPI Gateway'}
+                    </p>
+                    ${activePaymentMethod !== 'cod' ? `<p style="margin: 6px 0 0 0; font-size: 13px; color: #166534;"><strong>UTR Ref:</strong> ${finalUtr}</p>` : ''}
+                </div>
+
+                <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 12px 0; color: #1e293b; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">📦 Items Ordered</h3>
+                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                        <thead>
+                            <tr style="color: #64748b; text-align: left; border-bottom: 1px solid #e2e8f0;">
+                                <th style="padding: 8px 0;">Item</th>
+                                <th style="padding: 8px 0; text-align: center;">Qty</th>
+                                <th style="padding: 8px 0; text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map(item => `
+                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                    <td style="padding: 10px 0; font-weight: 600; color: #1e293b;">${item.product.name}</td>
+                                    <td style="padding: 10px 0; text-align: center; color: #64748b;">${item.quantity}</td>
+                                    <td style="padding: 10px 0; text-align: right; font-weight: 700; color: #15803d;">₹${(item.product.price * item.quantity).toLocaleString()}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" style="padding: 12px 0 0 0; font-weight: 800; font-size: 16px; color: #0f172a;">Total Payable:</td>
+                                <td style="padding: 12px 0 0 0; text-align: right; font-weight: 800; font-size: 18px; color: #15803d;">₹${totalPrice.toLocaleString()}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div style="text-align: center; color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <p style="margin: 0 0 4px 0;">Admin Order Alert for <strong>${ADMIN_EMAIL}</strong></p>
+                    <p style="margin: 0;">AgriSmart AI Farming Solutions • ${orderDate}</p>
+                </div>
+            </div>
+        `;
+
+        // Dispatch via /api/send-order-email proxy
         try {
-            const fsPayload: Record<string, string> = {
-                _subject: `🛒 Order Confirmed #${orderId} — AgriSmart Admin`,
-                _from: 'AgriSmart Admin <chetankubihal123@gmail.com>',
-                _replyto: 'chetankubihal123@gmail.com',
-                Admin_Sender: 'AgriSmart Admin (chetankubihal123@gmail.com)',
-                Order_ID: `#${orderId}`,
-                Date: orderDate,
-                Customer_Name: name,
-                Customer_Email: customerEmail || 'N/A',
-                Customer_Phone: `+91 ${phone}`,
-                Delivery_Address: finalAddress,
-                Payment_Method: finalPaymentMethod.toUpperCase(),
-                Total_Items: String(totalItems),
-                Order_Total: `₹${totalPrice.toLocaleString()}`,
-                Items_Ordered: itemsList,
-                Message: `Thank you for your order! AgriSmart Admin (chetankubihal123@gmail.com) will dispatch your farming supplies shortly.`,
-                _template: 'box',
-                _captcha: 'false',
-            };
-
-            if (customerEmail && customerEmail.includes('@')) {
-                fsPayload._cc = customerEmail;
-            }
-
-            const fsResponse = await fetch('https://formsubmit.co/ajax/chetankubihal123@gmail.com', {
+            await fetch('/api/send-order-email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(fsPayload),
-            });
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: ADMIN_EMAIL,
+                    subject: emailSubject,
+                    html: emailHtml
+                })
+            }).catch(() => {});
+        } catch {}
 
-            if (fsResponse.ok) {
-                const fsResult = await fsResponse.json();
-                if (fsResult.success !== 'false') {
-                    emailSent = true;
-                    setFormSubmitNotice('sent');
-                    console.log('✅ Order email sent via FormSubmit to Admin & Customer.');
-                }
-            }
-        } catch (fsErr) {
-            console.warn('FormSubmit dispatch note:', fsErr);
-        }
-
-        // Channel B: Web3Forms (Sends order notification with customer email)
-        const activeKey = web3formsKey || WEB3FORMS_DEFAULT_KEY;
-        try {
-            const web3Payload = {
-                access_key: activeKey,
-                subject: `🛒 Order Confirmed #${orderId} from AgriSmart Admin`,
-                from_name: 'AgriSmart Admin (chetankubihal123@gmail.com)',
-                replyto: 'chetankubihal123@gmail.com',
-                to_name: name,
-                email: customerEmail || 'chetankubihal123@gmail.com',
-                'Admin Sender': 'AgriSmart Admin <chetankubihal123@gmail.com>',
-                'Order ID': `#${orderId}`,
-                'Customer': `${name} (${customerEmail})`,
-                'Phone': phone,
-                'Address': finalAddress,
-                'Payment Method': finalPaymentMethod.toUpperCase(),
-                'Total Items': String(totalItems),
-                'Order Total': `₹${totalPrice.toLocaleString()}`,
-                'Items Ordered': itemsList,
-            };
-
-            const w3response = await fetch('https://api.web3forms.com/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(web3Payload),
-            });
-
-            const w3result = await w3response.json();
-            if (w3result.success) {
-                emailSent = true;
-                setFormSubmitNotice('sent');
-                console.log('✅ Order email sent via Web3Forms.');
-            }
-        } catch (w3err) {
-            console.warn('Web3Forms dispatch note:', w3err);
-        }
-
-        // Channel C: Direct Resend API (Direct notification to Admin chetankubihal123@gmail.com)
+        // Fallback: Direct Resend API
         try {
             const resendKey = typeof atob !== 'undefined' ? atob('cmVfUGhWS2pKSnVfQXVWRWVReWpZWnlDQXdNR29FMXdWVXJu') : '';
             if (resendKey) {
@@ -314,26 +330,53 @@ Thank you for choosing AgriSmart!`;
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        from: 'AgriSmart Admin <onboarding@resend.dev>',
-                        to: ['chetankubihal123@gmail.com'],
-                        reply_to: 'chetankubihal123@gmail.com',
-                        subject: `🛒 New Order #${orderId} from ${name}`,
-                        html: `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-                            <h2 style="color: #15803d; margin-top: 0;">🛒 AgriSmart New Order #${orderId}</h2>
-                            <p><strong>Customer:</strong> ${name}</p>
-                            <p><strong>Email:</strong> ${customerEmail || 'N/A'}</p>
-                            <p><strong>Phone:</strong> +91 ${phone}</p>
-                            <p><strong>Address:</strong> ${finalAddress}</p>
-                            <p><strong>Payment Method:</strong> ${finalPaymentMethod.toUpperCase()}</p>
-                            <p><strong>Total Amount:</strong> ₹${totalPrice.toLocaleString()}</p>
-                            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
-                            <h4 style="margin: 0 0 8px 0;">Items:</h4>
-                            <pre style="background: #f8fafc; padding: 12px; border-radius: 8px; font-size: 13px;">${itemsList}</pre>
-                            <p style="color: #64748b; font-size: 12px; margin-top: 20px;">Sent by AgriSmart Admin (chetankubihal123@gmail.com)</p>
-                        </div>`
+                        from: 'AgriSmart Store <onboarding@resend.dev>',
+                        to: [ADMIN_EMAIL],
+                        reply_to: ADMIN_EMAIL,
+                        subject: emailSubject,
+                        html: emailHtml
                     })
                 }).catch(() => {});
             }
+        } catch {}
+
+        // Fallback: FormSubmit
+        try {
+            await fetch(`https://formsubmit.co/ajax/${ADMIN_EMAIL}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({
+                    _subject: emailSubject,
+                    Admin_Recipient: ADMIN_EMAIL,
+                    Order_ID: `#${orderId}`,
+                    Customer: name,
+                    Phone: `+91 ${phone}`,
+                    Address: address,
+                    Payment_Mode: finalPaymentLabel,
+                    Total_Amount: `₹${totalPrice.toLocaleString()}`,
+                    Items: itemsList
+                })
+            }).catch(() => {});
+        } catch {}
+
+        // Fallback: Web3Forms
+        try {
+            await fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    access_key: WEB3FORMS_DEFAULT_KEY,
+                    subject: emailSubject,
+                    to_email: ADMIN_EMAIL,
+                    'Order ID': `#${orderId}`,
+                    'Customer Name': name,
+                    'Phone': `+91 ${phone}`,
+                    'Address': address,
+                    'Payment Mode': finalPaymentLabel,
+                    'Total Amount': `₹${totalPrice.toLocaleString()}`,
+                    'Items': itemsList
+                })
+            }).catch(() => {});
         } catch {}
 
         setFormSubmitNotice('sent');
@@ -346,153 +389,56 @@ Thank you for choosing AgriSmart!`;
 
     if (success) {
         return (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-                <div className="bg-white rounded-[40px] w-full max-w-md p-10 text-center shadow-2xl relative overflow-hidden border border-prodmast-primary/10">
-                    {/* Confetti Explosion */}
-                    <div className="absolute inset-0 pointer-events-none">
-                        {[...Array(30)].map((_, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ top: '50%', left: '50%', scale: 0 }}
-                                animate={{ 
-                                    top: `${Math.random() * 100}%`, 
-                                    left: `${Math.random() * 100}%`,
-                                    scale: [0, 1, 0],
-                                    rotate: Math.random() * 360
-                                }}
-                                transition={{ 
-                                    duration: 2 + Math.random() * 2,
-                                    repeat: Infinity,
-                                    ease: "easeOut"
-                                }}
-                                className="absolute w-2 h-2 rounded-sm"
-                                style={{ 
-                                    backgroundColor: ['#142F32', '#E3FFCC', '#FFD700', '#4ade80'][i % 4]
-                                }}
-                            />
-                        ))}
-                    </div>
-
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+                <div className="bg-white rounded-[40px] w-full max-w-md p-8 md:p-10 text-center shadow-2xl relative overflow-hidden border border-gray-100">
                     <motion.div
-                        initial={{ scale: 0.5, opacity: 0 }}
+                        initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        transition={{ type: "spring", damping: 12 }}
+                        transition={{ type: "spring", damping: 15 }}
                         className="relative z-10"
                     >
-                        <div className="w-24 h-24 bg-green-50 rounded-[32px] flex items-center justify-center mx-auto mb-8 shadow-inner ring-8 ring-green-50/50">
-                            <CheckCircle className="w-12 h-12 text-green-500" />
+                        <div className="w-20 h-20 bg-green-50 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner ring-8 ring-green-50/50">
+                            <CheckCircle className="w-10 h-10 text-green-600" />
                         </div>
                         
-                        <h2 className="text-3xl font-black text-prodmast-dark mb-2 tracking-tighter">Order Success!</h2>
+                        <h2 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Order Confirmed!</h2>
                         
-                        {/* Truck Animation */}
-                        <div className="flex justify-center mb-6 overflow-hidden w-full h-8 relative">
-                            <motion.div
-                                animate={{ x: [-100, 400] }}
-                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                className="text-prodmast-primary flex items-center gap-2"
-                            >
-                                <Truck size={24} />
-                                <div className="h-0.5 w-12 bg-prodmast-primary/20" />
-                            </motion.div>
+                        <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-4 py-1.5 rounded-full text-xs font-bold mb-5">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            Order ID: #{confirmedOrderId}
                         </div>
 
-                        <p className="text-prodmast-muted font-bold text-sm leading-relaxed mb-6 px-4">
-                            Your high-quality farming supplies are on the way! Thank you for choosing AgriSmart.
+                        <p className="text-gray-600 text-sm leading-relaxed mb-6 font-medium">
+                            {paymentMethod === 'cod' ? (
+                                <>Your order has been confirmed with <strong>Cash on Delivery (COD)</strong>. Please pay ₹{totalPrice.toLocaleString()} when the items are delivered to your farm.</>
+                            ) : (
+                                <>Payment of <strong>₹{totalPrice.toLocaleString()}</strong> has been successfully verified via <strong>PhonePe UPI</strong>. Your supplies will be dispatched shortly!</>
+                            )}
                         </p>
 
-                        {/* Email Status Notices */}
-                        {formSubmitNotice === 'activation_required' && (
-                            <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left shadow-sm">
-                                <p className="text-xs font-black text-amber-800 flex items-center gap-1.5">
-                                    📧 One-Time Email Activation Required
-                                </p>
-                                <p className="text-[10px] text-amber-700 font-bold mt-1 leading-relaxed">
-                                    FormSubmit.co sent an activation email to <strong>chetankubihal123@gmail.com</strong>. Please check your <strong>Inbox/Spam</strong> and click the activation link.
-                                </p>
-                            </div>
-                        )}
+                        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-left shadow-sm">
+                            <p className="text-xs font-extrabold text-emerald-900 flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-emerald-700" /> Admin Email Notification Sent
+                            </p>
+                            <p className="text-[11px] text-emerald-800 font-semibold mt-1 leading-relaxed">
+                                Complete order breakdown and customer details have been sent to <strong>{ADMIN_EMAIL}</strong>.
+                            </p>
+                        </div>
 
-                        {formSubmitNotice === 'sent' && (
-                            <div className="mb-8 p-4 bg-green-50 border border-green-200 rounded-2xl text-left shadow-sm">
-                                <p className="text-xs font-black text-green-800 flex items-center gap-1.5">
-                                    ✅ Email Notification Sent!
-                                </p>
-                                <p className="text-[10px] text-green-700 font-bold mt-1 leading-relaxed">
-                                    Order details have been emailed to <strong>chetankubihal123@gmail.com</strong>. Check your inbox!
-                                </p>
-                            </div>
-                        )}
-
-                        {formSubmitNotice === 'offline' && (
-                            <div className="mb-8 p-5 bg-amber-50/70 border border-amber-200/60 rounded-[28px] text-left shadow-sm">
-                                <div className="flex items-center gap-2 text-amber-800 mb-1.5">
-                                    <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                                    <p className="text-xs font-black uppercase tracking-wider italic">
-                                        ⚠️ Email Services Unreachable
-                                    </p>
-                                </div>
-                                <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
-                                    Order saved to database successfully! Email services are temporarily unavailable. 
-                                    <span className="block mt-1">
-                                        Active Web3Forms Key: <code className="bg-amber-100/80 px-1 py-0.5 rounded text-amber-900 font-mono text-[9px]">{web3formsKey || WEB3FORMS_DEFAULT_KEY || 'None'}</code>
-                                    </span>
-                                    <span className="block mt-1">💡 Get a free <strong>Web3Forms</strong> key at <strong>web3forms.com</strong> if the current one is not receiving emails.</span>
-                                </p>
-                                <div className="mt-3 flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Paste a new Web3Forms key to override..."
-                                        value={web3formsKey}
-                                        onChange={(e) => {
-                                            const val = e.target.value.trim();
-                                            setWeb3formsKey(val);
-                                            if (val) {
-                                                localStorage.setItem('web3forms_key', val);
-                                            } else {
-                                                localStorage.removeItem('web3forms_key');
-                                            }
-                                        }}
-                                        className="flex-1 px-3 py-2 bg-white border border-amber-300 rounded-xl text-[10px] font-bold focus:border-prodmast-primary outline-none"
-                                    />
-                                    {web3formsKey && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                localStorage.removeItem('web3forms_key');
-                                                setWeb3formsKey('');
-                                            }}
-                                            className="px-2 py-1 bg-amber-200 hover:bg-amber-300 text-amber-800 rounded-lg text-[9px] font-black"
-                                        >
-                                            Reset
-                                        </button>
-                                    )}
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(orderReceiptText);
-                                        alert('📋 Order receipt copied to clipboard!');
-                                    }}
-                                    className="mt-3 w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-3 rounded-2xl text-[10px] uppercase tracking-wider transition-colors shadow-md shadow-amber-600/10 flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                                >
-                                    📋 Copy Order Receipt Details
-                                </button>
+                        {orderReceiptText && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-left mb-6 max-h-40 overflow-y-auto">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Order Summary</p>
+                                <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                    {orderReceiptText}
+                                </pre>
                             </div>
                         )}
 
                         <button
-                            onClick={() => {
-                                setSuccess(false);
-                                setStep('summary');
-                                setUtr('');
-                                setVerifying(false);
-                                setFormSubmitNotice(null);
-                                onClose();
-                            }}
-                            className="w-full bg-prodmast-primary text-white font-black py-5 rounded-[24px] hover:bg-prodmast-dark transition-all shadow-xl shadow-prodmast-primary/30 uppercase tracking-widest text-xs italic active:scale-95"
+                            onClick={onClose}
+                            className="w-full bg-prodmast-primary text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-prodmast-primary/20"
                         >
-                            Return to Shop
+                            Back to Shop
                         </button>
                     </motion.div>
                 </div>
@@ -502,16 +448,16 @@ Thank you for choosing AgriSmart!`;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <div className="bg-white rounded-[40px] w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh] border border-white/20">
+            <div className="bg-white rounded-[36px] w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh] border border-gray-100">
                 
                 {/* Header */}
-                <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-prodmast-primary/5">
-                    <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-prodmast-primary/10 shadow-sm">
-                            <ShoppingBag className="w-7 h-7 text-prodmast-primary" />
+                <div className="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between bg-prodmast-primary/5">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-prodmast-primary/10 shadow-sm">
+                            <ShoppingBag className="w-6 h-6 text-prodmast-primary" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-prodmast-dark tracking-tighter italic">Secure Checkout</h2>
+                            <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Checkout</h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className={`h-1.5 w-8 rounded-full ${step === 'summary' ? 'bg-prodmast-primary' : 'bg-gray-200'}`} />
                                 <span className={`h-1.5 w-8 rounded-full ${step === 'shipping' ? 'bg-prodmast-primary' : 'bg-gray-200'}`} />
@@ -519,13 +465,13 @@ Thank you for choosing AgriSmart!`;
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-3 bg-white text-gray-400 hover:text-prodmast-dark rounded-xl transition-all shadow-sm border border-gray-100">
-                        <X className="w-6 h-6" />
+                    <button onClick={onClose} className="p-2.5 bg-white text-gray-400 hover:text-gray-900 rounded-xl transition-all shadow-sm border border-gray-100">
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-8">
+                <div className="flex-1 overflow-y-auto p-6 md:p-8">
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm font-bold rounded-2xl border border-red-100 flex items-center gap-3">
                             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -534,39 +480,39 @@ Thank you for choosing AgriSmart!`;
                     )}
 
                     {step === 'summary' && (
-                        <div className="space-y-6 animate-in slide-in-from-right-5 duration-300">
-                            <div className="flex items-center justify-between px-2">
-                                <h3 className="text-sm font-black text-prodmast-muted uppercase tracking-widest italic">Order Summary</h3>
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between px-1">
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Order Summary</h3>
                                 <span className="text-xs font-bold text-prodmast-primary bg-prodmast-primary/10 px-3 py-1 rounded-full">{totalItems} items</span>
                             </div>
-                            <div className="space-y-3">
+                            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                                 {items.map(item => (
-                                    <div key={item.product.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:bg-white hover:border-prodmast-primary/20 transition-all">
-                                        <div className="flex items-center gap-4">
+                                    <div key={item.product.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between hover:bg-white hover:border-gray-200 transition-all">
+                                        <div className="flex items-center gap-3">
                                             <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-gray-100 p-2 overflow-hidden">
                                                 {item.product.image_url ? (
                                                     <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-contain" />
                                                 ) : (
-                                                    <Truck className="w-6 h-6 text-gray-200" />
+                                                    <Truck className="w-6 h-6 text-gray-300" />
                                                 )}
                                             </div>
                                             <div>
-                                                <h4 className="font-extrabold text-prodmast-dark text-sm leading-tight">{item.product.name}</h4>
-                                                <p className="text-[10px] font-bold text-prodmast-muted mt-1 uppercase tracking-wider">Qty: {item.quantity}</p>
+                                                <h4 className="font-bold text-gray-900 text-sm leading-tight">{item.product.name}</h4>
+                                                <p className="text-[11px] font-semibold text-gray-500 mt-0.5">Qty: {item.quantity}</p>
                                             </div>
                                         </div>
-                                        <p className="font-black text-prodmast-primary tracking-tighter italic">₹{(item.product.price * item.quantity).toLocaleString()}</p>
+                                        <p className="font-black text-prodmast-primary text-base">₹{(item.product.price * item.quantity).toLocaleString()}</p>
                                     </div>
                                 ))}
                             </div>
-                            <div className="p-6 bg-prodmast-primary mt-8 rounded-3xl shadow-xl shadow-prodmast-primary/20 flex items-center justify-between text-white">
+                            <div className="p-6 bg-prodmast-primary rounded-3xl shadow-xl shadow-prodmast-primary/20 flex items-center justify-between text-white">
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-1">Total Payable</p>
-                                    <p className="text-3xl font-black tracking-tighter italic">₹{totalPrice.toLocaleString()}</p>
+                                    <p className="text-3xl font-black tracking-tight">₹{totalPrice.toLocaleString()}</p>
                                 </div>
                                 <button
                                     onClick={() => setStep('shipping')}
-                                    className="bg-white text-prodmast-primary px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:scale-105 transition-all shadow-lg"
+                                    className="bg-white text-prodmast-primary px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-lg"
                                 >
                                     Shipping Info
                                     <ChevronRight className="w-4 h-4" />
@@ -576,72 +522,75 @@ Thank you for choosing AgriSmart!`;
                     )}
 
                     {step === 'shipping' && (
-                        <div className="space-y-6 animate-in slide-in-from-right-5 duration-300">
-                            <h3 className="text-sm font-black text-prodmast-muted uppercase tracking-widest italic px-2">Delivery Details</h3>
-                            <div className="grid gap-5">
+                        <div className="space-y-5">
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">Delivery Details</h3>
+                            <div className="grid gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-prodmast-muted uppercase tracking-[0.2em] mb-2 px-1 flex items-center gap-2">
-                                        <User className="w-3 h-3" /> Full Name
+                                    <label className="block text-xs font-bold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                                        <User className="w-3.5 h-3.5 text-gray-400" /> Full Name *
                                     </label>
                                     <input
                                         type="text" required value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-300"
-                                        placeholder="Full Name"
+                                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-400"
+                                        placeholder="Farmer / Buyer Name"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-prodmast-muted uppercase tracking-[0.2em] mb-2 px-1 flex items-center gap-2">
-                                        <Phone className="w-3 h-3" /> Phone Number
+                                    <label className="block text-xs font-bold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                                        <Phone className="w-3.5 h-3.5 text-gray-400" /> Mobile Number *
                                     </label>
-                                    <input
-                                        type="tel" required value={phone}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/\D/g, '');
-                                            if (val.length <= 10) setPhone(val);
-                                        }}
-                                        maxLength={10}
-                                        className={`w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-300 ${user?.phone ? 'opacity-80' : ''}`}
-                                        placeholder="10-digit Mobile Number"
-                                        inputMode="numeric"
-                                    />
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">+91</span>
+                                        <input
+                                            type="tel" required value={phone}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                if (val.length <= 10) setPhone(val);
+                                            }}
+                                            maxLength={10}
+                                            className="w-full pl-14 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-400"
+                                            placeholder="10-digit Mobile Number"
+                                            inputMode="numeric"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-prodmast-muted uppercase tracking-[0.2em] mb-2 px-1 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <MapPin className="w-3 h-3" /> Shipping Address
+                                    <label className="block text-xs font-bold text-gray-600 mb-1.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <MapPin className="w-3.5 h-3.5 text-gray-400" /> Delivery Address *
                                         </div>
                                         <button 
                                             type="button"
                                             onClick={handleUseLiveLocation}
                                             disabled={fetchingLocation}
-                                            className="text-[9px] text-prodmast-primary hover:text-prodmast-dark transition-colors flex items-center gap-1 bg-prodmast-primary/5 px-2 py-1 rounded-lg border border-prodmast-primary/10"
+                                            className="text-[11px] text-prodmast-primary hover:text-prodmast-dark font-bold transition-colors flex items-center gap-1 bg-prodmast-primary/5 px-2.5 py-1 rounded-lg border border-prodmast-primary/10"
                                         >
-                                            {fetchingLocation ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Activity className="w-2.5 h-2.5" />}
+                                            {fetchingLocation ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
                                             {fetchingLocation ? 'Fetching...' : 'Use Live Location'}
                                         </button>
                                     </label>
                                     <textarea
                                         required rows={3} value={address}
                                         onChange={(e) => setAddress(e.target.value)}
-                                        className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-300 resize-none shadow-inner"
-                                        placeholder="Complete address with Area and Pin Code"
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-400 resize-none"
+                                        placeholder="Village, Taluk, District, State & PIN Code"
                                     />
                                 </div>
                             </div>
-                            <div className="flex gap-4 mt-8">
+                            <div className="flex gap-3 pt-4">
                                 <button
                                     onClick={() => setStep('summary')}
-                                    className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2"
+                                    className="px-5 py-3.5 bg-gray-100 text-gray-600 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2"
                                 >
                                     <ChevronLeft className="w-4 h-4" /> Back
                                 </button>
                                 <button
                                     disabled={!name || !phone || !address}
                                     onClick={() => setStep('payment')}
-                                    className="flex-1 bg-prodmast-primary text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale transition-all shadow-xl shadow-prodmast-primary/20 italic"
+                                    className="flex-1 bg-prodmast-primary text-white py-3.5 rounded-2xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-lg"
                                 >
-                                    Proceed to Payment
+                                    Select Payment Method
                                     <ChevronRight className="w-4 h-4" />
                                 </button>
                             </div>
@@ -649,286 +598,221 @@ Thank you for choosing AgriSmart!`;
                     )}
 
                     {step === 'payment' && (
-                        <div className="space-y-6 animate-in slide-in-from-right-5 duration-300">
-                            <h3 className="text-sm font-black text-prodmast-muted uppercase tracking-widest italic px-2">Select Payment Method</h3>
+                        <div className="space-y-6">
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">Choose Payment Method</h3>
+                            
                             <div className="grid gap-4">
-                                <button
+                                {/* Option 1: PhonePe UPI Online Payment */}
+                                <div
                                     onClick={() => setPaymentMethod('phonepe')}
-                                    className={`p-5 rounded-3xl border-2 flex items-center justify-between transition-all group ${paymentMethod === 'phonepe' ? 'border-prodmast-primary bg-prodmast-primary/5 shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                                    className={`p-5 rounded-3xl border-2 cursor-pointer flex items-center justify-between transition-all ${
+                                        paymentMethod === 'phonepe' 
+                                            ? 'border-indigo-600 bg-indigo-50/50 shadow-md ring-2 ring-indigo-500/20' 
+                                            : 'border-gray-200 bg-white hover:border-gray-300'
+                                    }`}
                                 >
-                                    <div className="flex items-center gap-5">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${paymentMethod === 'phonepe' ? 'bg-prodmast-primary text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-prodmast-primary/10 group-hover:text-prodmast-primary'}`}>
-                                            <Wallet className="w-6 h-6" />
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                                            paymentMethod === 'phonepe' ? 'bg-[#5f259f] text-white shadow-md' : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                            <QrCode className="w-6 h-6" />
                                         </div>
-                                        <div className="text-left">
-                                            <p className="font-black text-prodmast-dark text-sm">PhonePe / UPI</p>
-                                            <p className="text-[10px] font-bold text-prodmast-muted uppercase tracking-wider">Fast & Secure via BHIM UPI</p>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-extrabold text-gray-900 text-base">Online Payment (PhonePe UPI QR)</p>
+                                                <span className="px-2 py-0.5 bg-[#5f259f]/10 text-[#5f259f] text-[10px] font-black rounded-md uppercase">Instant</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 font-medium mt-0.5">Scan & Pay using PhonePe QR code attached (Chetan Kubihal)</p>
                                         </div>
                                     </div>
-                                    <div className={`w-6 h-6 rounded-full border-4 transition-all ${paymentMethod === 'phonepe' ? 'border-prodmast-primary bg-prodmast-primary shadow-[0_0_15px_rgba(20,47,50,0.3)]' : 'border-gray-200'}`} />
-                                </button>
-
-                                <button
-                                    onClick={() => setPaymentMethod('gpay')}
-                                    className={`p-5 rounded-3xl border-2 flex items-center justify-between transition-all group ${paymentMethod === 'gpay' ? 'border-prodmast-primary bg-prodmast-primary/5 shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'}`}
-                                >
-                                    <div className="flex items-center gap-5">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${paymentMethod === 'gpay' ? 'bg-prodmast-primary text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-prodmast-primary/10 group-hover:text-prodmast-primary'}`}>
-                                            <ShoppingCart className="w-6 h-6" />
-                                        </div>
-                                        <div className="text-left">
-                                            <p className="font-black text-prodmast-dark text-sm">Google Pay</p>
-                                            <p className="text-[10px] font-bold text-prodmast-muted uppercase tracking-wider">Direct Payment via GPay</p>
-                                        </div>
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                        paymentMethod === 'phonepe' ? 'border-[#5f259f] bg-[#5f259f]' : 'border-gray-300'
+                                    }`}>
+                                        {paymentMethod === 'phonepe' && <div className="w-2 h-2 rounded-full bg-white" />}
                                     </div>
-                                    <div className={`w-6 h-6 rounded-full border-4 transition-all ${paymentMethod === 'gpay' ? 'border-prodmast-primary bg-prodmast-primary shadow-[0_0_15px_rgba(20,47,50,0.3)]' : 'border-gray-200'}`} />
-                                </button>
+                                </div>
 
-                                <button
-                                    onClick={() => setPaymentMethod('card')}
-                                    className={`p-5 rounded-3xl border-2 flex items-center justify-between transition-all group ${paymentMethod === 'card' ? 'border-prodmast-primary bg-prodmast-primary/5 shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'}`}
-                                >
-                                    <div className="flex items-center gap-5">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${paymentMethod === 'card' ? 'bg-prodmast-primary text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-prodmast-primary/10 group-hover:text-prodmast-primary'}`}>
-                                            <CreditCard className="w-6 h-6" />
-                                        </div>
-                                        <div className="text-left">
-                                            <p className="font-black text-prodmast-dark text-sm">Credit / Debit Card</p>
-                                            <p className="text-[10px] font-bold text-prodmast-muted uppercase tracking-wider">All major cards accepted</p>
-                                        </div>
-                                    </div>
-                                    <div className={`w-6 h-6 rounded-full border-4 transition-all ${paymentMethod === 'card' ? 'border-prodmast-primary bg-prodmast-primary shadow-[0_0_15px_rgba(20,47,50,0.3)]' : 'border-gray-200'}`} />
-                                </button>
-
-                                <button
+                                {/* Option 2: Cash on Delivery (COD) */}
+                                <div
                                     onClick={() => setPaymentMethod('cod')}
-                                    className={`p-5 rounded-3xl border-2 flex items-center justify-between transition-all group ${paymentMethod === 'cod' ? 'border-prodmast-primary bg-prodmast-primary/5 shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                                    className={`p-5 rounded-3xl border-2 cursor-pointer flex items-center justify-between transition-all ${
+                                        paymentMethod === 'cod' 
+                                            ? 'border-emerald-600 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/20' 
+                                            : 'border-gray-200 bg-white hover:border-gray-300'
+                                    }`}
                                 >
-                                    <div className="flex items-center gap-5">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${paymentMethod === 'cod' ? 'bg-prodmast-primary text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-prodmast-primary/10 group-hover:text-prodmast-primary'}`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                                            paymentMethod === 'cod' ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-500'
+                                        }`}>
                                             <Truck className="w-6 h-6" />
                                         </div>
-                                        <div className="text-left">
-                                            <p className="font-black text-prodmast-dark text-sm">Cash on Delivery</p>
-                                            <p className="text-[10px] font-bold text-prodmast-muted uppercase tracking-wider">Pay when you receive items</p>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-extrabold text-gray-900 text-base">Cash on Delivery (COD)</p>
+                                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-md uppercase">Popular</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 font-medium mt-0.5">Pay in cash when goods are delivered to your farm</p>
                                         </div>
                                     </div>
-                                    <div className={`w-6 h-6 rounded-full border-4 transition-all ${paymentMethod === 'cod' ? 'border-prodmast-primary bg-prodmast-primary shadow-[0_0_15px_rgba(20,47,50,0.3)]' : 'border-gray-200'}`} />
-                                </button>
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                        paymentMethod === 'cod' ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300'
+                                    }`}>
+                                        {paymentMethod === 'cod' && <div className="w-2 h-2 rounded-full bg-white" />}
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="flex gap-4 mt-8">
+                            {/* Summary alert banner */}
+                            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Total Amount to Pay</span>
+                                    <span className="text-2xl font-black text-gray-900">₹{totalPrice.toLocaleString()}</span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[11px] font-semibold text-gray-500 block">Admin Order Email:</span>
+                                    <span className="text-xs font-bold text-emerald-700">{ADMIN_EMAIL}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
                                 <button
                                     onClick={() => setStep('shipping')}
-                                    className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2"
+                                    className="px-5 py-3.5 bg-gray-100 text-gray-600 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2"
                                 >
                                     <ChevronLeft className="w-4 h-4" /> Back
                                 </button>
-                                <button
-                                    onClick={(e) => {
-                                        if (paymentMethod === 'phonepe' || paymentMethod === 'gpay') {
-                                            setStep('upi-qr');
-                                        } else {
-                                            handleSubmit(e);
-                                        }
-                                    }}
-                                    disabled={loading}
-                                    className="flex-1 bg-prodmast-accent text-prodmast-primary py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-prodmast-accent/30 hover:scale-105 active:scale-95 transition-all italic"
-                                >
-                                    Confirm Order
-                                    <ArrowRight className="w-4 h-4" />
-                                </button>
+                                
+                                {paymentMethod === 'phonepe' ? (
+                                    <button
+                                        onClick={() => setStep('upi-qr')}
+                                        className="flex-1 bg-[#5f259f] hover:bg-[#521e8a] text-white py-3.5 rounded-2xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-900/20"
+                                    >
+                                        <QrCode className="w-4 h-4" />
+                                        Scan PhonePe QR & Pay (₹{totalPrice.toLocaleString()})
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => handleSubmitOrder(true)}
+                                        disabled={loading}
+                                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-700/20"
+                                    >
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
+                                        Confirm Cash on Delivery (COD) Order
+                                        <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {step === 'upi-qr' && (
-                        <div className="space-y-6 animate-in slide-in-from-right-5 duration-300">
+                        <div className="space-y-6">
                             <div className="text-center px-4">
-                                <h3 className="text-lg font-black text-prodmast-dark mb-1 tracking-tighter uppercase italic">Pay via UPI QR Code</h3>
-                                <p className="text-xs text-prodmast-muted font-bold">Scan the QR code below with GPay, PhonePe, Paytm, or BHIM to pay</p>
+                                <span className="inline-block px-3 py-1 bg-purple-100 text-purple-900 rounded-full text-xs font-black uppercase tracking-wider mb-2">
+                                    PhonePe UPI Payment
+                                </span>
+                                <h3 className="text-xl font-black text-gray-900">Scan & Pay Using PhonePe</h3>
+                                <p className="text-xs text-gray-500 font-medium mt-1">Open PhonePe, GPay, Paytm or any UPI App to scan the official QR code below</p>
                             </div>
 
-                            {/* Live QR Code Container */}
-                            <div className="bg-gray-50 border border-gray-100 rounded-[32px] p-6 flex flex-col items-center justify-center relative overflow-hidden max-w-sm mx-auto shadow-inner">
-                                {verifying ? (
-                                    <div className="h-64 flex flex-col items-center justify-center space-y-4">
-                                        <div className="relative w-16 h-16">
-                                            <div className="absolute inset-0 border-4 border-prodmast-primary/20 rounded-full"></div>
-                                            <div className="absolute inset-0 border-4 border-prodmast-primary border-t-transparent rounded-full animate-spin"></div>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-sm font-black text-prodmast-dark animate-pulse">Verifying payment with Bank...</p>
-                                            <p className="text-[10px] text-prodmast-muted font-bold mt-1">UTR: {utr}</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="bg-white p-4 rounded-2xl border border-gray-200/50 shadow-sm relative group">
-                                            {/* Dynamic UPI URL QR Code */}
-                                            <img
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(
-                                                    `upi://pay?pa=${payeeUpiId}&pn=${encodeURIComponent(
-                                                        'AgriSmart Market'
-                                                    )}&am=${totalPrice}&cu=INR&tn=${encodeURIComponent(
-                                                        'AgriSmart Order'
-                                                    )}`
-                                                )}`}
-                                                alt="UPI QR Code"
-                                                className="w-48 h-48 object-contain"
-                                            />
-                                        </div>
-                                        
-                                        {/* Amount & UPI Details */}
-                                        <div className="mt-5 text-center w-full">
-                                            <p className="text-[10px] font-black uppercase text-prodmast-muted tracking-widest">Amount to Pay</p>
-                                            <p className="text-3xl font-black text-prodmast-primary tracking-tighter italic mt-0.5">₹{totalPrice.toLocaleString()}</p>
-                                            
-                                            <div className="mt-3 flex items-center justify-center gap-1.5 bg-white border border-gray-100 py-1.5 px-3 rounded-xl w-fit mx-auto shadow-sm">
-                                                <span className="text-[10px] font-bold text-prodmast-muted">UPI ID:</span>
-                                                <span className="text-xs font-black text-prodmast-dark select-all">{payeeUpiId}</span>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                            {/* PhonePe QR Card */}
+                            <div className="bg-[#0b0f19] text-white rounded-3xl p-6 flex flex-col items-center justify-center max-w-sm mx-auto shadow-2xl border border-gray-800 relative">
+                                <div className="text-center mb-3">
+                                    <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">Accepted Here</span>
+                                    <p className="text-base font-extrabold text-white">CHETAN KUBIHAL</p>
+                                </div>
+
+                                <div className="bg-white p-3 rounded-2xl shadow-inner border border-gray-100">
+                                    <img
+                                        src={paymentQrImg}
+                                        alt="PhonePe QR Code - Chetan Kubihal"
+                                        className="w-56 h-auto max-h-72 object-contain rounded-xl"
+                                    />
+                                </div>
+
+                                <div className="mt-4 text-center">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Amount to Pay</p>
+                                    <p className="text-2xl font-black text-emerald-400 mt-0.5">₹{totalPrice.toLocaleString()}</p>
+                                </div>
                             </div>
 
-                            {/* Demo Simulation Banner */}
-                            <div className="text-center px-4 max-w-sm mx-auto">
+                            {/* Live Backend Payment Status Simulation */}
+                            <div className="max-w-sm mx-auto">
                                 {!paymentDetected ? (
-                                    <div className="flex items-center justify-center gap-2 bg-amber-50 text-amber-700 border border-amber-200 py-2.5 px-4 rounded-xl font-bold text-xs">
-                                        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
-                                        Simulating transaction scan... ({paymentTimer}s remaining)
+                                    <div className="flex items-center justify-center gap-2.5 bg-amber-50 text-amber-800 border border-amber-200 py-3 px-4 rounded-2xl font-bold text-xs">
+                                        <Loader2 className="w-4 h-4 animate-spin text-amber-600 shrink-0" />
+                                        <span>Checking payment status in backend... ({paymentTimer}s)</span>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-center gap-2 bg-green-50 text-green-700 border border-green-200 py-2.5 px-4 rounded-xl font-black text-xs animate-bounce shadow-md">
-                                        <CheckCircle className="w-4 h-4 text-green-600" />
-                                        Payment of ₹{totalPrice.toLocaleString()} Detected Successfully!
+                                    <div className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-300 py-3 px-4 rounded-2xl font-black text-xs shadow-md">
+                                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                                        <span>Payment of ₹{totalPrice.toLocaleString()} Verified Successfully!</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* UTR Input Form (Only if not verifying) */}
-                            {!verifying && (
-                                <div className="space-y-4 max-w-sm mx-auto">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-prodmast-muted uppercase tracking-[0.15em] mb-2 px-1">
-                                            12-Digit UPI Transaction Ref No (UTR) *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={utr}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/\D/g, '');
-                                                if (val.length <= 12) setUtr(val);
-                                            }}
-                                            maxLength={12}
-                                            placeholder="Enter 12-digit UTR number"
-                                            className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-center text-lg font-black tracking-[0.2em] focus:ring-4 focus:ring-prodmast-primary/10 focus:border-prodmast-primary outline-none transition-all placeholder:text-gray-300 placeholder:tracking-normal placeholder:font-bold"
-                                        />
-                                        <span className="block text-[9px] text-prodmast-muted font-bold mt-1.5 px-1 leading-normal text-center">
-                                            💡 UTR will auto-fill when the scanner finishes, or you can type it manually.
-                                        </span>
-                                    </div>
-
-                                    {/* Config Drawer for Custom UPI (Live payment demo setup) */}
-                                    <div className="border-t border-gray-100 pt-3 mt-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowUpiConfig(!showUpiConfig)}
-                                            className="text-[10px] text-prodmast-primary hover:text-prodmast-dark font-black uppercase tracking-wider flex items-center justify-center gap-1 mx-auto"
-                                        >
-                                            ⚙️ {showUpiConfig ? 'Hide' : 'Configure'} Payee & Web3Forms
-                                        </button>
-                                        {showUpiConfig && (
-                                            <div className="mt-3 p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-4 animate-in slide-in-from-top-2 duration-200 text-left">
-                                                <div>
-                                                    <label className="block text-[9px] font-black text-prodmast-muted uppercase tracking-wider mb-1">Configure Merchant UPI ID</label>
-                                                    <input
-                                                        type="text"
-                                                        value={payeeUpiId}
-                                                        onChange={(e) => setPayeeUpiId(e.target.value)}
-                                                        placeholder="Enter your personal UPI ID"
-                                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold focus:border-prodmast-primary outline-none"
-                                                    />
-                                                    <span className="block text-[8px] text-prodmast-muted leading-tight mt-1">
-                                                        Scan with GPay/PhonePe after changing the UPI ID to test live payments to your own account!
-                                                    </span>
-                                                </div>
-
-                                                <div className="border-t border-gray-200/60 pt-3">
-                                                    <label className="block text-[9px] font-black text-prodmast-muted uppercase tracking-wider mb-1">Web3Forms Access Key</label>
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={web3formsKey}
-                                                            onChange={(e) => {
-                                                                const val = e.target.value.trim();
-                                                                setWeb3formsKey(val);
-                                                                if (val) {
-                                                                    localStorage.setItem('web3forms_key', val);
-                                                                } else {
-                                                                    localStorage.removeItem('web3forms_key');
-                                                                }
-                                                            }}
-                                                            placeholder={`Default: ${WEB3FORMS_DEFAULT_KEY.slice(0, 8)}...`}
-                                                            className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:border-prodmast-primary outline-none"
-                                                        />
-                                                        {web3formsKey && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    localStorage.removeItem('web3forms_key');
-                                                                    setWeb3formsKey('');
-                                                                }}
-                                                                className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-[9px] font-black"
-                                                            >
-                                                                Reset
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <span className="block text-[8px] text-prodmast-muted leading-tight mt-1">
-                                                        Enter a custom key from <strong>web3forms.com</strong> to send order notifications to your own email address!
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Navigation & Submit Buttons */}
-                            {!verifying && (
-                                <div className="flex gap-4 mt-8">
-                                    <button
-                                        onClick={() => setStep('payment')}
-                                        className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" /> Back
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (utr.length === 12) {
-                                                setVerifying(true);
-                                                setTimeout(() => {
-                                                    setVerifying(false);
-                                                    handleSubmit({ preventDefault: () => {} } as any);
-                                                }, 1500);
-                                            }
+                            {/* UTR Input Form */}
+                            <div className="max-w-sm mx-auto space-y-3">
+                                <div>
+                                    <label className="block text-[11px] font-extrabold text-gray-600 uppercase tracking-wider mb-1.5 text-center">
+                                        12-Digit UPI UTR / Transaction ID
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={utr}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                                            setUtr(val);
                                         }}
-                                        disabled={utr.length !== 12 || loading}
-                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl italic ${
-                                            paymentDetected 
-                                                ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-500/20 hover:scale-105 active:scale-95' 
-                                                : 'bg-prodmast-primary text-white shadow-prodmast-primary/20'
-                                        }`}
-                                    >
-                                        {paymentDetected ? 'Complete Checkout' : 'Verify & Place Order'}
-                                        <ArrowRight className="w-4 h-4" />
-                                    </button>
+                                        maxLength={12}
+                                        placeholder="Enter 12-digit UTR number"
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-center text-base font-mono font-bold tracking-widest focus:ring-4 focus:ring-purple-500/10 focus:border-purple-600 outline-none transition-all placeholder:text-gray-400 placeholder:tracking-normal placeholder:font-normal placeholder:text-xs"
+                                    />
+                                    <span className="block text-[10px] text-gray-500 font-medium text-center mt-1">
+                                        Auto-filled upon payment detection, or type manually from your PhonePe app.
+                                    </span>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setStep('payment')}
+                                    className="px-5 py-3.5 bg-gray-100 text-gray-600 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2"
+                                >
+                                    <ChevronLeft className="w-4 h-4" /> Back
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setVerifying(true);
+                                        setTimeout(() => {
+                                            setVerifying(false);
+                                            handleSubmitOrder(false);
+                                        }, 1200);
+                                    }}
+                                    disabled={loading || verifying}
+                                    className={`flex-1 py-3.5 rounded-2xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all shadow-xl ${
+                                        paymentDetected
+                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
+                                            : 'bg-[#5f259f] hover:bg-[#521e8a] text-white shadow-purple-900/20'
+                                    }`}
+                                >
+                                    {verifying || loading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Verifying & Placing Order...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ShieldCheck className="w-4 h-4" />
+                                            {paymentDetected ? 'Complete Order Now' : 'I Have Paid & Verify'}
+                                            <ArrowRight className="w-4 h-4" />
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

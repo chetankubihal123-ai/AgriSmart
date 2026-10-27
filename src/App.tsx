@@ -22,6 +22,7 @@ import { ClassifierProvider } from './contexts/ClassifierContext';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -34,8 +35,11 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/auth" />;
+  const storedPhone = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_phone') : null;
+  const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_email') : null;
+
+  if (!user && !storedPhone && !storedEmail) {
+    return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
   return <>{children}</>;
@@ -64,7 +68,14 @@ function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
   useRole();
   const location = useLocation();
 
-  if (user) {
+  const storedPhone = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_phone') : null;
+  const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('agrismart_user_email') : null;
+  const isAdmin = storedPhone === '9739623988' || (typeof window !== 'undefined' && localStorage.getItem('agrismart_is_admin') === 'true');
+
+  if (user || storedPhone || storedEmail) {
+    if (isAdmin) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
     const from = location.state?.from || '/dashboard';
     return <Navigate to={from} replace />;
   }
@@ -115,14 +126,17 @@ function AppContent() {
              <Layout>
                 <Routes>
                    <Route path="dashboard" element={<Dashboard />} />
+                   <Route path="admin" element={<PrivateRoute><AdminDashboard initialView="dashboard" /></PrivateRoute>} />
+                   <Route path="admin/dashboard" element={<PrivateRoute><AdminDashboard initialView="dashboard" /></PrivateRoute>} />
                    <Route path="admin/users" element={<PrivateRoute><AdminDashboard initialView="users" /></PrivateRoute>} />
                    <Route path="admin/orders" element={<PrivateRoute><AdminDashboard initialView="orders" /></PrivateRoute>} />
+                   <Route path="admin/payments" element={<PrivateRoute><AdminDashboard initialView="payments" /></PrivateRoute>} />
                    <Route path="admin/analytics" element={<PrivateRoute><AdminDashboard initialView="dashboard" /></PrivateRoute>} />
                    <Route path="land-analysis" element={<LandAnalysis />} />
                    <Route path="crop-health" element={<CropHealthWrapper />} />
                    <Route path="disease-detection" element={<DiseaseDetectionWrapper />} />
                    <Route path="weather" element={<WeatherImpactWrapper />} />
-                   <Route path="shop" element={<PrivateRoute><Shop /></PrivateRoute>} />
+                   <Route path="shop" element={<Shop />} />
                    <Route path="market-rates" element={<MarketRates />} />
                    <Route path="schemes" element={<SchemesFinder />} />
                    <Route path="*" element={<Navigate to="/dashboard" replace />} />

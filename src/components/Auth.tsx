@@ -101,6 +101,47 @@ export function Auth() {
   // 1. MOBILE NUMBER FLOW (NO OTP FOR SIGNUP/LOGIN)
   // ==========================================
 
+  // Helper to record farmer logins and registrations for the Admin Dashboard
+  const recordFarmerActivity = (phoneNum: string, emailAddr: string, actType: 'signup' | 'login' = 'login') => {
+    try {
+      const existingLogins = JSON.parse(localStorage.getItem('agrismart_farmer_logins') || '[]');
+      const existingFarmers = JSON.parse(localStorage.getItem('agrismart_registered_farmers') || '[]');
+      const now = new Date();
+      const displayName = phoneNum ? `Farmer (+91 ${phoneNum})` : (emailAddr ? emailAddr.split('@')[0] : 'Farmer');
+
+      existingLogins.unshift({
+        id: 'log_' + Date.now() + Math.random().toString(36).substring(2, 5),
+        name: displayName,
+        phone: phoneNum || 'N/A',
+        email: emailAddr || 'N/A',
+        type: actType,
+        date: now.toLocaleDateString('en-IN'),
+        time: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        timestamp: now.toISOString(),
+        status: 'Active'
+      });
+      localStorage.setItem('agrismart_farmer_logins', JSON.stringify(existingLogins.slice(0, 50)));
+
+      const existingIdx = existingFarmers.findIndex((f: any) => (phoneNum && f.phone === phoneNum) || (emailAddr && f.email === emailAddr));
+      if (existingIdx >= 0) {
+        existingFarmers[existingIdx].lastLogin = now.toISOString();
+        existingFarmers[existingIdx].loginCount = (existingFarmers[existingIdx].loginCount || 1) + 1;
+      } else {
+        existingFarmers.unshift({
+          id: 'usr_' + Date.now(),
+          name: displayName,
+          phone: phoneNum || 'N/A',
+          email: emailAddr || 'N/A',
+          registeredAt: now.toISOString(),
+          lastLogin: now.toISOString(),
+          loginCount: 1,
+          status: 'Active'
+        });
+      }
+      localStorage.setItem('agrismart_registered_farmers', JSON.stringify(existingFarmers.slice(0, 50)));
+    } catch {}
+  };
+
   // --- MOBILE SIGN UP (CREATE ACCOUNT: NO OTP) ---
   const handlePhoneSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +166,11 @@ export function Auth() {
       localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
       localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
 
+      if (phone === '9739623988') {
+        localStorage.setItem('agrismart_is_admin', 'true');
+        localStorage.setItem('user_role', 'expert');
+      }
+
       // 2. Also register in Supabase using virtual email
       const virtualEmail = `${phone.slice(-10)}@agrismart.local`;
       await supabase.auth.signUp({
@@ -144,10 +190,17 @@ export function Auth() {
         password: password
       }).catch(() => {});
 
+      recordFarmerActivity(phone, '', 'signup');
+      window.dispatchEvent(new Event('agrismart_auth_state_changed'));
+
       setMessage('✓ Account created successfully! Logging you in...');
       setTimeout(() => {
-        const from = location.state?.from || '/dashboard';
-        navigate(from, { replace: true });
+        if (phone === '9739623988') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          const from = location.state?.from || '/dashboard';
+          navigate(from, { replace: true });
+        }
       }, 600);
     } catch (err: any) {
       setError(err.message || 'Error creating account. Please try again.');
@@ -173,6 +226,27 @@ export function Auth() {
 
     setLoading(true);
     try {
+      // Check Admin credentials explicitly
+      if (phone === '9739623988' && password === '123456789') {
+        localStorage.setItem('agrismart_user_phone', '9739623988');
+        localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
+        localStorage.setItem('agrismart_is_admin', 'true');
+        localStorage.setItem('user_role', 'expert');
+        localStorage.setItem('agrismart_pwd_9739623988', btoa('123456789'));
+
+        const virtualEmail = '9739623988@agrismart.local';
+        await supabase.auth.signInWithPassword({ email: virtualEmail, password: '123456789' }).catch(async () => {
+          await supabase.auth.signUp({ email: virtualEmail, password: '123456789' }).catch(() => {});
+        });
+
+        window.dispatchEvent(new Event('agrismart_auth_state_changed'));
+        setMessage('✓ Welcome Administrator! Accessing Admin Dashboard...');
+        setTimeout(() => {
+          navigate('/admin/dashboard', { replace: true });
+        }, 600);
+        return;
+      }
+
       // 1. Check local saved password
       const savedPwd = localStorage.getItem(`agrismart_pwd_${phone}`);
       if (savedPwd && atob(savedPwd) === password) {
@@ -186,10 +260,17 @@ export function Auth() {
           password: password
         }).catch(() => {});
 
+        recordFarmerActivity(phone, '', 'login');
+        window.dispatchEvent(new Event('agrismart_auth_state_changed'));
+
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
-          const from = location.state?.from || '/dashboard';
-          navigate(from, { replace: true });
+          if (localStorage.getItem('agrismart_is_admin') === 'true' || phone === '9739623988') {
+            navigate('/admin/dashboard', { replace: true });
+          } else {
+            const from = location.state?.from || '/dashboard';
+            navigate(from, { replace: true });
+          }
         }, 600);
         return;
       }
@@ -205,10 +286,18 @@ export function Auth() {
         localStorage.setItem('agrismart_user_phone', phone);
         localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
         localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
+
+        recordFarmerActivity(phone, '', 'login');
+        window.dispatchEvent(new Event('agrismart_auth_state_changed'));
+
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
-          const from = location.state?.from || '/dashboard';
-          navigate(from, { replace: true });
+          if (phone === '9739623988') {
+            navigate('/admin/dashboard', { replace: true });
+          } else {
+            const from = location.state?.from || '/dashboard';
+            navigate(from, { replace: true });
+          }
         }, 600);
         return;
       }
@@ -269,6 +358,9 @@ export function Auth() {
         await supabase.auth.signInWithPassword({ email, password }).catch(() => {});
       }
 
+      recordFarmerActivity('', email, 'signup');
+      window.dispatchEvent(new Event('agrismart_auth_state_changed'));
+
       setMessage('✓ Account created successfully! Logging you in...');
       setTimeout(() => {
         const from = location.state?.from || '/dashboard';
@@ -316,6 +408,10 @@ export function Auth() {
       if (data?.session) {
         localStorage.setItem('agrismart_user_email', email);
         localStorage.setItem('agrismart_auth_method', 'email');
+        
+        recordFarmerActivity('', email, 'login');
+        window.dispatchEvent(new Event('agrismart_auth_state_changed'));
+
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
           const from = location.state?.from || '/dashboard';

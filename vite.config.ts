@@ -106,6 +106,60 @@ function agriSmartDevPlugin(env: Record<string, string>): Plugin {
         });
       });
 
+      // 1b. Order Notification Email to Admin
+      server.middlewares.use('/api/send-order-email', async (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const parsed = JSON.parse(body || '{}');
+            const targetEmail = parsed.email || adminEmail;
+            const subject = parsed.subject || '🛒 New Order - AgriSmart';
+            const html = parsed.html || '<p>New order placed</p>';
+
+            const resendRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: 'AgriSmart Store <onboarding@resend.dev>',
+                reply_to: adminEmail,
+                to: [targetEmail],
+                subject,
+                html,
+              })
+            });
+
+            const data = await resendRes.json();
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = resendRes.status;
+            res.end(JSON.stringify(data));
+          } catch (err: any) {
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: err.message || 'Internal server error' }));
+          }
+        });
+      });
+
       // 2. MiniMoth Send OTP
       server.middlewares.use('/api/minimoth/send', async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');

@@ -56,10 +56,12 @@ export function Layout({ children }: LayoutProps) {
     ];
 
     const adminNavItems = [
-        { icon: LayoutDashboard, label: "Admin Overview", path: '/dashboard' },
-        { icon: Users, label: "User Management", path: '/admin/users' },
+        { icon: LayoutDashboard, label: "Admin Overview", path: '/admin/dashboard' },
+        { icon: Users, label: "Farmers & Logins", path: '/admin/users' },
         { icon: ShoppingBag, label: "Shop Orders", path: '/admin/orders' },
-        { icon: Activity, label: "Platform Analytics", path: '/admin/analytics' },
+        { icon: FileText, label: "Payments History", path: '/admin/payments' },
+        { icon: ShoppingBag, label: "Agri Shop", path: '/shop' },
+        { icon: LayoutDashboard, label: "Farmer View", path: '/dashboard' },
     ];
 
     const navItems = isAdmin ? adminNavItems : farmerNavItems;
@@ -83,13 +85,20 @@ export function Layout({ children }: LayoutProps) {
                 <div className="h-full flex flex-col w-72">
                     {/* Header/Logo */}
                     <div className="p-6 h-20 border-b border-gray-100 flex items-center shrink-0">
-                        <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/dashboard')}>
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(isAdmin ? '/admin/dashboard' : '/dashboard')}>
                             <div className="w-10 h-10 shrink-0 bg-prodmast-primary rounded-[14px] flex items-center justify-center shadow-md">
                                 <Sprout className="w-5 h-5 text-prodmast-accent" />
                             </div>
-                            <span className="text-2xl font-sans font-extrabold text-prodmast-dark tracking-tight whitespace-nowrap opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
-                                AgriSmart
-                            </span>
+                            <div className="flex flex-col opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                                <span className="text-xl font-sans font-extrabold text-prodmast-dark tracking-tight whitespace-nowrap leading-none">
+                                    AgriSmart
+                                </span>
+                                {isAdmin && (
+                                    <span className="text-[9px] font-black uppercase text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md mt-1 w-fit tracking-wider border border-amber-200">
+                                        Admin Active
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
