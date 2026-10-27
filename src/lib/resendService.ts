@@ -6,6 +6,8 @@
  * In dev, tries the local proxy first, then falls back to direct API call.
  */
 
+export const ADMIN_EMAIL = 'chetankubihal123@gmail.com';
+
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY || (typeof atob !== 'undefined' ? atob('cmVfUGhWS2pKSnVfQXVWRWVReWpZWnlDQXdNR29FMXdWVXJu') : '');
 
 export interface SendOtpResult {
@@ -15,7 +17,7 @@ export interface SendOtpResult {
   isDomainRestricted?: boolean;
 }
 
-function buildOtpEmailHtml(otp: string, purpose: 'login' | 'reset'): string {
+function buildOtpEmailHtml(otp: string, purpose: 'login' | 'reset' = 'reset'): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
       <div style="text-align: center; margin-bottom: 24px;">
@@ -23,9 +25,15 @@ function buildOtpEmailHtml(otp: string, purpose: 'login' | 'reset'): string {
           <span style="font-size: 24px;">🌿</span>
           <strong style="color: #15803d; font-size: 18px; margin-left: 8px;">AgriSmart AI</strong>
         </div>
-        <h2 style="color: #0f172a; margin: 8px 0 4px 0; font-size: 22px; font-weight: 800;">Your Verification Code</h2>
-        <p style="color: #64748b; font-size: 14px; margin: 0;">Please use the OTP below to ${purpose === 'reset' ? 'reset your password' : 'complete your login'}</p>
+        <h2 style="color: #0f172a; margin: 8px 0 4px 0; font-size: 22px; font-weight: 800;">${purpose === 'reset' ? 'Password Reset Verification' : 'Verification Code'}</h2>
+        <p style="color: #64748b; font-size: 14px; margin: 0;">Sent by Admin: <strong>${ADMIN_EMAIL}</strong></p>
       </div>
+
+      <div style="background: #f8fafc; border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; border: 1px solid #e2e8f0; text-align: center;">
+        <span style="font-size: 12px; color: #475569; font-weight: 600;">Official Admin Sender: </span>
+        <strong style="font-size: 13px; color: #15803d; font-family: monospace;">${ADMIN_EMAIL}</strong>
+      </div>
+
       <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 2px dashed #86efac; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
         <span style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 8px;">One-Time Password</span>
         <div style="font-size: 40px; font-weight: 900; letter-spacing: 10px; color: #16a34a; font-family: 'Courier New', monospace; margin: 4px 0;">
@@ -53,7 +61,8 @@ async function callResendDirect(email: string, otp: string, subject: string, pur
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'AgriSmart <onboarding@resend.dev>',
+      from: 'AgriSmart Admin <onboarding@resend.dev>',
+      reply_to: ADMIN_EMAIL,
       to: [email],
       subject,
       html: buildOtpEmailHtml(otp, purpose),

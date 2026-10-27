@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react';
 
 function agriSmartDevPlugin(env: Record<string, string>): Plugin {
   const resendApiKey = env.VITE_RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || '';
-  const minimothApiKey = env.VITE_MINIMOTH_API_KEY || process.env.VITE_MINIMOTH_API_KEY || 'mm_test_228cbe86487cb6e23322caad39355e06700a6e783a9c909e90757817c6af674c63499d3f21bfebd3fc60314db0092745';
+  const minimothApiKey = env.VITE_MINIMOTH_API_KEY || process.env.VITE_MINIMOTH_API_KEY || 'mm_live_4576c0435f1fd54a24da811eee67de085bbdaf1a8164216684bab042738b8a8e1ff7ad4f689d07f86fa0d377e1f252cb';
   const agmarknetApiKey = env.VITE_AGMARKNET_API_KEY || process.env.VITE_AGMARKNET_API_KEY || '579b464db66ec23bdd0000015ecd53fda7cd452c4c6d7eaa78973f6e';
+  const adminEmail = 'chetankubihal123@gmail.com';
 
   return {
     name: 'agrismart-dev-api',
@@ -35,7 +36,7 @@ function agriSmartDevPlugin(env: Record<string, string>): Plugin {
             const parsed = JSON.parse(body || '{}');
             const email = parsed.email;
             const otp = parsed.otp;
-            const subject = parsed.subject || `🌿 AgriSmart Login OTP: ${otp}`;
+            const subject = parsed.subject || `🌿 AgriSmart Password Reset OTP: ${otp} (From Admin: ${adminEmail})`;
 
             if (!email || !otp) {
               res.statusCode = 400;
@@ -51,7 +52,8 @@ function agriSmartDevPlugin(env: Record<string, string>): Plugin {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                from: 'AgriSmart <onboarding@resend.dev>',
+                from: 'AgriSmart Admin <onboarding@resend.dev>',
+                reply_to: adminEmail,
                 to: [email],
                 subject: subject,
                 html: `
@@ -61,8 +63,13 @@ function agriSmartDevPlugin(env: Record<string, string>): Plugin {
                         <span style="font-size: 24px;">🌿</span>
                         <strong style="color: #15803d; font-size: 18px; margin-left: 8px;">AgriSmart AI</strong>
                       </div>
-                      <h2 style="color: #0f172a; margin: 8px 0 4px 0; font-size: 22px; font-weight: 800;">Your Verification Code</h2>
-                      <p style="color: #64748b; font-size: 14px; margin: 0;">Please use the OTP below to complete your login</p>
+                      <h2 style="color: #0f172a; margin: 8px 0 4px 0; font-size: 22px; font-weight: 800;">Password Reset Verification Code</h2>
+                      <p style="color: #64748b; font-size: 14px; margin: 0;">Sent by Admin: <strong>${adminEmail}</strong></p>
+                    </div>
+
+                    <div style="background: #f8fafc; border-radius: 12px; padding: 10px 16px; margin-bottom: 18px; border: 1px solid #e2e8f0; text-align: center;">
+                      <span style="font-size: 12px; color: #475569; font-weight: 600;">Sender / Admin Email: </span>
+                      <strong style="font-size: 12px; color: #15803d;">${adminEmail}</strong>
                     </div>
 
                     <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 2px dashed #86efac; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">

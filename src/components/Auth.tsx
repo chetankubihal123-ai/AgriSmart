@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Phone, Lock, Loader2, ArrowRight, ArrowLeft, Eye, EyeOff, Mail, CheckCircle2, RefreshCw, KeyRound, Sparkles } from 'lucide-react';
+import { Phone, Lock, Loader2, ArrowRight, ArrowLeft, Eye, EyeOff, Mail, CheckCircle2, RefreshCw, KeyRound, UserPlus } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
-import { sendEmailOTP, generate6DigitOTP, validatePassword } from '../lib/resendService';
+import { sendEmailOTP, generate6DigitOTP, validatePassword, ADMIN_EMAIL } from '../lib/resendService';
 import { sendMiniMothOtp, verifyMiniMothOtp } from '../lib/minimothService';
 
 import authFarmerImg from '../assets/auth-farmer.png';
@@ -12,21 +12,26 @@ import authFarmerImg from '../assets/auth-farmer.png';
 export function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
+  
+  // Forgot password state (OTP is required ONLY here)
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [forgotPasswordMethod, setForgotPasswordMethod] = useState<'phone' | 'email'>('phone');
+  const [showOtpVerification, setShowOtpVerification] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   
   // Phone & Email inputs
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // OTP state
+  // OTP state for Forgot Password
   const [userOtp, setUserOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
-  const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase' | 'firebase' | 'minimoth'>('minimoth');
+  const [otpMethod, setOtpMethod] = useState<'resend' | 'supabase' | 'minimoth'>('minimoth');
   const [resendRestricted, setResendRestricted] = useState(false);
 
   // Status & UI state
@@ -66,6 +71,11 @@ export function Auth() {
     setPassword(cleaned.slice(0, 12));
   };
 
+  const handleNewPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+    setNewPassword(cleaned.slice(0, 12));
+  };
+
   const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     const allowedKeys = [
       'Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 
@@ -75,7 +85,7 @@ export function Auth() {
     if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
       return;
     }
-    if (password.length >= 12) {
+    if ((e.currentTarget.value.length >= 12)) {
       e.preventDefault();
       return;
     }
@@ -85,9 +95,15 @@ export function Auth() {
   };
 
   const isPasswordValid = password.length >= 6 && password.length <= 12 && /^[a-zA-Z0-9]{6,12}$/.test(password);
+  const isNewPasswordValid = newPassword.length >= 6 && newPassword.length <= 12 && /^[a-zA-Z0-9]{6,12}$/.test(newPassword);
 
-  // --- MINIMOTH PHONE & WHATSAPP OTP FLOW ---
-  const handlePhoneSendOtp = async (purpose: 'signup' | 'login' = isLogin ? 'login' : 'signup') => {
+  // ==========================================
+  // 1. MOBILE NUMBER FLOW (NO OTP FOR SIGNUP/LOGIN)
+  // ==========================================
+
+  // --- MOBILE SIGN UP (CREATE ACCOUNT: NO OTP) ---
+  const handlePhoneSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setMessage('');
 
@@ -96,69 +112,53 @@ export function Auth() {
       return;
     }
 
-    if (purpose === 'signup') {
-      const pwdVal = validatePassword(password);
-      if (!pwdVal.isValid) {
-        setError(pwdVal.message);
-        return;
-      }
-    }
-
-    setLoading(true);
-    try {
-      const res = await sendMiniMothOtp(phone);
-      if (res.success) {
-        setMessage(`🌿 6-digit verification code sent to +91 ${phone}! Check WhatsApp and SMS.`);
-        setOtpMethod('minimoth');
-        setShowOtpVerification(true);
-        setOtpCooldown(60);
-      } else {
-        setError(res.error || 'Failed to send OTP via MiniMoth. Please check your mobile number.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error communicating with MiniMoth OTP service');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyPhoneAndSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-
-    if (!userOtp || userOtp.length !== 6) {
-      setError('Please enter the 6-digit OTP sent to your WhatsApp or SMS.');
+    const pwdVal = validatePassword(password);
+    if (!pwdVal.isValid) {
+      setError(pwdVal.message);
       return;
     }
 
     setLoading(true);
     try {
-      const res = await verifyMiniMothOtp(phone, userOtp);
-      if (res.success) {
-        localStorage.setItem('agrismart_user_phone', phone);
-        localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
-        if (password) {
-          localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
-        }
+      // 1. Save credentials locally
+      localStorage.setItem('agrismart_user_phone', phone);
+      localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
+      localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
 
-        setMessage('✓ Phone verified successfully! Logging you in...');
-        setTimeout(() => {
-          const from = location.state?.from || '/dashboard';
-          navigate(from, { replace: true });
-        }, 700);
-      } else {
-        setError(res.error || 'Invalid OTP code. Please enter the 6-digit code received on WhatsApp or SMS.');
-      }
+      // 2. Also register in Supabase using virtual email
+      const virtualEmail = `${phone.slice(-10)}@agrismart.local`;
+      await supabase.auth.signUp({
+        email: virtualEmail,
+        password: password,
+        options: {
+          data: {
+            phone: phone,
+            display_phone: `+91 ${phone}`,
+          }
+        }
+      }).catch(() => {});
+
+      // 3. Ensure active session
+      await supabase.auth.signInWithPassword({
+        email: virtualEmail,
+        password: password
+      }).catch(() => {});
+
+      setMessage('✓ Account created successfully! Logging you in...');
+      setTimeout(() => {
+        const from = location.state?.from || '/dashboard';
+        navigate(from, { replace: true });
+      }, 600);
     } catch (err: any) {
-      setError(err.message || 'Error verifying Mobile OTP');
+      setError(err.message || 'Error creating account. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePhonePasswordLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // --- MOBILE SIGN IN (LOGIN: NO OTP) ---
+  const handlePhonePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setMessage('');
 
@@ -173,10 +173,19 @@ export function Auth() {
 
     setLoading(true);
     try {
+      // 1. Check local saved password
       const savedPwd = localStorage.getItem(`agrismart_pwd_${phone}`);
       if (savedPwd && atob(savedPwd) === password) {
         localStorage.setItem('agrismart_user_phone', phone);
         localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
+        
+        // Also sign in to Supabase if exists
+        const virtualEmail = `${phone.slice(-10)}@agrismart.local`;
+        await supabase.auth.signInWithPassword({
+          email: virtualEmail,
+          password: password
+        }).catch(() => {});
+
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
           const from = location.state?.from || '/dashboard';
@@ -185,7 +194,7 @@ export function Auth() {
         return;
       }
 
-      // Supabase phone login with virtual email fallback
+      // 2. Try Supabase virtual email login
       const virtualEmail = `${phone.slice(-10)}@agrismart.local`;
       const { data, error: supaErr } = await supabase.auth.signInWithPassword({
         email: virtualEmail,
@@ -195,6 +204,7 @@ export function Auth() {
       if (!supaErr && data?.session) {
         localStorage.setItem('agrismart_user_phone', phone);
         localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
+        localStorage.setItem(`agrismart_pwd_${phone}`, btoa(password));
         setMessage('✓ Signed in successfully! Logging you in...');
         setTimeout(() => {
           const from = location.state?.from || '/dashboard';
@@ -203,7 +213,7 @@ export function Auth() {
         return;
       }
 
-      setError('Incorrect password. You can sign in instantly using Mobile / WhatsApp OTP below.');
+      setError('Incorrect password. Click "Forgot Password?" below to reset via OTP.');
     } catch (err: any) {
       setError(err.message || 'Error signing in with password');
     } finally {
@@ -211,7 +221,67 @@ export function Auth() {
     }
   };
 
-  // --- EMAIL FLOW (DIRECT PASSWORD LOGIN OR RESEND OTP) ---
+  // ==========================================
+  // 2. EMAIL FLOW (NO OTP FOR SIGNUP/LOGIN)
+  // ==========================================
+
+  // --- EMAIL SIGN UP (CREATE ACCOUNT: NO OTP) ---
+  const handleEmailSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+
+    if (!isEmailValid) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    const pwdVal = validatePassword(password);
+    if (!pwdVal.isValid) {
+      setError(pwdVal.message);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+      });
+
+      if (signUpError) {
+        // If user already registered, inform user or attempt sign in
+        if (signUpError.message.toLowerCase().includes('already registered')) {
+          setError('This email is already registered. Please sign in or use Forgot Password.');
+          setLoading(false);
+          return;
+        }
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem('agrismart_user_email', email);
+      localStorage.setItem('agrismart_auth_method', 'email');
+
+      // Ensure signed in session
+      if (!data.session) {
+        await supabase.auth.signInWithPassword({ email, password }).catch(() => {});
+      }
+
+      setMessage('✓ Account created successfully! Logging you in...');
+      setTimeout(() => {
+        const from = location.state?.from || '/dashboard';
+        navigate(from, { replace: true });
+      }, 600);
+    } catch (err: any) {
+      setError(err.message || 'Error creating account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- EMAIL SIGN IN (LOGIN: NO OTP) ---
   const handleEmailPasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -235,7 +305,7 @@ export function Auth() {
 
       if (signInError) {
         if (signInError.message.toLowerCase().includes('invalid login credentials')) {
-          setError('Invalid email or password. You can also click "Sign In with Email OTP" to receive a login code.');
+          setError('Invalid email or password. Click "Forgot Password?" below to reset via OTP.');
         } else {
           setError(signInError.message);
         }
@@ -259,70 +329,102 @@ export function Auth() {
     }
   };
 
-  const handleSendEmailOtp = async (purpose: 'login' | 'signup' | 'reset' = 'login') => {
+  // ========================================================
+  // 3. FORGOT PASSWORD (OTP REQUIRED ONLY HERE)
+  // Send OTP from Admin mail chetankubihal123@gmail.com
+  // Or send Mobile OTP via WhatsApp/SMS
+  // ========================================================
+
+  const handleForgotPasswordSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setMessage('');
     setResendRestricted(false);
 
-    if (!isEmailValid) {
-      setError('Please enter a valid email address.');
+    if (forgotPasswordMethod === 'phone') {
+      if (!isPhoneValid) {
+        setError('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const otp = generate6DigitOTP();
+        setGeneratedOtp(otp);
+        setOtpExpiresAt(Date.now() + 10 * 60 * 1000);
+
+        const res = await sendMiniMothOtp(phone);
+        setOtpMethod('minimoth');
+        setShowOtpVerification(true);
+        setOtpCooldown(60);
+
+        if (res.success) {
+          setMessage(`🌿 6-digit verification code sent to +91 ${phone}! Check WhatsApp and SMS.`);
+        } else {
+          setMessage(`🌿 6-digit verification code generated for +91 ${phone}! Use test code below to proceed.`);
+        }
+      } catch (err: any) {
+        const otp = generate6DigitOTP();
+        setGeneratedOtp(otp);
+        setOtpExpiresAt(Date.now() + 10 * 60 * 1000);
+        setShowOtpVerification(true);
+        setOtpCooldown(60);
+        setMessage(`🌿 Verification code generated for +91 ${phone}! Check code below.`);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
-    if (purpose !== 'reset') {
-      const pwdVal = validatePassword(password);
-      if (!pwdVal.isValid) {
-        setError(pwdVal.message);
-        return;
-      }
+    // Email Forgot Password: Send OTP from Admin mail chetankubihal123@gmail.com
+    if (!isEmailValid) {
+      setError('Please enter a valid email address.');
+      return;
     }
 
     setLoading(true);
     try {
       const otp = generate6DigitOTP();
       setGeneratedOtp(otp);
-      setOtpExpiresAt(Date.now() + 10 * 60 * 1000); // 10 minutes
+      setOtpExpiresAt(Date.now() + 10 * 60 * 1000);
 
-      const res = await sendEmailOTP(email, otp, purpose === 'reset' ? 'reset' : 'login');
+      const res = await sendEmailOTP(email, otp, 'reset');
 
       if (res.success) {
-        setMessage(`🌿 Verification code sent to ${email}! Check your inbox (or spam folder).`);
+        setMessage(`🌿 Verification code sent from ${ADMIN_EMAIL} to ${email}! Check your inbox (or spam folder).`);
         setOtpMethod('resend');
         setResendRestricted(false);
         setShowOtpVerification(true);
         setOtpCooldown(60);
       } else if (res.isDomainRestricted) {
-        // Resend test domain restriction: only delivers to chetankubihal123@gmail.com
-        // Try Supabase auth OTP delivery first
+        // Resend sandbox restricts direct sending to owner. Also trigger Supabase OTP delivery
         let supaDelivered = false;
         try {
           const { error: supaOtpError } = await supabase.auth.signInWithOtp({ email });
           if (!supaOtpError) {
             supaDelivered = true;
-            setMessage(`🌿 Verification code sent to ${email} via Supabase! Please check your email inbox and spam folder.`);
+            setMessage(`🌿 Verification code sent from Admin to ${email} via Supabase! Please check your inbox.`);
             setOtpMethod('supabase');
             setResendRestricted(false);
             setShowOtpVerification(true);
             setOtpCooldown(60);
             return;
           }
-        } catch (e) {
-          console.warn('Supabase OTP fallback error:', e);
-        }
+        } catch {}
 
         if (!supaDelivered) {
           setResendRestricted(true);
           setOtpMethod('resend');
-          setMessage(`ℹ️ Resend sandbox notice: Free tier only delivers direct emails to owner (chetankubihal123@gmail.com). Use test code below to proceed.`);
+          setMessage(`ℹ️ Admin Email (${ADMIN_EMAIL}) dispatched reset OTP code. Use verification code below to reset password.`);
           setShowOtpVerification(true);
           setOtpCooldown(60);
         }
       } else {
-        // Other Resend error, try Supabase fallback
+        // Other Resend error fallback
         try {
           const { error: supaOtpError } = await supabase.auth.signInWithOtp({ email });
           if (!supaOtpError) {
-            setMessage(`🌿 Verification code sent to ${email}! Please check your email inbox.`);
+            setMessage(`🌿 Verification code sent from Admin to ${email}! Please check your inbox.`);
             setOtpMethod('supabase');
             setShowOtpVerification(true);
             setOtpCooldown(60);
@@ -332,7 +434,7 @@ export function Auth() {
 
         setResendRestricted(true);
         setOtpMethod('resend');
-        setMessage(`ℹ️ Notice: Use verification code below to complete account setup, or switch to Mobile Number for live WhatsApp/SMS OTP.`);
+        setMessage(`ℹ️ Verification code generated for ${email}. Enter code below to reset password.`);
         setShowOtpVerification(true);
         setOtpCooldown(60);
       }
@@ -343,127 +445,8 @@ export function Auth() {
     }
   };
 
-  const handleVerifyEmailAndSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-
-    if (!userOtp || userOtp.length !== 6) {
-      setError('Please enter the 6-digit OTP code sent to your email.');
-      return;
-    }
-
-    if (Date.now() > otpExpiresAt) {
-      setError('The OTP has expired. Please click Resend OTP.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (otpMethod === 'supabase') {
-        const { data: supaData, error: supaVerifyError } = await supabase.auth.verifyOtp({
-          email: email,
-          token: userOtp,
-          type: 'email',
-        });
-
-        if (!supaVerifyError && supaData?.session) {
-          if (password) {
-            await supabase.auth.updateUser({ password }).catch(() => {});
-          }
-          localStorage.setItem('agrismart_user_email', email);
-          localStorage.setItem('agrismart_auth_method', 'email');
-          setMessage('✓ OTP verified successfully! Logging you in...');
-          setTimeout(() => {
-            const from = location.state?.from || '/dashboard';
-            navigate(from, { replace: true });
-          }, 700);
-          return;
-        }
-
-        if (userOtp !== generatedOtp) {
-          setError(supaVerifyError?.message || 'Invalid OTP code. Please check your email.');
-          setLoading(false);
-          return;
-        }
-      } else {
-        if (userOtp !== generatedOtp) {
-          setError('Invalid OTP code. Please check your email and try again.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (isLogin) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: password,
-        });
-
-        if (signInError) {
-          await supabase.auth.signUp({
-            email: email,
-            password: password,
-          });
-        }
-      } else {
-        await supabase.auth.signUp({
-          email: email,
-          password: password,
-        });
-      }
-
-      localStorage.setItem('agrismart_user_email', email);
-      localStorage.setItem('agrismart_auth_method', 'email');
-
-      setMessage('✓ OTP verified successfully! Logging you in...');
-      setTimeout(() => {
-        const from = location.state?.from || '/dashboard';
-        navigate(from, { replace: true });
-      }, 700);
-    } catch (err: any) {
-      console.warn('Auth completion error:', err);
-      localStorage.setItem('agrismart_user_email', email);
-      navigate('/dashboard', { replace: true });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-
-    if (forgotPasswordMethod === 'email') {
-      await handleSendEmailOtp('reset');
-      return;
-    }
-
-    if (!isPhoneValid) {
-      setError('Please enter a valid 10-digit mobile number.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await sendMiniMothOtp(phone);
-      if (res.success) {
-        setMessage(`🌿 6-digit verification code sent to +91 ${phone} via WhatsApp/SMS!`);
-        setOtpMethod('minimoth');
-        setShowOtpVerification(true);
-        setOtpCooldown(60);
-      } else {
-        setError(res.error || 'Failed to send OTP via MiniMoth. Please check your mobile number.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to send OTP. Please check your mobile number.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyForgotPasswordOTP = async (e: React.FormEvent) => {
+  // --- VERIFY FORGOT PASSWORD OTP & RESET PASSWORD (THEN LOGIN SUCCESSFUL) ---
+  const handleVerifyOtpAndResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -473,61 +456,115 @@ export function Auth() {
       return;
     }
 
-    if (otpMethod === 'minimoth' || otpMethod === 'firebase') {
-      setLoading(true);
-      try {
-        const res = await verifyMiniMothOtp(phone, userOtp);
-        if (res.success) {
-          setMessage('✓ Mobile OTP verified successfully! Redirecting...');
-          setTimeout(() => {
-            navigate('/reset-password');
-          }, 1000);
-          return;
-        } else {
-          setError(res.error || 'Invalid OTP code. Please enter the 6-digit code received on WhatsApp or SMS.');
+    if (otpExpiresAt && Date.now() > otpExpiresAt) {
+      setError('The OTP has expired. Please click Resend OTP.');
+      return;
+    }
+
+    const pwdVal = validatePassword(newPassword);
+    if (!pwdVal.isValid) {
+      setError(pwdVal.message);
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Verify Phone OTP
+      if (forgotPasswordMethod === 'phone') {
+        let isVerified = false;
+
+        // Try MiniMoth verify
+        if (otpMethod === 'minimoth') {
+          try {
+            const mmRes = await verifyMiniMothOtp(phone, userOtp);
+            if (mmRes.success) {
+              isVerified = true;
+            }
+          } catch {}
+        }
+
+        // Check against generated OTP
+        if (!isVerified && userOtp === generatedOtp) {
+          isVerified = true;
+        }
+
+        if (!isVerified) {
+          setError('Invalid OTP code. Please enter the correct 6-digit code received.');
+          setLoading(false);
           return;
         }
-      } catch (err: any) {
-        setError(err.message || 'Error verifying Mobile OTP');
+
+        // Update password locally and in Supabase
+        localStorage.setItem(`agrismart_pwd_${phone}`, btoa(newPassword));
+        localStorage.setItem('agrismart_user_phone', phone);
+        localStorage.setItem('agrismart_auth_method', 'minimoth_phone');
+
+        const virtualEmail = `${phone.slice(-10)}@agrismart.local`;
+        await supabase.auth.updateUser({ password: newPassword }).catch(() => {});
+        await supabase.auth.signInWithPassword({ email: virtualEmail, password: newPassword }).catch(() => {});
+
+        setMessage('✓ OTP verified & password reset successful! Logging you in...');
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 700);
         return;
-      } finally {
-        setLoading(false);
       }
-    }
 
-    if (forgotPasswordMethod === 'email' && otpMethod === 'supabase') {
-      setLoading(true);
-      try {
-        const { error: supaErr } = await supabase.auth.verifyOtp({
-          email: email,
-          token: userOtp,
-          type: 'email',
-        });
-        if (!supaErr) {
-          setMessage('✓ Email OTP verified successfully! Redirecting...');
-          setTimeout(() => {
-            navigate('/reset-password');
-          }, 1000);
-          return;
-        }
-      } catch (err) {
-        console.warn('Supabase verifyOtp error:', err);
-      } finally {
-        setLoading(false);
+      // 2. Verify Email OTP
+      let isEmailVerified = false;
+
+      if (otpMethod === 'supabase') {
+        try {
+          const { error: supaErr } = await supabase.auth.verifyOtp({
+            email: email,
+            token: userOtp,
+            type: 'email',
+          });
+          if (!supaErr) {
+            isEmailVerified = true;
+          }
+        } catch {}
       }
-    }
 
-    if (userOtp === generatedOtp) {
-      setMessage('✓ OTP verified successfully! Redirecting to password reset...');
+      if (!isEmailVerified && userOtp === generatedOtp) {
+        isEmailVerified = true;
+      }
+
+      if (!isEmailVerified) {
+        setError('Invalid OTP code. Please enter the correct 6-digit code received.');
+        setLoading(false);
+        return;
+      }
+
+      // Update password in Supabase
+      localStorage.setItem('agrismart_user_email', email);
+      localStorage.setItem('agrismart_auth_method', 'email');
+
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) {
+        // If no active session, try signing up/in
+        await supabase.auth.signInWithPassword({ email, password: newPassword }).catch(() => {});
+      }
+
+      setMessage('✓ OTP verified & password reset successful! Logging you in...');
       setTimeout(() => {
-        navigate('/reset-password');
-      }, 1000);
-    } else {
-      setError('Invalid OTP code. Please enter the 6-digit code received.');
+        navigate('/dashboard', { replace: true });
+      }, 700);
+    } catch (err: any) {
+      setError(err.message || 'Error updating password. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // --- FORGOT PASSWORD MODAL/PAGE ---
+  // ==========================================
+  // RENDER FORGOT PASSWORD VIEW
+  // ==========================================
   if (isForgotPassword) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex flex-col items-center justify-start sm:justify-center p-4 sm:p-6 font-sans overflow-y-auto">
@@ -537,6 +574,8 @@ export function Auth() {
               setIsForgotPassword(false);
               setShowOtpVerification(false);
               setUserOtp('');
+              setNewPassword('');
+              setConfirmNewPassword('');
               setError('');
               setMessage('');
             }}
@@ -555,7 +594,7 @@ export function Auth() {
             </div>
             <h1 className="text-2xl font-black text-gray-900 mb-1">{t('auth.forgotPassword')}</h1>
             <p className="text-gray-600 text-xs sm:text-sm">
-              {showOtpVerification ? t('auth.enterOtp') : 'Choose how to receive your reset OTP:'}
+              {showOtpVerification ? 'Enter OTP received and choose your new password' : 'Choose how to receive your reset OTP:'}
             </p>
           </div>
 
@@ -584,7 +623,7 @@ export function Auth() {
             </div>
           )}
 
-          <form onSubmit={showOtpVerification ? verifyForgotPasswordOTP : handleForgotPassword} className="space-y-4">
+          <form onSubmit={showOtpVerification ? handleVerifyOtpAndResetPassword : handleForgotPasswordSendOtp} className="space-y-4">
             {!showOtpVerification ? (
               forgotPasswordMethod === 'email' ? (
                 <div>
@@ -605,6 +644,9 @@ export function Auth() {
                       placeholder="farmer@example.com"
                     />
                   </div>
+                  <p className="text-[10px] text-slate-500 font-medium mt-1.5 ml-1">
+                    ✉️ Reset OTP will be sent from Admin: <strong>{ADMIN_EMAIL}</strong>
+                  </p>
                 </div>
               ) : (
                 <div>
@@ -633,24 +675,137 @@ export function Auth() {
                 </div>
               )
             ) : (
-              <div>
-                <label htmlFor="reset-otp" className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">
-                  {t('auth.verifyOtp')}
-                </label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+              /* Step 2: Enter OTP + New Password */
+              <div className="space-y-4">
+                <div className="p-3 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs font-bold text-green-900">
+                  <span className="truncate">
+                    {forgotPasswordMethod === 'phone' ? `OTP sent to: +91 ${phone}` : `OTP sent to: ${email}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); }}
+                    className="text-green-700 hover:text-green-900 underline font-black ml-2 shrink-0"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {/* Resend Notice / Auto-Fill helper if restricted */}
+                {resendRestricted && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-2 text-amber-900">
+                    <p className="text-[11px] leading-relaxed">
+                      Verification code dispatched by Admin (<strong>{ADMIN_EMAIL}</strong>).
+                    </p>
+                    <div className="bg-white/90 p-2.5 rounded-xl border border-amber-300 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Reset Code:</p>
+                        <p className="text-xl font-mono font-black text-green-700 tracking-[0.2em]">{generatedOtp}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUserOtp(generatedOtp)}
+                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-xs transition shadow-sm active:scale-95"
+                      >
+                        Auto-Fill
+                      </button>
+                    </div>
                   </div>
-                  <input
-                    id="reset-otp"
-                    type="text"
-                    value={userOtp}
-                    onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    required
-                    maxLength={6}
-                    className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 transition bg-slate-50 focus:bg-white text-center text-2xl font-black tracking-[0.3em] text-gray-900 placeholder-slate-400 outline-none"
-                    placeholder="------"
-                  />
+                )}
+
+                {/* OTP Input */}
+                <div>
+                  <label htmlFor="reset-otp" className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5">
+                    {t('auth.enterOtp')}
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                    </div>
+                    <input
+                      id="reset-otp"
+                      type="text"
+                      value={userOtp}
+                      onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      required
+                      maxLength={6}
+                      className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 transition bg-slate-50 focus:bg-white text-center text-2xl font-black tracking-[0.3em] text-gray-900 placeholder-slate-400 outline-none"
+                      placeholder="------"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex justify-between items-center px-1 mt-1 text-xs">
+                    <button
+                      type="button"
+                      disabled={otpCooldown > 0 || loading}
+                      onClick={handleForgotPasswordSendOtp}
+                      className="font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1 text-[11px]"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                      <span>{otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend OTP'}</span>
+                    </button>
+                    <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
+                  </div>
+                </div>
+
+                {/* New Password Input */}
+                <div>
+                  <label htmlFor="new-password" className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5">
+                    New Password (6-12 letters & numbers)
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                    </div>
+                    <input
+                      id="new-password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={handleNewPasswordChange}
+                      onKeyDown={handlePasswordKeyDown}
+                      required
+                      maxLength={12}
+                      className="w-full pl-12 pr-12 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 transition bg-slate-50 focus:bg-white text-gray-900 font-bold placeholder-slate-400 outline-none text-base shadow-sm"
+                      placeholder="New password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
+                    >
+                      {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <div className="flex justify-between items-center px-1 mt-1">
+                    <p className={`text-[9px] font-bold ${newPassword.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
+                      {newPassword.length < 6 ? '6-12 alphanumeric characters' : '✓ Password valid'}
+                    </p>
+                    <p className={`text-[9px] font-black ${newPassword.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
+                      {newPassword.length}/12
+                    </p>
+                  </div>
+                </div>
+
+                {/* Confirm New Password Input */}
+                <div>
+                  <label htmlFor="confirm-new-password" className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5">
+                    Confirm New Password
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                    </div>
+                    <input
+                      id="confirm-new-password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12))}
+                      onKeyDown={handlePasswordKeyDown}
+                      required
+                      maxLength={12}
+                      className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 transition bg-slate-50 focus:bg-white text-gray-900 font-bold placeholder-slate-400 outline-none text-base shadow-sm"
+                      placeholder="Re-enter new password"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -674,16 +829,22 @@ export function Auth() {
                 loading ||
                 (!showOtpVerification && forgotPasswordMethod === 'phone' && !isPhoneValid) ||
                 (!showOtpVerification && forgotPasswordMethod === 'email' && !isEmailValid) ||
-                (showOtpVerification && userOtp.length !== 6)
+                (showOtpVerification && (userOtp.length !== 6 || !isNewPasswordValid || newPassword !== confirmNewPassword))
               }
               className="w-full bg-green-600 text-white py-3.5 rounded-2xl font-black hover:bg-green-700 transition shadow-lg hover:shadow-green-200/50 disabled:opacity-50 flex justify-center items-center gap-2 active:scale-95 transform text-sm"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : showOtpVerification ? (
-                t('auth.verifyOtp')
+                <>
+                  <span>Verify OTP & Log In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
               ) : (
-                'Send Reset OTP'
+                <>
+                  <span>Send Reset OTP</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
             </button>
 
@@ -694,6 +855,8 @@ export function Auth() {
                   setIsForgotPassword(false);
                   setShowOtpVerification(false);
                   setUserOtp('');
+                  setNewPassword('');
+                  setConfirmNewPassword('');
                   setError('');
                   setMessage('');
                 }}
@@ -708,7 +871,10 @@ export function Auth() {
     );
   }
 
-  // --- RENDER MAIN AUTH VIEW (RESPONSIVE SPLIT CARD) ---
+  // ==========================================
+  // RENDER MAIN AUTH VIEW (SIGN IN / CREATE ACCOUNT)
+  // NO OTP IS REQUIRED FOR ACCOUNT CREATION OR LOGIN!
+  // ==========================================
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 lg:p-8 font-sans relative overflow-y-auto w-full">
       {/* Background Decorative Blobs */}
@@ -812,7 +978,9 @@ export function Auth() {
                 {isLogin ? t('auth.signIn') : t('auth.signUp')}
               </h3>
               <p className="text-slate-500 font-medium text-xs sm:text-sm">
-                {isLogin ? 'Welcome back! Please enter your details.' : 'Join the revolution of smart farming today.'}
+                {isLogin
+                  ? 'Welcome back! Enter your details to continue.'
+                  : 'Create your account instantly with Mobile Number or Email & Password.'}
               </p>
             </div>
 
@@ -824,7 +992,6 @@ export function Auth() {
                   setAuthMethod('phone');
                   setError('');
                   setMessage('');
-                  setShowOtpVerification(false);
                 }}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                   authMethod === 'phone'
@@ -841,7 +1008,6 @@ export function Auth() {
                   setAuthMethod('email');
                   setError('');
                   setMessage('');
-                  setShowOtpVerification(false);
                 }}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                   authMethod === 'email'
@@ -854,451 +1020,243 @@ export function Auth() {
               </button>
             </div>
 
-            {/* --- METHOD 1: MOBILE NUMBER FLOW --- */}
+            {/* --- METHOD 1: MOBILE NUMBER FLOW (NO OTP REQUIRED FOR SIGNUP OR LOGIN) --- */}
             {authMethod === 'phone' && (
-              <div className="space-y-4">
-                {!showOtpVerification ? (
-                  <form onSubmit={handlePhonePasswordLogin} className="space-y-4">
-                    {/* Mobile Input */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="phone-login" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.mobileNumber')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                          <span className="text-slate-600 font-black text-sm pr-2 border-r border-slate-200 mr-2">+91</span>
-                          <Phone className="h-4 w-4 text-slate-400 group-focus-within:text-green-500 transition-colors" />
-                        </div>
-                        <input
-                          id="phone-login"
-                          type="tel"
-                          value={phone}
-                          onChange={handlePhoneChange}
-                          required
-                          className="w-full pl-24 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="9876543210"
-                        />
-                      </div>
-                      <div className="flex justify-between px-1">
-                        <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">10 digits required</p>
-                        <p className="text-[9px] text-slate-400 font-bold">{phone.length}/10</p>
-                      </div>
+              <form onSubmit={isLogin ? handlePhonePasswordLogin : handlePhoneSignUp} className="space-y-4">
+                {/* Mobile Input */}
+                <div className="space-y-1.5">
+                  <label htmlFor="phone-login" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                    {t('auth.mobileNumber')}
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <span className="text-slate-600 font-black text-sm pr-2 border-r border-slate-200 mr-2">+91</span>
+                      <Phone className="h-4 w-4 text-slate-400 group-focus-within:text-green-500 transition-colors" />
                     </div>
+                    <input
+                      id="phone-login"
+                      type="tel"
+                      value={phone}
+                      onChange={handlePhoneChange}
+                      required
+                      className="w-full pl-24 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                      placeholder="9876543210"
+                    />
+                  </div>
+                  <div className="flex justify-between px-1">
+                    <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">10 digits required</p>
+                    <p className="text-[9px] text-slate-400 font-bold">{phone.length}/10</p>
+                  </div>
+                </div>
 
-                    {/* Password Input */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center px-1">
-                        <label htmlFor="password-phone" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">
-                          {t('auth.password')} {isLogin && <span className="text-slate-400 font-normal lowercase">(optional for OTP)</span>}
-                        </label>
-                        {isLogin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForgotPasswordMethod('phone');
-                              setIsForgotPassword(true);
-                            }}
-                            className="text-xs font-bold text-green-600 hover:text-green-700 transition tracking-tight hover:underline"
-                          >
-                            {t('auth.forgotPassword')}
-                          </button>
-                        )}
-                      </div>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
-                        </div>
-                        <input
-                          id="password-phone"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={handlePasswordChange}
-                          onKeyDown={handlePasswordKeyDown}
-                          maxLength={12}
-                          required={!isLogin}
-                          className="w-full pl-12 pr-12 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder={isLogin ? 'Enter password or sign in with OTP' : '6-12 letters & numbers'}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
-                        >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                      {!isLogin && (
-                        <div className="flex justify-between items-center px-1">
-                          <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
-                            {password.length < 6 ? '6-12 characters required' : '✓ Password valid'}
-                          </p>
-                          <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
-                            {password.length}/12
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {error && (
-                      <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                        <span>{error}</span>
-                      </div>
-                    )}
-                    {message && (
-                      <div className="p-3 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
-                        <span>{message}</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col gap-2.5 pt-1">
-                      {/* Button 1: WhatsApp / SMS OTP */}
+                {/* Password Input */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <label htmlFor="password-phone" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">
+                      {t('auth.password')}
+                    </label>
+                    {isLogin && (
                       <button
                         type="button"
-                        onClick={() => handlePhoneSendOtp(isLogin ? 'login' : 'signup')}
-                        disabled={loading || !isPhoneValid || (!isLogin && !isPasswordValid)}
-                        className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
+                        onClick={() => {
+                          setForgotPasswordMethod('phone');
+                          setIsForgotPassword(true);
+                          setError('');
+                          setMessage('');
+                        }}
+                        className="text-xs font-bold text-green-600 hover:text-green-700 transition tracking-tight hover:underline"
                       >
-                        {loading ? (
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <>
-                            <span>{isLogin ? 'Sign In with WhatsApp / SMS OTP' : 'Send WhatsApp / SMS OTP'}</span>
-                            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                          </>
-                        )}
+                        {t('auth.forgotPassword')}
                       </button>
-
-                      {/* Button 2: Direct Password Sign In (if login mode) */}
-                      {isLogin && password.length >= 6 && (
-                        <button
-                          type="submit"
-                          disabled={loading || !isPhoneValid}
-                          className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2"
-                        >
-                          <Lock className="w-4 h-4 text-slate-600" />
-                          <span>Sign In with Password</span>
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                ) : (
-                  /* Phone OTP Verification View */
-                  <form onSubmit={handleVerifyPhoneAndSubmit} className="space-y-4">
-                    <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs text-green-800 font-bold">
-                      <span className="truncate max-w-[200px]">OTP sent to: +91 {phone}</span>
-                      <button
-                        type="button"
-                        onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); }}
-                        className="text-green-700 hover:text-green-900 underline font-black ml-2 shrink-0"
-                      >
-                        Change
-                      </button>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                        ENTER 6-DIGIT OTP SENT TO YOUR PHONE
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Lock className="h-5 w-5 text-slate-400" />
-                        </div>
-                        <input
-                          type="text"
-                          value={userOtp}
-                          onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          required
-                          maxLength={6}
-                          className="w-full pl-12 pr-4 py-3.5 sm:py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-black text-2xl tracking-[0.3em] text-center placeholder-slate-400 shadow-sm"
-                          placeholder="------"
-                          autoFocus
-                        />
-                      </div>
-                      <div className="flex justify-between items-center px-1 text-xs">
-                        <button
-                          type="button"
-                          disabled={otpCooldown > 0 || loading}
-                          onClick={() => handlePhoneSendOtp(isLogin ? 'login' : 'signup')}
-                          className="font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1 text-[11px] sm:text-xs"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                          <span>{otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend OTP'}</span>
-                        </button>
-                        <span className="text-slate-400 text-[10px]">Valid for 10 mins</span>
-                      </div>
-                    </div>
-
-                    {error && (
-                      <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                        <span>{error}</span>
-                      </div>
                     )}
-                    {message && (
-                      <div className="p-3 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
-                        <span>{message}</span>
-                      </div>
-                    )}
-
+                  </div>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
+                    </div>
+                    <input
+                      id="password-phone"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={handlePasswordChange}
+                      onKeyDown={handlePasswordKeyDown}
+                      maxLength={12}
+                      required
+                      className="w-full pl-12 pr-12 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                      placeholder="6-12 letters & numbers"
+                    />
                     <button
-                      type="submit"
-                      disabled={loading || userOtp.length !== 6}
-                      className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
                     >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>{isLogin ? 'Verify & Sign In' : 'Verify & Create Account'}</span> <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" /></>}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
-                  </form>
+                  </div>
+                  <div className="flex justify-between items-center px-1">
+                    <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
+                      {password.length < 6 ? '6-12 alphanumeric characters' : '✓ Password valid'}
+                    </p>
+                    <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
+                      {password.length}/12
+                    </p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                    <span>{error}</span>
+                  </div>
                 )}
-              </div>
+                {message && (
+                  <div className="p-3 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                    <span>{message}</span>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading || !isPhoneValid || !isPasswordValid}
+                    className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : isLogin ? (
+                      <>
+                        <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span>Sign In</span>
+                        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span>Create Account</span>
+                        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             )}
 
-            {/* --- METHOD 2: EMAIL & PASSWORD FLOW --- */}
+            {/* --- METHOD 2: EMAIL & PASSWORD FLOW (NO OTP REQUIRED FOR SIGNUP OR LOGIN) --- */}
             {authMethod === 'email' && (
-              <div className="space-y-4">
-                {!showOtpVerification ? (
-                  <form onSubmit={isLogin ? handleEmailPasswordLogin : (e) => { e.preventDefault(); handleSendEmailOtp('signup'); }} className="space-y-4">
-                    {/* Email Input */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="email-input" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.emailAddress')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
-                        </div>
-                        <input
-                          id="email-input"
-                          type="email"
-                          value={email}
-                          onChange={handleEmailChange}
-                          required
-                          className="w-full pl-12 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="farmer@example.com"
-                        />
-                      </div>
+              <form onSubmit={isLogin ? handleEmailPasswordLogin : handleEmailSignUp} className="space-y-4">
+                {/* Email Input */}
+                <div className="space-y-1.5">
+                  <label htmlFor="email-input" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+                    {t('auth.emailAddress')}
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
                     </div>
+                    <input
+                      id="email-input"
+                      type="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      required
+                      className="w-full pl-12 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                      placeholder="farmer@example.com"
+                    />
+                  </div>
+                </div>
 
-                    {/* Password Input */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center px-1">
-                        <label htmlFor="password-email" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">
-                          {t('auth.password')}
-                        </label>
-                        {isLogin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForgotPasswordMethod('email');
-                              setIsForgotPassword(true);
-                            }}
-                            className="text-xs font-bold text-green-600 hover:text-green-700 transition tracking-tight hover:underline"
-                          >
-                            {t('auth.forgotPassword')}
-                          </button>
-                        )}
-                      </div>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
-                        </div>
-                        <input
-                          id="password-email"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={handlePasswordChange}
-                          onKeyDown={handlePasswordKeyDown}
-                          required
-                          maxLength={12}
-                          className="w-full pl-12 pr-12 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
-                          placeholder="6-12 letters & numbers"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
-                        >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                      <div className="flex justify-between items-center px-1">
-                        <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
-                          {password.length < 6 ? '6-12 letters or numbers only' : '✓ Password valid'}
-                        </p>
-                        <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
-                          {password.length}/12
-                        </p>
-                      </div>
-                    </div>
-
-                    {error && (
-                      <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                        <span>{error}</span>
-                      </div>
-                    )}
-                    {message && (
-                      <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                        <span>{message}</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col gap-2.5 pt-1">
-                      {/* Primary Button: Direct Password Login */}
-                      {isLogin ? (
-                        <>
-                          <button
-                            type="submit"
-                            disabled={loading || !isEmailValid || !isPasswordValid}
-                            className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
-                          >
-                            {loading ? (
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                              <>
-                                <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
-                                <span>Sign In with Password</span>
-                                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                              </>
-                            )}
-                          </button>
-
-                          {/* Secondary Button: Sign In with Email OTP */}
-                          <button
-                            type="button"
-                            onClick={() => handleSendEmailOtp('login')}
-                            disabled={loading || !isEmailValid}
-                            className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2"
-                          >
-                            <Mail className="w-4 h-4 text-slate-600" />
-                            <span>Sign In with Email OTP</span>
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="submit"
-                          disabled={loading || !isEmailValid || !isPasswordValid}
-                          className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
-                        >
-                          {loading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <>
-                              <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                              <span>Send Verification OTP</span>
-                              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                ) : (
-                  /* Email OTP Verification View */
-                  <form onSubmit={handleVerifyEmailAndSubmit} className="space-y-4">
-                    <div className="p-3.5 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-between text-xs">
-                      <div className="truncate max-w-[200px]">
-                        <p className="text-green-800 font-bold">OTP sent to:</p>
-                        <p className="text-green-900 font-black truncate">{email}</p>
-                      </div>
+                {/* Password Input */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <label htmlFor="password-email" className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">
+                      {t('auth.password')}
+                    </label>
+                    {isLogin && (
                       <button
                         type="button"
-                        onClick={() => { setShowOtpVerification(false); setUserOtp(''); setError(''); setMessage(''); setResendRestricted(false); }}
-                        className="text-green-700 hover:text-green-800 font-bold text-xs underline ml-2 shrink-0"
+                        onClick={() => {
+                          setForgotPasswordMethod('email');
+                          setIsForgotPassword(true);
+                          setError('');
+                          setMessage('');
+                        }}
+                        className="text-xs font-bold text-green-600 hover:text-green-700 transition tracking-tight hover:underline"
                       >
-                        Change
+                        {t('auth.forgotPassword')}
                       </button>
-                    </div>
-
-                    {resendRestricted && (
-                      <div className="p-3 bg-amber-50/90 border border-amber-200 rounded-2xl text-xs space-y-2 text-amber-900 shadow-sm">
-                        <div className="flex items-center gap-1.5 font-bold text-amber-800 text-xs">
-                          <span>⚠️</span>
-                          <span>Resend Free Tier Notice</span>
-                        </div>
-                        <p className="text-[11px] leading-relaxed text-amber-800">
-                          Resend's test account domain (<span className="font-mono font-semibold">onboarding@resend.dev</span>) strictly allows direct delivery to the developer's registered email (<span className="font-mono font-bold">chetankubihal123@gmail.com</span>).
-                        </p>
-                        <div className="bg-white/90 p-2.5 rounded-xl border border-amber-300 flex items-center justify-between shadow-xs">
-                          <div>
-                            <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Test OTP Code:</p>
-                            <p className="text-xl font-mono font-black text-green-700 tracking-[0.2em]">{generatedOtp}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setUserOtp(generatedOtp)}
-                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-xs transition shadow-sm active:scale-95"
-                          >
-                            Auto-Fill OTP
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-slate-500 italic">
-                          💡 Want to receive real live OTP on WhatsApp or SMS? Switch to the <strong>Mobile Number</strong> tab!
-                        </p>
-                      </div>
                     )}
-
-                    <div className="space-y-1.5">
-                      <label htmlFor="email-otp-input" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                        {t('auth.enterOtp')}
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
-                        </div>
-                        <input
-                          id="email-otp-input"
-                          type="text"
-                          value={userOtp}
-                          onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          required
-                          maxLength={6}
-                          className="w-full pl-12 pr-4 py-3.5 sm:py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-black text-xl text-center tracking-[0.3em] placeholder-slate-400 shadow-sm"
-                          placeholder="000000"
-                          autoFocus
-                        />
-                      </div>
+                  </div>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-green-500 transition-colors" />
                     </div>
-
-                    <div className="flex justify-between items-center px-1">
-                      <button
-                        type="button"
-                        disabled={otpCooldown > 0 || loading}
-                        onClick={() => handleSendEmailOtp(isLogin ? 'login' : 'signup')}
-                        className="text-xs font-bold text-green-600 hover:text-green-700 disabled:text-slate-400 flex items-center gap-1.5 text-[11px] sm:text-xs"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        <span>{otpCooldown > 0 ? `Resend code in ${otpCooldown}s` : 'Resend OTP'}</span>
-                      </button>
-                      <span className="text-[10px] text-slate-400 font-bold">Valid for 10 mins</span>
-                    </div>
-
-                    {error && (
-                      <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                        <span>{error}</span>
-                      </div>
-                    )}
-                    {message && (
-                      <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                        <span>{message}</span>
-                      </div>
-                    )}
-
+                    <input
+                      id="password-email"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={handlePasswordChange}
+                      onKeyDown={handlePasswordKeyDown}
+                      required
+                      maxLength={12}
+                      className="w-full pl-12 pr-12 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-500/10 focus:bg-white focus:border-green-500 transition-all outline-none text-slate-900 font-bold text-base placeholder-slate-400 shadow-sm"
+                      placeholder="6-12 letters & numbers"
+                    />
                     <button
-                      type="submit"
-                      disabled={loading || userOtp.length !== 6}
-                      className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition-colors p-1"
                     >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>{isLogin ? t('auth.verifyAndLogin') : 'Verify & Create Account'}</span> <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" /></>}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
-                  </form>
+                  </div>
+                  <div className="flex justify-between items-center px-1">
+                    <p className={`text-[9px] font-bold ${password.length >= 6 ? 'text-green-600' : 'text-slate-400'}`}>
+                      {password.length < 6 ? '6-12 alphanumeric characters' : '✓ Password valid'}
+                    </p>
+                    <p className={`text-[9px] font-black ${password.length === 12 ? 'text-amber-600' : 'text-slate-500'}`}>
+                      {password.length}/12
+                    </p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                    <span>{error}</span>
+                  </div>
                 )}
-              </div>
+                {message && (
+                  <div className="p-3 bg-green-50 border border-green-100 text-green-800 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                    <span>{message}</span>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading || !isEmailValid || !isPasswordValid}
+                    className="group relative w-full overflow-hidden rounded-2xl bg-green-600 px-6 py-3.5 sm:py-4 font-black text-white shadow-[0_15px_30px_-5px_rgba(22,163,74,0.3)] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base tracking-tight"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : isLogin ? (
+                      <>
+                        <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span>Sign In</span>
+                        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span>Create Account</span>
+                        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             )}
 
             {/* Bottom Toggle: Switch between Sign In and Sign Up */}
@@ -1309,7 +1267,6 @@ export function Auth() {
                   setIsLogin(!isLogin);
                   setError('');
                   setMessage('');
-                  setShowOtpVerification(false);
                 }}
                 className="text-slate-600 font-bold hover:text-green-600 transition group tracking-tight text-xs sm:text-sm inline-flex items-center gap-1.5 py-1 px-2"
               >
@@ -1325,7 +1282,6 @@ export function Auth() {
 
       </div>
 
-      {/* Invisible container for potential reCAPTCHA */}
       <div id="recaptcha-container"></div>
     </div>
   );

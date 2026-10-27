@@ -85,7 +85,8 @@ async def send_email_otp(req_data: EmailOtpRequest):
     """
     
     payload = {
-        "from": "AgriSmart <onboarding@resend.dev>",
+        "from": "AgriSmart Admin <onboarding@resend.dev>",
+        "reply_to": "chetankubihal123@gmail.com",
         "to": [req_data.email],
         "subject": subject,
         "html": html_content

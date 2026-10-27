@@ -33,18 +33,19 @@ export function ResetPassword() {
             // Check for session
             const { data: { session } } = await supabase.auth.getSession();
 
-            if (!session) {
-                // Since we used a custom WhatsApp OTP, we don't have a Supabase session.
-                // For project demonstration, we will simulate success.
-                console.warn('No active session found. Simulating password update for custom OTP flow.');
+            const userPhone = localStorage.getItem('agrismart_user_phone');
+            if (userPhone) {
+                localStorage.setItem(`agrismart_pwd_${userPhone}`, btoa(password));
+            }
 
-                // Add a small delay to make it feel real
-                await new Promise(resolve => setTimeout(resolve, 1500));
+            if (!session) {
+                console.warn('No active session found. Updating password in local storage.');
+                await new Promise(resolve => setTimeout(resolve, 800));
 
                 setSuccess(true);
                 setTimeout(() => {
-                    navigate('/auth');
-                }, 3000);
+                    navigate('/dashboard');
+                }, 1500);
                 return;
             }
 
@@ -56,8 +57,8 @@ export function ResetPassword() {
 
             setSuccess(true);
             setTimeout(() => {
-                navigate('/auth');
-            }, 3000);
+                navigate('/dashboard');
+            }, 1500);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
