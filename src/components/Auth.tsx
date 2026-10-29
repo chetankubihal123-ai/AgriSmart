@@ -42,7 +42,7 @@ export function Auth() {
   
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Cooldown timer for resending OTP
   useEffect(() => {
@@ -812,32 +812,46 @@ export function Auth() {
                   </button>
                 </div>
 
-                {/* Resend Notice / Auto-Fill helper if restricted */}
-                {resendRestricted && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-2 text-amber-900">
-                    <p className="text-[11px] leading-relaxed">
-                      Verification code dispatched by Admin (<strong>{ADMIN_EMAIL}</strong>).
-                    </p>
-                    <div className="bg-white/90 p-2.5 rounded-xl border border-amber-300 flex items-center justify-between">
+                {/* OTP Verification & Auto-Fill Card */}
+                {generatedOtp && (
+                  <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-green-50 to-emerald-50 border-2 border-emerald-300 rounded-2xl shadow-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <KeyRound className="w-4 h-4 text-emerald-600" />
+                        {forgotPasswordMethod === 'phone' ? 'Phone Verification Code' : 'Email Verification Code'}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+                        ⏱️ Valid 10 mins
+                      </span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-emerald-200 flex items-center justify-between shadow-xs">
                       <div>
-                        <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Reset Code:</p>
-                        <p className="text-xl font-mono font-black text-green-700 tracking-[0.2em]">{generatedOtp}</p>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Your 6-Digit OTP:</p>
+                        <p className="text-2xl font-mono font-black text-emerald-600 tracking-[0.25em]">{generatedOtp}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setUserOtp(generatedOtp)}
-                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-xs transition shadow-sm active:scale-95"
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-black text-xs transition shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
                       >
-                        Auto-Fill
+                        <CheckCircle2 className="w-4 h-4" />
+                        Auto-Fill OTP
                       </button>
                     </div>
+                    <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
+                      {forgotPasswordMethod === 'phone' 
+                        ? '✓ Tap Auto-Fill OTP above or type the 6 digits to proceed instantly.' 
+                        : `✓ Verification code dispatched by Admin (${ADMIN_EMAIL}). Tap Auto-Fill to proceed.`}
+                    </p>
                   </div>
                 )}
 
                 {/* OTP Input */}
                 <div>
                   <label htmlFor="reset-otp" className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5">
-                    {t('auth.enterOtp')}
+                    {forgotPasswordMethod === 'phone'
+                      ? (language === 'kn' ? 'ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಗೆ ಕಳುಹಿಸಲಾದ 6-ಅಂಕಿಯ OTP ನಮೂದಿಸಿ' : 'Enter the 6-digit OTP sent to your mobile')
+                      : t('auth.enterOtp')}
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
